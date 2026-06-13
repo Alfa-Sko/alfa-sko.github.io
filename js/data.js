@@ -101,7 +101,6 @@
   {id:"100",name:"INTERSPORT HONNINGSVÅG AS",city:"Honningsvåg",chain:"Intersport · Franchise",l12:0,budget:2449,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
   {id:"101",name:"SPORT 1 KIRKENES",city:"Kirkenes",chain:"Sport 1",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
   {id:"102",name:"JOH. LØVOLD HANDEL AS",city:"Bodø",chain:"Frittstående sport",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
-  {id:"103",name:"JOH. LØVOLD HANDEL AS",city:"Bodø",chain:"Frittstående sport",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
   {id:"104",name:"Sportshuset Svolvær AS",city:"Svolvær",chain:"Sport 1",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
   {id:"105",name:"INTERSPORT LEKNES LOFOTEN AS",city:"Leknes",chain:"Intersport · Franchise",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
   {id:"106",name:"SPORT 1 LEKNES LOFOTSENT. AS",city:"Leknes",chain:"Sport 1",l12:0,budget:0,concept:"",class:"",priority:"Ny relasjon",contacts:[],note:""},
