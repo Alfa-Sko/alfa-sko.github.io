@@ -237,7 +237,7 @@ function rpRegionOfCustomer(c){
 
 function rpAllRegionsPresent(){
   const set = {};
-  (CUSTOMERS||[]).forEach(c=>{ const r=rpRegionOfCustomer(c); set[r]=(set[r]||0)+1; });
+  getCustomers().forEach(c=>{ const r=rpRegionOfCustomer(c); set[r]=(set[r]||0)+1; });
   return set;
 }
 
@@ -264,7 +264,7 @@ function rpInitRegionSelect(){
 // Bygg bolker: valgt region øverst, så naboregioner i egne bolker.
 function rpBuildBlocks(selectedRegion){
   const byRegion = {};
-  (CUSTOMERS||[]).forEach(c=>{
+  getCustomers().forEach(c=>{
     const r = rpRegionOfCustomer(c);
     (byRegion[r]=byRegion[r]||[]).push(c);
   });
@@ -329,7 +329,7 @@ function rpClearSelection(){
 
 function rpUpdateSelectionBar(){
   const ids = Object.keys(_rpSelected);
-  const sel = (CUSTOMERS||[]).filter(c=>_rpSelected[c.id]);
+  const sel = getCustomers().filter(c=>_rpSelected[c.id]);
   const sumL12 = sel.reduce((s,c)=>s+(c.l12||0),0);
   const cEl=document.getElementById('rp-selected-count'); if(cEl) cEl.textContent=ids.length;
   const lEl=document.getElementById('rp-selected-l12'); if(lEl) lEl.textContent=fmtKr(sumL12);
@@ -377,7 +377,7 @@ function rpSplitIntoDays(route, opts){
 
 
 function rpBuildRoute(){
-  const allSel = (CUSTOMERS||[]).filter(c=>_rpSelected[c.id]);
+  const allSel = getCustomers().filter(c=>_rpSelected[c.id]);
   const host = document.getElementById('rp-route-result');
   if(!host) return;
   if(allSel.length===0){ host.innerHTML='<div class="empty-state">Hak av minst én kunde for å lage en plan.</div>'; return; }
@@ -669,7 +669,7 @@ function runPlanner(){
     const uniqueCities=[];
     _customRoute.forEach(r=>{ if(!uniqueCities.includes(r.city)) uniqueCities.push(r.city); });
     uniqueCities.forEach(city=>{
-      const cityCust=CUSTOMERS.filter(c=>c.l12>0&&!seen.has(c.name)&&matchesArea(c,city));
+      const cityCust=getCustomers().filter(c=>c.l12>0&&!seen.has(c.name)&&matchesArea(c,city));
       cityCust.sort((a,b)=>b.l12-a.l12);
       cityCust.forEach(c=>{
         seen.add(c.name);
@@ -678,15 +678,15 @@ function runPlanner(){
       });
     });
   } else {
-    pool=CUSTOMERS.filter(c=>c.l12>0&&matchesArea(c,area));
+    pool=getCustomers().filter(c=>c.l12>0&&matchesArea(c,area));
     pool.forEach(c=>customerZone.set(c.name, area));
     if(_plannerDays>1 && area!=='Alle'){
       // Hent naboområder i geografisk rekkefølge fra korridoren
-      const neighbors=getCorridorNeighbors(area, CUSTOMERS);
+      const neighbors=getCorridorNeighbors(area, getCustomers());
       const seen=new Set(pool.map(c=>c.name));
       // For hver nabo-by i korridoren (i geografisk rekkefølge), hent kunder fra den byen
       neighbors.forEach(nb=>{
-        const nbCust=CUSTOMERS.filter(c=>c.l12>0&&!seen.has(c.name)&&matchesArea(c,nb));
+        const nbCust=getCustomers().filter(c=>c.l12>0&&!seen.has(c.name)&&matchesArea(c,nb));
         nbCust.sort((a,b)=>b.l12-a.l12);
         nbCust.forEach(c=>{
           seen.add(c.name);
@@ -697,7 +697,7 @@ function runPlanner(){
       // Som fallback: legg til evt. gjenværende kunder fra samme fylke
       const startRegion=CITY_TO_REGION[area];
       if(startRegion){
-        const moreInRegion=CUSTOMERS.filter(c=>c.l12>0&&!seen.has(c.name)&&(c.city||'').toLowerCase()===startRegion.toLowerCase());
+        const moreInRegion=getCustomers().filter(c=>c.l12>0&&!seen.has(c.name)&&(c.city||'').toLowerCase()===startRegion.toLowerCase());
         moreInRegion.sort((a,b)=>b.l12-a.l12);
         moreInRegion.forEach(c=>{
           seen.add(c.name);
@@ -709,7 +709,7 @@ function runPlanner(){
   }
   if(pool.length===0 && !customRouteActive && area!=='Alle' && CITY_TO_REGION[area]){
     const region=CITY_TO_REGION[area];
-    pool=CUSTOMERS.filter(c=>c.l12>0&&(c.city||'').toLowerCase()===region.toLowerCase());
+    pool=getCustomers().filter(c=>c.l12>0&&(c.city||'').toLowerCase()===region.toLowerCase());
     pool.forEach(c=>customerZone.set(c.name, area));
   }
   if(pool.length===0){
@@ -717,7 +717,7 @@ function runPlanner(){
     return;
   }
   // Sortér: respekter egendefinert rekkefølge, ellers korridor-rekkefølge
-  const zoneOrder = customRouteActive ? (()=>{const u=[];_customRoute.forEach(r=>{if(!u.includes(r.city))u.push(r.city);});return u;})() : [area, ...getCorridorNeighbors(area, CUSTOMERS)];
+  const zoneOrder = customRouteActive ? (()=>{const u=[];_customRoute.forEach(r=>{if(!u.includes(r.city))u.push(r.city);});return u;})() : [area, ...getCorridorNeighbors(area, getCustomers())];
   pool.sort((a,b)=>{
     const za=zoneOrder.indexOf(customerZone.get(a.name));
     const zb=zoneOrder.indexOf(customerZone.get(b.name));
@@ -1075,7 +1075,7 @@ function runPlanner(){
   // Telefonpool: ringbare kandidater som ikke er på planen, sortert etter L12
   const planNames=new Set();
   days.forEach(day=>day.customers.forEach(c=>planNames.add(c.name)));
-  const callPool=CUSTOMERS.filter(c=>!planNames.has(c.name)&&(c.phone||(c.contacts||[]).some(p=>p.phone)));
+  const callPool=getCustomers().filter(c=>!planNames.has(c.name)&&(c.phone||(c.contacts||[]).some(p=>p.phone)));
   callPool.sort((a,b)=>(b.l12||0)-(a.l12||0));
   let html='<div class="planner-result">';
   // Pool-fordeling per sone (debug-informasjon for å vise hvor kundene kommer fra)
@@ -1215,7 +1215,7 @@ function runPlanner(){
         html+='<div class="planner-stop" style="background:#F1EFE8;border-radius:8px;padding:6px 10px;margin:4px 0;opacity:0.92"><div class="planner-stop-time" style="color:#5F5E5A">'+hh+':'+mm+'</div><div class="planner-stop-icon">💻</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A">Adm. / forberedelse <span style="font-size:10px;background:#D3D1C7;color:#5F5E5A;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">'+durStr.trim()+'</span></div><div class="planner-stop-meta" style="color:#888780">'+hh+':'+mm+' – '+ehh+':'+emm+' · e-post, ordre, rapportering, samtaler</div></div></div>';
       } else if(item.kind==='fixed'){
         html+='<div class="planner-stop" style="background:#E6F1FB;border-radius:8px;padding:6px 10px;margin:4px 0"><div class="planner-stop-time" style="color:#0C447C">'+hh+':'+mm+'</div><div class="planner-stop-icon">🔒</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#0A4A7A">'+item.appt.label+' <span style="font-size:10px;background:#1976D2;color:#fff;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Fast avtale</span></div><div class="planner-stop-meta" style="color:#0C447C">'+hh+':'+mm+' – '+ehh+':'+emm+'</div></div></div>';
-        const fc=CUSTOMERS.find(c=>c.name===item.appt.label);
+        const fc=getCustomers().find(c=>c.name===item.appt.label);
         if(fc) prevCity=fc.city||prevCity;
       } else {
         const c=item.customer;
@@ -1708,7 +1708,7 @@ function plannerAddStopPrompt(dayIdx){
   // Bygg en liste over kunder som ikke allerede er i planen
   const inPlan = new Set();
   days.forEach(d=>d.customers.forEach(c=>inPlan.add(c.name)));
-  const available = CUSTOMERS.filter(c=>!inPlan.has(c.name)).sort((a,b)=>(b.l12||0)-(a.l12||0));
+  const available = getCustomers().filter(c=>!inPlan.has(c.name)).sort((a,b)=>(b.l12||0)-(a.l12||0));
   if(available.length===0){ showToast('Alle kunder er allerede i planen'); return; }
   // Vis søkbar modal
   showAddStopModal(dayIdx, available);
@@ -1748,7 +1748,7 @@ function filterAddStop(){
 function plannerConfirmAddStop(dayIdx, name){
   const days = window._lastPlan;
   if(!days || !days[dayIdx]) return;
-  const cust = CUSTOMERS.find(c=>c.name===name);
+  const cust = getCustomers().find(c=>c.name===name);
   if(!cust) return;
   days[dayIdx].customers.push(Object.assign({}, cust));
   recomputeDayTimes(days[dayIdx]);
