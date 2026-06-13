@@ -87,6 +87,6 @@ function syncProfileToPlanner(){
   if(endEl && userProfile.workEnd) endEl.value = userProfile.workEnd;
   // Oppdater kundetelling
   const cnt = document.getElementById('current-customer-count');
-  if(cnt) cnt.textContent = (CUSTOMERS||[]).length + ' kunder';
+  if(cnt) cnt.textContent = getCustomers().length + ' kunder';
 }
 
