@@ -39,3 +39,7 @@ Alt ligger nå i én index.html (~7766 linjer). Mål:
   17. js/workbooks.js   — workbooks (IndexedDB) + felles kataloger (Supabase Storage)
   18. js/orders.js      — ordrestatus-widget
   19. js/init.js        — oppstartssekvens (kun startup-kall, ingen state-deklarasjoner)
+
+## Backlog (etter refaktorering)
+
+- Tidslinje viser ikke bildevedlegg. Kode (renderNotesWithPhotos → getPhotosForVisit) er identisk med original-main, så feilen er pre-eksisterende. Uavklart om det er reell feil eller bare manglende lagrede bilder. Undersøk når refaktorering er ferdig: verifiser at initPhotoDB faktisk åpner basen (sjekk schema-versjon / IndexedDB i DevTools → Application), og at et besøk med faktisk lagret bilde rendres i tidslinjen.
