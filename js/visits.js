@@ -3,7 +3,7 @@
 
 function populateVisitCustomers(){
   const sel=document.getElementById('visit-customer');
-  sel.innerHTML='<option value="">Velg kunde...</option>'+'<option value="__new__">+ Ny kunde (skriv inn nå)</option>'+'<optgroup label="─────────────────"></optgroup>'+CUSTOMERS.map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
+  sel.innerHTML='<option value="">Velg kunde...</option>'+'<option value="__new__">+ Ny kunde (skriv inn nå)</option>'+'<optgroup label="─────────────────"></optgroup>'+getCustomers().map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
   sel.onchange=function(){if(this.value==='__new__'){openQuickCustomerModal();this.value='';}};
   document.getElementById('visit-date').value=TODAY_STR;
   fillHalfHourSlots(document.getElementById('visit-time'), '09:00');
@@ -24,7 +24,7 @@ function populateVisitCustomers(){
 }
 function populateFollowCustomers(){
   const sel=document.getElementById('follow-customer');
-  sel.innerHTML='<option value="">Velg kunde...</option>'+CUSTOMERS.map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
+  sel.innerHTML='<option value="">Velg kunde...</option>'+getCustomers().map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
 }
 
 function clearVisitForm(){
