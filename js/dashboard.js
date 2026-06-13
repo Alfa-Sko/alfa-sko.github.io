@@ -170,7 +170,7 @@ async function managerViewUser(uid, name){
     if(rows.length===0){ showToast(name+' har ingen synkede data ennå'); return; }
     // Ta vare på egne data første gang
     if(!window._mgrBackup){
-      window._mgrBackup = {customers:CUSTOMERS, calEvents:calEvents, visits:visits, followups:followups, profile:userProfile};
+      window._mgrBackup = {customers:getCustomers(), calEvents:calEvents, visits:visits, followups:followups, profile:userProfile};
     }
     const byKey = {};
     rows.forEach(row=>{ byKey[row.key] = row.value; });
@@ -230,17 +230,17 @@ function toggleDemoMode(){
 function _demoOn(){
   // 1) Ta vare på originalene
   window._demoBackup = {
-    customers: CUSTOMERS,
+    customers: getCustomers(),
     calEvents: calEvents,
     visits: visits,
     followups: followups,
     profile: userProfile,
-    sales: Object.assign({}, CUSTOMER_SALES),
+    sales: Object.assign({}, getCustomerSales()),
     homeBase: _plannerHomeBase,
   };
   // 2) Bygg navnemapping og anonymisert kundeliste
   const nameMap = {};
-  const anonCustomers = CUSTOMERS.map((c,i)=>{
+  const anonCustomers = getCustomers().map((c,i)=>{
     const newName = _demoName(i, c);
     nameMap[c.name] = newName;
     const f = _demoFactor(i);
@@ -365,9 +365,9 @@ function renderDistrictDashboard(){
 
   // 1. Budsjettoppnåelse
   let totalBudget=0, totalY2026=0, totalY2025=0;
-  CUSTOMERS.forEach(c=>{
+  getCustomers().forEach(c=>{
     totalBudget += (c.budget||0);
-    const sales = (typeof CUSTOMER_SALES !== 'undefined') ? CUSTOMER_SALES[c.name] : null;
+    const sales = getCustomerSales()[c.name];
     if(sales){
       sales.forEach(a=>{
         totalY2026 += a.y2026||0;
@@ -388,7 +388,7 @@ function renderDistrictDashboard(){
     if(vs.length===0) return null;
     return vs.map(v=>v.date).sort().pop();
   }
-  const aCustomers = CUSTOMERS.filter(c=>c.class==='A');
+  const aCustomers = getCustomers().filter(c=>c.class==='A');
   const aOverdue = aCustomers.filter(c=>{
     const last = lastVisitDate(c.name);
     return !last || last < cutoffKey;
@@ -396,9 +396,9 @@ function renderDistrictDashboard(){
 
   // 3. Kunder med fallende omsetning (2026 ratejustert < 70% av 2025)
   // Sammenlign 2026 YTD vs 2025 YTD (samme periode)
-  const fallingCustomers = CUSTOMERS.filter(c=>{
+  const fallingCustomers = getCustomers().filter(c=>{
     if(c.l12===0) return false;
-    const sales = (typeof CUSTOMER_SALES !== 'undefined') ? CUSTOMER_SALES[c.name] : null;
+    const sales = getCustomerSales()[c.name];
     if(!sales || sales.length===0) return false;
     let s25=0, s26=0;
     sales.forEach(a=>{ s25+=a.y2025||0; s26+=a.y2026||0; });
@@ -410,7 +410,7 @@ function renderDistrictDashboard(){
   fallingCustomers.sort((a,b)=>(b.l12||0)-(a.l12||0));
 
   // 4. Nye relasjoner uten besøk
-  const newWithoutVisit = CUSTOMERS.filter(c=>c.priority==='Ny relasjon' && !lastVisitDate(c.name));
+  const newWithoutVisit = getCustomers().filter(c=>c.priority==='Ny relasjon' && !lastVisitDate(c.name));
 
   // 5. Forfalte oppfølginger
   const overdueFollowups = (followups||[]).filter(f=>!f.done && f.due < TODAY_STR);
@@ -542,7 +542,7 @@ function renderOverview(){
     tv.innerHTML='<div class="empty-state">Ingen besøk registrert for i dag</div>';
   } else {
     tv.innerHTML = todayVisits.map(v=>{
-      const c = CUSTOMERS.find(c=>c.name===v.customer)||{class:''};
+      const c = getCustomers().find(c=>c.name===v.customer)||{class:''};
       const bCls = c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
       const bLbl = c.class==='A'?'A-kunde':c.class==='B'?'B-kunde':c.class==='C'?'C-kunde':'Ny';
       const safeName = v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
