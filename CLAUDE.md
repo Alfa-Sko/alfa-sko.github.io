@@ -19,4 +19,4 @@ Intern CRM-webapp for Alfa Sko. I produksjon, brukes av 5–6 personer (selgere,
 ## Pågående arbeid: refaktorering
 Alt ligger nå i én index.html (~7766 linjer). Mål:
 - CSS → css/app.css
-- JS → js/data.js, js/utils.js, js/supabase.js, js/ui.js, js/calendar.js, js/customers.js, js/dashboard.js, js/planner.js, js/init.js
+- JS → js/data.js, js/utils.js, js/supabase.js, js/ui.js, js/calendar.js, js/customers.js, js/dashboard.js, js/planner-data.js, js/planner.js, js/init.js
