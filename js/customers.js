@@ -234,7 +234,7 @@ function filterCustomers(){
     let displayName=c.name;
     if(q){const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi');displayName=c.name.replace(re,'<mark style="background:#FFF3CD;border-radius:2px;padding:0 1px">$1</mark>');}
     return `<tr onclick="openCustomer('${safeName}')">
-      <td><div class="ct-name">${displayName}</div>${c.address?`<div class="ct-sub">${c.address}</div>`:''}</td>
+      <td><div class="ct-name">${displayName}</div>${(c.gate||c.address)?`<div class="ct-sub">${c.gate?`${c.gate}, ${c.postnr} ${c.poststed}`:c.address}</div>`:''}</td>
       <td><div style="font-size:12px">${c.city||'–'}</div></td>
       <td><div style="font-size:12px">${contactName||'–'}</div></td>
       <td>${phone?`<a href="tel:${phone}" class="ct-phone" onclick="event.stopPropagation()">${phone}</a>`:'<span style="color:#B4B2A9">–</span>'}</td>
@@ -319,7 +319,7 @@ function openCustomer(name){
         <div style="flex:1">
           <div style="font-size:20px;font-weight:700;color:#2C2C2A">${c.name}</div>
           <div style="font-size:13px;color:#888780;margin-top:3px">${c.city||''}${c.chain?' · '+c.chain:''}</div>
-          ${c.address?`<div style="font-size:12px;color:#888780;margin-top:2px">📍 ${c.address}</div>`:''}
+          ${(c.gate||c.address)?`<div style="font-size:12px;color:#888780;margin-top:2px">📍 ${c.gate?`${c.gate}, ${c.postnr} ${c.poststed}`:c.address}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
           <span class="badge ${bCls}">${bLbl}</span>
