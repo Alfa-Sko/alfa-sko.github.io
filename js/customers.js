@@ -19,6 +19,11 @@
 }
 let CUSTOMERS = loadCustomers();
 
+// Getter-lag: appen henter alltid kunder herfra.
+// Bytt implementasjon her når kilden flyttes til Supabase.
+function getCustomers()     { return CUSTOMERS; }
+function getCustomerSales() { return CUSTOMER_SALES; }
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EXCEL-IMPORT AV KUNDELISTE (mal: kundeoversikt_oppdatering_mal.xlsx)
 // Hver selger importerer sitt distrikts kundeliste i sin egen konto.
@@ -95,7 +100,7 @@ function _handleCustomerImportFile(ev){
         'Fant '+customers.length+' kunder i "'+sheetName+'":\n'+cityWarn+
         '  A: '+aCount+' · B: '+bCount+' · C: '+cCount+'\n'+
         '  Sum L12: '+Math.round(sumL12/1000)+' tusen kr\n\n'+
-        'Dette ERSTATTER dagens kundeliste ('+CUSTOMERS.length+' kunder).\n'+
+        'Dette ERSTATTER dagens kundeliste ('+getCustomers().length+' kunder).\n'+
         'Besøkshistorikk og kalender beholdes.\n\nFortsette?'
       );
       if(!ok) return;
@@ -168,7 +173,7 @@ function renderCustomers(){
 function populateChainFilter(){
   const sel = document.getElementById('ct-filter-chain');
   if(!sel) return;
-  const chains = [...new Set(CUSTOMERS.map(c=>c.chain||'').filter(Boolean))].sort();
+  const chains = [...new Set(getCustomers().map(c=>c.chain||'').filter(Boolean))].sort();
   sel.innerHTML = '<option value="">Alle kjeder</option>' + chains.map(ch=>`<option value="${ch.replace(/"/g,'&quot;')}">${ch}</option>`).join('');
 }
 
@@ -178,7 +183,7 @@ function filterCustomers(){
   const typeF=document.getElementById('ct-filter-type').value;
   const chainF=document.getElementById('ct-filter-chain').value;
 
-  let filtered=CUSTOMERS.filter(c=>{
+  let filtered=getCustomers().filter(c=>{
     const searchTarget=[c.name,c.city,c.chain,c.address,c.phone,c.discount,c.storetype,c.note,(c.contacts||[]).map(p=>p.name+' '+p.role).join(' ')].filter(Boolean).join(' ').toLowerCase();
     const matchQ=!q||q.split(' ').every(word=>searchTarget.includes(word));
     const matchCls=!clsF||c.class===clsF;
@@ -241,7 +246,7 @@ function filterCustomers(){
     </tr>`;
   }).join('');
 
-  document.getElementById('ct-count').textContent=`Viser ${filtered.length} av ${CUSTOMERS.length} kunder`;
+  document.getElementById('ct-count').textContent=`Viser ${filtered.length} av ${getCustomers().length} kunder`;
 }
 
 let _sortCol='name', _sortDir=1;
@@ -251,7 +256,7 @@ function sortCustomers(col){
 }
 
 function renderTopArticles(customerName){
-  const articles = (typeof CUSTOMER_SALES !== 'undefined' ? CUSTOMER_SALES[customerName] : null);
+  const articles = getCustomerSales()[customerName];
   if(!articles || articles.length===0){
     return '<div class="empty-state" style="padding:16px;font-size:12px">Ingen artikkelsalg registrert for denne kunden.</div>';
   }
@@ -295,7 +300,7 @@ function renderTopArticles(customerName){
 }
 
 function openCustomer(name){
-  const c=CUSTOMERS.find(c=>c.name===name);
+  const c=getCustomers().find(c=>c.name===name);
   if(!c) return;
   document.getElementById('customer-list-view').style.display='none';
   document.getElementById('customer-detail').style.display='block';
@@ -386,7 +391,7 @@ function openCustomer(name){
 }
 
 function saveCustomerEdits(name){
-  const c=CUSTOMERS.find(c=>c.name===name);
+  const c=getCustomers().find(c=>c.name===name);
   if(!c) return;
   c.address=document.getElementById('edit-address').value.trim();
   c.phone=document.getElementById('edit-phone').value.trim();
@@ -498,7 +503,7 @@ async function handleCustomerImport(fileInput){
     }
     // Bekreftelse
     const confirmed = confirm(
-      'Erstatte nåværende kundeliste ('+CUSTOMERS.length+' kunder) med ny import ('+newCustomers.length+' kunder)?\n\n' +
+      'Erstatte nåværende kundeliste ('+getCustomers().length+' kunder) med ny import ('+newCustomers.length+' kunder)?\n\n' +
       'Salgsdata (topp 20-artikler) beholdes for kunder med samme navn.\n\n' +
       (skipped>0?'OBS: '+skipped+' rader uten navn ble hoppet over.\n\n':'') +
       'Trykk OK for å erstatte, Avbryt for å beholde nåværende liste.'
@@ -514,7 +519,7 @@ async function handleCustomerImport(fileInput){
     setImportStatus('✓ '+newCustomers.length+' kunder importert. '+(skipped>0?'('+skipped+' rader hoppet over.)':''),'success');
     // Oppdater telling
     const cnt = document.getElementById('current-customer-count');
-    if(cnt) cnt.textContent = CUSTOMERS.length + ' kunder';
+    if(cnt) cnt.textContent = getCustomers().length + ' kunder';
     showToast('✓ '+newCustomers.length+' kunder importert');
   } catch(e){
     console.error(e);
@@ -542,9 +547,9 @@ function downloadCustomerTemplate(){
 
 function exportCurrentCustomers(){
   if(typeof XLSX==='undefined'){ showToast('XLSX-biblioteket har ikke lastet ennå'); return; }
-  if(!CUSTOMERS || CUSTOMERS.length===0){ showToast('Ingen kunder å eksportere'); return; }
+  if(!getCustomers().length){ showToast('Ingen kunder å eksportere'); return; }
   const headers = ['Navn','By','Kjede','L12','Budsjett','Konsept','Klasse','Prioritet','Notat'];
-  const rows = CUSTOMERS.map(c=>[c.name||'',c.city||'',c.chain||'',c.l12||0,c.budget||0,c.concept||'',c.class||'',c.priority||'',c.note||'']);
+  const rows = getCustomers().map(c=>[c.name||'',c.city||'',c.chain||'',c.l12||0,c.budget||0,c.concept||'',c.class||'',c.priority||'',c.note||'']);
   const data = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [{wch:35},{wch:15},{wch:20},{wch:12},{wch:12},{wch:12},{wch:8},{wch:12},{wch:30}];
