@@ -502,7 +502,7 @@ function getCallSuggestionsForDrive(dateKey, from, to){
     dayCustomerNames = new Set(dayEvs.filter(e=>e.type==='visit').map(e=>e.label));
   }
   // Eksluder også fra/til-byene fra ringepoolen — disse besøker du allerede
-  const callPool = CUSTOMERS.filter(c=>{
+  const callPool = getCustomers().filter(c=>{
     if(dayCustomerNames.has(c.name)) return false;
     if(!(c.phone||(c.contacts||[]).some(p=>p.phone))) return false;
     return true;
@@ -673,7 +673,7 @@ function openEvPopup(evt, dateKey, e){
     popup.innerHTML = `<div class="ev-popup-hdr" style="background:#5F5E5A"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${calEvEmoji(e.type)} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr} · ${calFmt(e.startMins)}–${calFmt(e.endMins)}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px"><button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
   } else {
     const cname = e.label;
-    const c = CUSTOMERS.find(c=>c.name===cname)||{};
+    const c = getCustomers().find(c=>c.name===cname)||{};
     const v = visits.filter(v=>v.customer===cname).sort((a,b)=>b.date.localeCompare(a.date));
     const todayV = v.find(x=>x.date===dateKey);
     const lastV = todayV||v[0];
@@ -752,7 +752,7 @@ function openAppt(dateKey, evt, presetHour){
   document.getElementById('appt-start').value = hS+':00';
   document.getElementById('appt-end').value = hE+':00';
   const sel = document.getElementById('appt-customer');
-  sel.innerHTML = '<option value="">Velg kunde...</option>'+'<option value="__new__">+ Legg til ny kunde</option>'+'<optgroup label="──────────────────"></optgroup>'+CUSTOMERS.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
+  sel.innerHTML = '<option value="">Velg kunde...</option>'+'<option value="__new__">+ Legg til ny kunde</option>'+'<optgroup label="──────────────────"></optgroup>'+getCustomers().map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
   sel.value = '';
   document.getElementById('appt-cinfo').style.display = 'none';
   document.getElementById('appt-agenda').value = '';
@@ -784,7 +784,7 @@ function apptUpdateTitle(){
 function apptCustomerChange(){
   const val = document.getElementById('appt-customer').value;
   if(val === '__new__'){ document.getElementById('appt-customer').value=''; openQuickCustomerModal(); return; }
-  const c = CUSTOMERS.find(x=>x.name===val);
+  const c = getCustomers().find(x=>x.name===val);
   const infoDiv = document.getElementById('appt-cinfo');
   if(c){
     infoDiv.style.display = 'block';
