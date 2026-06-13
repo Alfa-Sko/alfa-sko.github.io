@@ -19,4 +19,23 @@ Intern CRM-webapp for Alfa Sko. I produksjon, brukes av 5–6 personer (selgere,
 ## Pågående arbeid: refaktorering
 Alt ligger nå i én index.html (~7766 linjer). Mål:
 - CSS → css/app.css
-- JS → js/data.js, js/utils.js, js/supabase.js, js/ui.js, js/calendar.js, js/customers.js, js/dashboard.js, js/planner-data.js, js/planner.js, js/init.js
+- JS → lasterekkefølge:
+  1. js/data.js         — statiske datasett (BASE_CUSTOMERS, CUSTOMER_SALES)
+  2. js/utils.js        — rene hjelpefunksjoner (loadData, formatering, dato)
+  3. js/state.js        — delt global state (visits, followups, calEvents, userProfile m.fl.)
+  4. js/supabase.js     — auth, synk, saveData
+  5. js/ui.js           — felles UI-funksjoner (nav, modal, toast)
+  6. js/dashboard.js    — oversikt, ledermodus, demo
+  7. js/customers.js    — kundeliste, detaljer, import/eksport
+  8. js/calendar.js     — kalender, hendelser, drag-drop, ICS-eksport
+  9. js/planner-data.js — statiske planlegger-datasett (ruter, hoteller, regioner)
+  10. js/planner.js     — AI-planlegger (algoritme, redigering, kalendereksport)
+  11. js/photos.js      — IndexedDB-lag for besøksbilder
+  12. js/visits.js      — besøksskjema, saveVisit, deleteVisit
+  13. js/followups.js   — oppfølginger og bestillings-oppfølging
+  14. js/timeline.js    — tidslinje, team-tidslinje, renderNotes
+  15. js/profile.js     — brukerprofil
+  16. js/calculator.js  — rabattkalkulator
+  17. js/workbooks.js   — workbooks (IndexedDB) + felles kataloger (Supabase Storage)
+  18. js/orders.js      — ordrestatus-widget
+  19. js/init.js        — oppstartssekvens (kun startup-kall, ingen state-deklarasjoner)
