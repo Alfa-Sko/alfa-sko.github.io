@@ -1,0 +1,557 @@
+﻿function loadCustomers(){
+  const savedVersion = loadData('alfa_customers_version', null);
+  // 'imported' = brukeren har lastet inn egen kundeliste (Excel) — den vinner alltid
+  if(savedVersion === CUSTOMER_DATA_VERSION || savedVersion === 'imported'){
+    const saved = loadData('alfa_customers', null);
+    if(saved) return saved;
+  }
+  // Innloggede brukere (eller enheter som har vært innlogget) seedes ALDRI med
+  // fil-innbakt startliste — kundene deres kommer fra skyen eller Excel-import.
+  try{
+    if(localStorage.getItem('sb_session') || localStorage.getItem('sb_data_owner')){
+      return [];
+    }
+  }catch(e){}
+  // Ny versjon → bruk BASE_CUSTOMERS og lagre versjonsstempel
+  saveData('alfa_customers', BASE_CUSTOMERS);
+  saveData('alfa_customers_version', CUSTOMER_DATA_VERSION);
+  return BASE_CUSTOMERS;
+}
+let CUSTOMERS = loadCustomers();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXCEL-IMPORT AV KUNDELISTE (mal: kundeoversikt_oppdatering_mal.xlsx)
+// Hver selger importerer sitt distrikts kundeliste i sin egen konto.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Map en Excel-rad (norske kolonneoverskrifter) til appens kundeformat
+function _mapImportRow(row, idx){
+  const get = (...names)=>{
+    for(const k of Object.keys(row)){
+      const kl = String(k).toLowerCase().trim();
+      for(const n of names){ if(kl===n || kl.startsWith(n)) return row[k]; }
+    }
+    return undefined;
+  };
+  const name = get('navn','kundenavn');
+  if(!name || !String(name).trim()) return null;
+  const num = v => {
+    if(v===undefined || v===null || v==='') return 0;
+    const n = parseFloat(String(v).replace(/\s/g,'').replace(/kr/gi,'').replace(',','.'));
+    return isNaN(n) ? 0 : Math.round(n);
+  };
+  const cls = String(get('klasse')||'').trim().toUpperCase();
+  return {
+    id: String(get('nr','nummer','kundenr')||('imp'+(idx+1))),
+    name: String(name).trim(),
+    city: String(get('by','sted','poststed')||'').trim(),
+    address: String(get('adresse')||'').trim(),
+    chain: String(get('kjede')||'').trim(),
+    concept: String(get('konsept')||'').trim(),
+    class: ['A','B','C'].includes(cls) ? cls : (cls||''),
+    priority: String(get('prioritet')||'').trim(),
+    l12: num(get('l12','omsetning')),
+    budget: num(get('budsjett','budget')),
+    phone: String(get('telefon','tlf')||'').trim(),
+    email: String(get('e-post','epost','email')||'').trim(),
+    note: String(get('notat','kommentar')||'').trim(),
+    contacts: [],
+  };
+}
+
+function importCustomersExcel(){
+  const inp = document.getElementById('cust-import-file');
+  if(inp) inp.click();
+}
+
+function _handleCustomerImportFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  ev.target.value = '';
+  if(typeof XLSX === 'undefined'){
+    alert('Excel-biblioteket er ikke lastet (krever nettilgang ved første åpning). Prøv å laste siden på nytt.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      // Foretrekk arket 'Kunder' (malen), ellers første ark
+      const sheetName = wb.SheetNames.find(n=>n.toLowerCase().includes('kunde')) || wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:''});
+      const customers = rows.map((r,i)=>_mapImportRow(r,i)).filter(c=>c!==null);
+      if(customers.length===0){
+        alert('Fant ingen kunder i arket "'+sheetName+'". Sjekk at filen følger malen (kolonner: Nr, Navn, By, Kjede, Klasse, L12 …) og at kundene ligger i arket "Kunder".');
+        return;
+      }
+      const aCount = customers.filter(c=>c.class==='A').length;
+      const bCount = customers.filter(c=>c.class==='B').length;
+      const cCount = customers.filter(c=>c.class==='C').length;
+      const sumL12 = customers.reduce((s,c)=>s+(c.l12||0),0);
+      const knownCity = c => { const cl=String(c||'').toLowerCase(); return Object.keys(CITY_COORDS).some(k=>cl.includes(k.toLowerCase())); };
+      const unknownCities = [...new Set(customers.filter(c=>c.city && !knownCity(c.city)).map(c=>c.city))];
+      const cityWarn = unknownCities.length>0 ? '\n⚠ '+unknownCities.length+' by(er) appen ikke kjenner ruter for: '+unknownCities.slice(0,6).join(', ')+(unknownCities.length>6?' …':'')+'\nKjøretider for disse blir grove — sjekk stavemåten mot tettstedslisten.\n' : '';
+      const ok = confirm(
+        'Fant '+customers.length+' kunder i "'+sheetName+'":\n'+cityWarn+
+        '  A: '+aCount+' · B: '+bCount+' · C: '+cCount+'\n'+
+        '  Sum L12: '+Math.round(sumL12/1000)+' tusen kr\n\n'+
+        'Dette ERSTATTER dagens kundeliste ('+CUSTOMERS.length+' kunder).\n'+
+        'Besøkshistorikk og kalender beholdes.\n\nFortsette?'
+      );
+      if(!ok) return;
+      CUSTOMERS = customers;
+      saveData('alfa_customers', CUSTOMERS);
+      saveData('alfa_customers_version', 'imported');
+      _demoRerender();
+      showToast('📥 '+customers.length+' kunder importert'+(window._sbUser?' — synkes til skyen':''));
+    }catch(err){
+      alert('Kunne ikke lese filen: '+(err.message||err)+'\nSjekk at det er en .xlsx-fil fra malen.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── NY KUNDE ────────────────────────────────────────────────────────────────
+
+function openNewCustomerModal(){ document.getElementById('new-customer-modal').classList.add('open'); }
+function closeNewCustomerModal(){
+  document.getElementById('new-customer-modal').classList.remove('open');
+  ['nc-name','nc-city','nc-address','nc-chain','nc-contact','nc-phone','nc-discount','nc-l12','nc-budget','nc-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('nc-class').value='B';
+  document.getElementById('nc-storetype').value='';
+}
+function saveNewCustomer(){
+  const name=document.getElementById('nc-name').value.trim();
+  const city=document.getElementById('nc-city').value.trim();
+  if(!name||!city){ showToast('Kundenavn og fylke/by er påkrevd'); return; }
+  const contactName=document.getElementById('nc-contact').value.trim();
+  const phone=document.getElementById('nc-phone').value.trim();
+  const newC={id:'custom_'+Date.now(),name,city,address:document.getElementById('nc-address').value.trim(),chain:document.getElementById('nc-chain').value.trim(),class:document.getElementById('nc-class').value,storetype:document.getElementById('nc-storetype').value,discount:document.getElementById('nc-discount').value.trim(),phone,l12:parseInt(document.getElementById('nc-l12').value)||0,budget:parseInt(document.getElementById('nc-budget').value)||0,note:document.getElementById('nc-note').value.trim(),priority:'',contacts:contactName?[{name:contactName,role:'',type:'decision',phone}]:[]};
+  CUSTOMERS.push(newC);
+  saveData('alfa_customers', CUSTOMERS);
+  closeNewCustomerModal();
+  renderCustomers();
+  showToast('Kunde "'+name+'" lagt til!');
+}
+
+function openQuickCustomerModal(){
+  document.getElementById('quick-customer-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('qc-name').focus(),100);
+}
+function closeQuickCustomerModal(){ document.getElementById('quick-customer-modal').classList.remove('open'); }
+function saveQuickCustomer(){
+  const name=document.getElementById('qc-name').value.trim();
+  const city=document.getElementById('qc-city').value.trim();
+  if(!name||!city){ showToast('Navn og by er påkrevd'); return; }
+  const newC={id:'custom_'+Date.now(),name,city,chain:'',address:'',class:document.getElementById('qc-class').value,concept:'',l12:0,budget:0,priority:'',contacts:[]};
+  CUSTOMERS.push(newC);
+  saveData('alfa_customers', CUSTOMERS);
+  closeQuickCustomerModal();
+  populateVisitCustomers();
+  const sel=document.getElementById('visit-customer');
+  sel.value=name;
+  showToast('Kunde "'+name+'" opprettet og valgt!');
+}
+
+document.getElementById('new-customer-modal').addEventListener('click',function(e){ if(e.target===this) closeNewCustomerModal(); });
+document.getElementById('quick-customer-modal').addEventListener('click',function(e){ if(e.target===this) closeQuickCustomerModal(); });
+
+// ─── CUSTOMERS ──────────────────────────────────────────────────────────────
+
+function renderCustomers(){
+  document.getElementById('customer-list-view').style.display='block';
+  document.getElementById('customer-detail').style.display='none';
+  populateChainFilter();
+  filterCustomers();
+}
+
+function populateChainFilter(){
+  const sel = document.getElementById('ct-filter-chain');
+  if(!sel) return;
+  const chains = [...new Set(CUSTOMERS.map(c=>c.chain||'').filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Alle kjeder</option>' + chains.map(ch=>`<option value="${ch.replace(/"/g,'&quot;')}">${ch}</option>`).join('');
+}
+
+function filterCustomers(){
+  const q=(document.getElementById('customer-search').value||'').toLowerCase().trim();
+  const clsF=document.getElementById('ct-filter-class').value;
+  const typeF=document.getElementById('ct-filter-type').value;
+  const chainF=document.getElementById('ct-filter-chain').value;
+
+  let filtered=CUSTOMERS.filter(c=>{
+    const searchTarget=[c.name,c.city,c.chain,c.address,c.phone,c.discount,c.storetype,c.note,(c.contacts||[]).map(p=>p.name+' '+p.role).join(' ')].filter(Boolean).join(' ').toLowerCase();
+    const matchQ=!q||q.split(' ').every(word=>searchTarget.includes(word));
+    const matchCls=!clsF||c.class===clsF;
+    const matchType=!typeF||(c.storetype||'')=== typeF;
+    const matchChain=!chainF||(c.chain||'')=== chainF;
+    return matchQ&&matchCls&&matchType&&matchChain;
+  });
+
+  const col=_sortCol||'name';
+  const dir=_sortDir||1;
+  filtered=[...filtered].sort((a,b)=>{
+    let av='',bv='';
+    if(col==='name'){av=a.name;bv=b.name;}
+    else if(col==='city'){av=a.city||'';bv=b.city||'';}
+    else if(col==='contact'){av=(a.contacts&&a.contacts[0]?a.contacts[0].name:'');bv=(b.contacts&&b.contacts[0]?b.contacts[0].name:'');}
+    else if(col==='phone'){av=a.phone||'';bv=b.phone||'';}
+    else if(col==='chain'){av=a.chain||'';bv=b.chain||'';}
+    else if(col==='discount'){av=parseFloat((a.discount||'0').replace(/[^0-9.]/g,''))||0;bv=parseFloat((b.discount||'0').replace(/[^0-9.]/g,''))||0;return dir*(av-bv);}
+    else if(col==='storetype'){av=a.storetype||'';bv=b.storetype||'';}
+    else if(col==='class'){av=a.class||'Ø';bv=b.class||'Ø';}
+    else if(col==='l12'){av=a.l12||0;bv=b.l12||0;return dir*(bv-av);}
+    return dir*av.localeCompare(bv,'no');
+  });
+
+  document.querySelectorAll('.ct th').forEach(th=>th.classList.remove('sorted'));
+  const thEl=document.getElementById('th-'+col);
+  if(thEl){thEl.classList.add('sorted');thEl.querySelector('.sort-arrow').textContent=dir===1?'\u25b2':'\u25bc';}
+
+  const tbody=document.getElementById('customer-tbody');
+  if(!tbody) return;
+
+  if(filtered.length===0){
+    tbody.innerHTML=`<tr><td colspan="9" class="empty-state" style="padding:32px;text-align:center">Ingen kunder matcher søket</td></tr>`;
+    document.getElementById('ct-count').textContent='';
+    return;
+  }
+
+  tbody.innerHTML=filtered.map(c=>{
+    const safeName=c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const bCls=c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
+    const bLbl=c.class==='A'?'A':c.class==='B'?'B':c.class==='C'?'C':'Ny';
+    const primaryContact=c.contacts&&c.contacts[0]?c.contacts[0]:null;
+    const contactName=primaryContact?primaryContact.name:(c.contactName||'');
+    const phone=c.phone||'';
+    const discount=c.discount||'';
+    const storetype=c.storetype||'';
+    const l12=c.l12>0?c.l12.toLocaleString('no-NO')+' kr':'–';
+    let displayName=c.name;
+    if(q){const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi');displayName=c.name.replace(re,'<mark style="background:#FFF3CD;border-radius:2px;padding:0 1px">$1</mark>');}
+    return `<tr onclick="openCustomer('${safeName}')">
+      <td><div class="ct-name">${displayName}</div>${c.address?`<div class="ct-sub">${c.address}</div>`:''}</td>
+      <td><div style="font-size:12px">${c.city||'–'}</div></td>
+      <td><div style="font-size:12px">${contactName||'–'}</div></td>
+      <td>${phone?`<a href="tel:${phone}" class="ct-phone" onclick="event.stopPropagation()">${phone}</a>`:'<span style="color:#B4B2A9">–</span>'}</td>
+      <td><div style="font-size:12px;color:#5F5E5A">${c.chain||'–'}</div></td>
+      <td><div class="ct-discount">${discount||'–'}</div></td>
+      <td>${storetype?`<span class="ct-type">${storetype}</span>`:'<span style="color:#B4B2A9;font-size:12px">–</span>'}</td>
+      <td>${c.class?`<span class="ct-badge ${bCls}">${bLbl}</span>`:'<span style="color:#B4B2A9;font-size:12px">–</span>'}</td>
+      <td style="text-align:right"><div style="font-size:12px;font-weight:500">${l12}</div></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('ct-count').textContent=`Viser ${filtered.length} av ${CUSTOMERS.length} kunder`;
+}
+
+let _sortCol='name', _sortDir=1;
+function sortCustomers(col){
+  if(_sortCol===col){ _sortDir*=-1; } else { _sortCol=col; _sortDir=1; }
+  filterCustomers();
+}
+
+function renderTopArticles(customerName){
+  const articles = (typeof CUSTOMER_SALES !== 'undefined' ? CUSTOMER_SALES[customerName] : null);
+  if(!articles || articles.length===0){
+    return '<div class="empty-state" style="padding:16px;font-size:12px">Ingen artikkelsalg registrert for denne kunden.</div>';
+  }
+  // Norsk tallformat med tusenskille
+  function fmtKr(n){
+    if(!n) return '–';
+    return Math.round(n).toLocaleString('no-NO')+' kr';
+  }
+  function fmtKrShort(n){
+    if(!n) return '–';
+    return Math.round(n).toLocaleString('no-NO');
+  }
+  // Sum total per år
+  const sum2025 = articles.reduce((s,a)=>s+(a.y2025||0), 0);
+  const sum2026 = articles.reduce((s,a)=>s+(a.y2026||0), 0);
+  const maxTot = Math.max(...articles.map(a=>(a.y2025||0)+(a.y2026||0))) || 1;
+  let html = '';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+  html += '<div style="background:#F1EFE8;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#888780;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Topp 20 · 2025</div><div style="font-size:16px;font-weight:700;color:#2C2C2A">'+fmtKr(sum2025)+'</div></div>';
+  html += '<div style="background:#E6F1FB;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#0C447C;font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Topp 20 · 2026</div><div style="font-size:16px;font-weight:700;color:#0C447C">'+fmtKr(sum2026)+'</div></div>';
+  html += '</div>';
+  html += '<div style="border:1px solid #D3D1C7;border-radius:8px;overflow:hidden">';
+  html += '<div style="display:grid;grid-template-columns:24px 1fr 90px 90px;gap:8px;padding:8px 10px;background:#F8F7F3;font-size:10px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #D3D1C7"><div>#</div><div>Artikkel</div><div style="text-align:right">2025</div><div style="text-align:right">2026</div></div>';
+  articles.forEach((a,i)=>{
+    const tot = (a.y2025||0)+(a.y2026||0);
+    const pct = Math.round(tot/maxTot*100);
+    const bgStyle = i%2 ? 'background:#fff' : 'background:#FAFAF7';
+    const trend = (a.y2026>a.y2025) ? '↑' : (a.y2026<a.y2025*0.5 && a.y2025>0 ? '↓' : '');
+    const trendColor = trend==='↑' ? '#1A7A4E' : (trend==='↓' ? '#A23B27' : '#888780');
+    html += '<div style="display:grid;grid-template-columns:24px 1fr 90px 90px;gap:8px;padding:8px 10px;font-size:12px;border-bottom:1px solid #F1EFE8;'+bgStyle+';position:relative" title="'+escapeHtml(a.id)+'">';
+    html += '<div style="position:absolute;left:0;top:0;bottom:0;width:'+pct+'%;background:linear-gradient(90deg, rgba(159,225,203,0.18), rgba(159,225,203,0.02));pointer-events:none"></div>';
+    html += '<div style="color:#888780;font-weight:600;position:relative">'+(i+1)+'</div>';
+    html += '<div style="color:#2C2C2A;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative">'+escapeHtml(a.name)+(trend?' <span style="color:'+trendColor+';font-weight:700">'+trend+'</span>':'')+'</div>';
+    html += '<div style="text-align:right;color:'+(a.y2025?'#2C2C2A':'#B4B2A9')+';position:relative">'+fmtKrShort(a.y2025)+'</div>';
+    html += '<div style="text-align:right;color:'+(a.y2026?'#0C447C':'#B4B2A9')+';font-weight:'+(a.y2026?'600':'400')+';position:relative">'+fmtKrShort(a.y2026)+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '<div style="font-size:10px;color:#888780;margin-top:6px;font-style:italic">↑ økt fra 2025 · ↓ vesentlig redusert</div>';
+  return html;
+}
+
+function openCustomer(name){
+  const c=CUSTOMERS.find(c=>c.name===name);
+  if(!c) return;
+  document.getElementById('customer-list-view').style.display='none';
+  document.getElementById('customer-detail').style.display='block';
+  const custVisits=visits.filter(v=>v.customer===name).sort((a,b)=>b.date.localeCompare(a.date));
+  const custFollows=followups.filter(f=>f.customer===name&&!f.done);
+  const typeLabel={decision:'Beslutningstaker',buyer:'Innkjøper',influence:'Påvirker'};
+  const typeClass={decision:'ct-decision',buyer:'ct-buyer',influence:'ct-influence'};
+  const bCls=c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
+  const bLbl=c.class==='A'?'A-kunde':c.class==='B'?'B-kunde':c.class==='C'?'C-kunde':'Ny relasjon';
+  const safeName=name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const primaryContact=c.contacts&&c.contacts[0]?c.contacts[0]:null;
+
+  document.getElementById('customer-detail-content').innerHTML=`
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:20px;font-weight:700;color:#2C2C2A">${c.name}</div>
+          <div style="font-size:13px;color:#888780;margin-top:3px">${c.city||''}${c.chain?' · '+c.chain:''}</div>
+          ${c.address?`<div style="font-size:12px;color:#888780;margin-top:2px">📍 ${c.address}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+          <span class="badge ${bCls}">${bLbl}</span>
+          ${c.storetype?`<span style="font-size:11px;padding:3px 9px;border-radius:99px;background:#EEEDFE;color:#3C3489;font-weight:600">${c.storetype}</span>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px">
+        <div style="background:#F8F7F3;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">L12</div>
+          <div style="font-size:15px;font-weight:600;color:#2C2C2A;margin-top:2px">${c.l12>0?c.l12.toLocaleString('no-NO')+' kr':'–'}</div>
+        </div>
+        <div style="background:#F8F7F3;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Budsjett</div>
+          <div style="font-size:15px;font-weight:600;color:#2C2C2A;margin-top:2px">${c.budget>0?c.budget.toLocaleString('no-NO')+' kr':'–'}</div>
+        </div>
+        <div style="background:#F8F7F3;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Rabatt</div>
+          <div style="font-size:15px;font-weight:600;color:#2C2C2A;margin-top:2px">${c.discount||'–'}</div>
+        </div>
+        ${c.phone?`<div style="background:#E6F1FB;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:#0C447C;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Telefon</div>
+          <a href="tel:${c.phone}" style="font-size:14px;font-weight:600;color:#0C447C;text-decoration:none;margin-top:2px;display:block">${c.phone}</a>
+        </div>`:''}
+      </div>
+      <hr class="divider">
+      <div class="section-label">Rediger kundeopplysninger</div>
+      <div class="form-row-2" style="margin-bottom:8px">
+        <div class="form-group" style="margin-bottom:8px"><label>Adresse</label><input type="text" id="edit-address" value="${(c.address||'').replace(/"/g,'&quot;')}" placeholder="Gateadresse"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>Telefon</label><input type="tel" id="edit-phone" value="${(c.phone||'').replace(/"/g,'&quot;')}" placeholder="+47 900 00 000"></div>
+      </div>
+      <div class="form-row-2" style="margin-bottom:8px">
+        <div class="form-group" style="margin-bottom:8px"><label>Rabatt (%)</label><input type="text" id="edit-discount" value="${(c.discount||'').replace(/"/g,'&quot;')}" placeholder="F.eks. 52%"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>Type butikk</label>
+          <select id="edit-storetype">
+            <option value="">Ingen</option>
+            <option value="SIS"${(c.storetype||'')==='SIS'?' selected':''}>SIS</option>
+            <option value="PRO"${(c.storetype||'')==='PRO'?' selected':''}>PRO</option>
+            <option value="Pop-up"${(c.storetype||'')==='Pop-up'?' selected':''}>Pop-up</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:8px"><label>Kontaktperson</label><input type="text" id="edit-contact-name" value="${primaryContact?(primaryContact.name||'').replace(/"/g,'&quot;'):''}" placeholder="Navn, Butikksjef"></div>
+      <div class="form-group" style="margin-bottom:10px"><label>Notat</label><textarea id="edit-note" style="min-height:60px">${c.note||''}</textarea></div>
+      <button class="btn btn-dark btn-sm" onclick="saveCustomerEdits('${safeName}')">Lagre endringer</button>
+      ${c.contacts&&c.contacts.length>0?`<hr class="divider"><div class="section-label">Kontaktpersoner</div><div class="contact-grid">${c.contacts.map(p=>`<div class="contact-card"><div class="contact-name">${p.name}</div><div class="contact-role">${p.role||''}</div>${p.phone?`<div style="font-size:11px;color:#0C447C;margin-top:3px"><a href="tel:${p.phone}" style="color:#0C447C">${p.phone}</a></div>`:''}<span class="contact-type ${typeClass[p.type]||'ct-influence'}">${typeLabel[p.type]||p.type}</span></div>`).join('')}</div>`:''}
+      ${c.note?`<div style="margin-top:12px;font-size:12px;color:#5F5E5A;background:#F8F7F3;padding:8px 10px;border-radius:7px;line-height:1.5">📋 ${c.note}</div>`:''}
+      <hr class="divider">
+      <div class="section-label">Topp 20 mest kjøpte artikler</div>
+      ${renderTopArticles(c.name)}
+      <hr class="divider">
+      <div class="section-label">Aktivitetshistorikk</div>
+      ${custVisits.length===0?'<div class="empty-state" style="padding:16px">Ingen aktiviteter registrert</div>':custVisits.map(v=>{
+        const tMap={visit:{ico:'🏪',lbl:'Kundebesøk'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen'},phone:{ico:'📞',lbl:'Telefonsamtale'},clinic:{ico:'🎓',lbl:'Clinic'},dinner:{ico:'🍽️',lbl:'Kundemiddag'}};
+        const t=tMap[v.type]||tMap.visit;
+        return `<div class="tl-item"><div class="tl-dot tl-dot-visit">${t.ico}</div><div class="tl-body"><div class="tl-date">${v.date.split('-').reverse().join('.')} · ${v.time||''}${v.timeEnd?' – '+v.timeEnd:''} · ${v.contact||''}</div><div class="tl-title">${t.lbl}</div>${v.notes?`<div class="tl-text">${v.notes}</div>`:''}${v.followup?`<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: ${v.followup}</div>`:''}</div></div>`;
+      }).join('')}
+      <hr class="divider">
+      <div class="section-label">Åpen oppfølging</div>
+      ${custFollows.length===0?'<div class="empty-state" style="padding:12px">Ingen åpen oppfølging</div>':custFollows.map(f=>followItem(f)).join('')}
+      <hr class="divider">
+      <div id="os-widget-container"></div>
+      <hr class="divider">
+      <button class="btn btn-dark" onclick="startNewVisit('${safeName}')">+ Registrer ny aktivitet</button>
+    </div>`;
+  const osContainer = document.getElementById('os-widget-container');
+  if(osContainer) osContainer.appendChild(osWidget(name));
+  // Scroll to top on mobile
+  window.scrollTo(0,0);
+}
+
+function saveCustomerEdits(name){
+  const c=CUSTOMERS.find(c=>c.name===name);
+  if(!c) return;
+  c.address=document.getElementById('edit-address').value.trim();
+  c.phone=document.getElementById('edit-phone').value.trim();
+  c.discount=document.getElementById('edit-discount').value.trim();
+  c.storetype=document.getElementById('edit-storetype').value;
+  c.note=document.getElementById('edit-note').value.trim();
+  const contactName=document.getElementById('edit-contact-name').value.trim();
+  if(contactName){if(c.contacts&&c.contacts.length>0){c.contacts[0].name=contactName;}else{c.contacts=[{name:contactName,role:'',type:'decision',phone:c.phone||''}];}}
+  saveData('alfa_customers',CUSTOMERS);
+  openCustomer(name);
+  showToast('Kundekortet er oppdatert!');
+}
+
+function closeCustomerDetail(){ renderCustomers(); window.scrollTo(0,0); }
+
+function startNewVisit(name){
+  showSection('nytt-besok', document.querySelectorAll('.nav-item')[3]);
+  setTimeout(()=>{const sel=document.getElementById('visit-customer');populateVisitCustomers();sel.value=name;},100);
+}
+
+// ─── KUNDELISTE-IMPORT ──────────────────────────────────────────────────────
+
+function setImportStatus(msg, type){
+  const el = document.getElementById('customer-import-status');
+  if(!el) return;
+  if(!msg){ el.innerHTML=''; return; }
+  const colors = {
+    info:    {bg:'#E6F1FB', border:'#B8D4E8', color:'#0C447C'},
+    success: {bg:'#E8F4ED', border:'#B8D4C2', color:'#1A5C3A'},
+    error:   {bg:'#FBE6E6', border:'#E8B8B8', color:'#7A1A1A'},
+    warning: {bg:'#FAEEDA', border:'#E6D9B8', color:'#6D4C00'},
+  };
+  const c = colors[type||'info'];
+  el.innerHTML = '<div style="background:'+c.bg+';border:1px solid '+c.border+';color:'+c.color+';padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5">'+msg+'</div>';
+}
+
+// Normaliser kolonne-navn til kjent format
+
+async function handleCustomerImport(fileInput){
+  const file = fileInput.files[0];
+  if(!file){ return; }
+  fileInput.value=''; // Reset for å kunne velge samme fil igjen
+  if(typeof XLSX==='undefined'){
+    setImportStatus('XLSX-biblioteket har ikke lastet ennå. Vent et øyeblikk og prøv på nytt.','error');
+    return;
+  }
+  setImportStatus('Leser fil ...','info');
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, {type:'array'});
+    // Bruk første ark
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+    if(rows.length<2){
+      setImportStatus('Filen er tom eller har bare overskrift.','error');
+      return;
+    }
+    // Finn header-raden — første rad med tekst i flere kolonner
+    let headerIdx = 0;
+    for(let i=0;i<Math.min(rows.length,5);i++){
+      const cells = rows[i].filter(c=>String(c).trim());
+      if(cells.length>=3){ headerIdx=i; break; }
+    }
+    const headers = rows[headerIdx];
+    const dataRows = rows.slice(headerIdx+1);
+    // Map kolonner
+    const cols = {
+      name: findColIdx(headers, 'name'),
+      city: findColIdx(headers, 'city'),
+      chain: findColIdx(headers, 'chain'),
+      l12: findColIdx(headers, 'l12'),
+      budget: findColIdx(headers, 'budget'),
+      concept: findColIdx(headers, 'concept'),
+      class: findColIdx(headers, 'class'),
+      priority: findColIdx(headers, 'priority'),
+      note: findColIdx(headers, 'note'),
+      id: findColIdx(headers, 'id'),
+    };
+    if(cols.name<0){
+      setImportStatus('Klarte ikke finne kolonnen "Navn". Sjekk at overskriften heter "Navn" eller "Kunde". Funnet kolonner: '+headers.filter(h=>h).join(', '),'error');
+      return;
+    }
+    // Bygg ny kundeliste
+    const newCustomers = [];
+    let skipped = 0;
+    dataRows.forEach((row,idx)=>{
+      const name = String(row[cols.name]||'').trim();
+      if(!name){ skipped++; return; }
+      const num = (v)=>{ if(v==null||v==='') return 0; const n=parseFloat(String(v).replace(/[\s,]/g,'')); return isFinite(n)?Math.round(n):0; };
+      const get = (k)=>cols[k]>=0?String(row[cols[k]]||'').trim():'';
+      newCustomers.push({
+        id: cols.id>=0 ? String(row[cols.id]||(idx+1)) : String(idx+1),
+        name,
+        city: get('city'),
+        chain: get('chain'),
+        l12: num(row[cols.l12]),
+        budget: num(row[cols.budget]),
+        concept: get('concept'),
+        class: get('class'),
+        priority: get('priority'),
+        contacts: [],
+        note: get('note'),
+      });
+    });
+    if(newCustomers.length===0){
+      setImportStatus('Ingen kunder funnet i filen. Sjekk at "Navn" er fylt ut for hver rad.','error');
+      return;
+    }
+    // Bekreftelse
+    const confirmed = confirm(
+      'Erstatte nåværende kundeliste ('+CUSTOMERS.length+' kunder) med ny import ('+newCustomers.length+' kunder)?\n\n' +
+      'Salgsdata (topp 20-artikler) beholdes for kunder med samme navn.\n\n' +
+      (skipped>0?'OBS: '+skipped+' rader uten navn ble hoppet over.\n\n':'') +
+      'Trykk OK for å erstatte, Avbryt for å beholde nåværende liste.'
+    );
+    if(!confirmed){ setImportStatus('Import avbrutt — kundelisten er uendret.','warning'); return; }
+    // Lagre
+    CUSTOMERS.length=0;
+    newCustomers.forEach(c=>CUSTOMERS.push(c));
+    saveData('alfa_customers', CUSTOMERS);
+    // Bump versjonen så den nye listen er kanonisk
+    const newVer = 'imported-'+Date.now();
+    saveData('alfa_customers_version', newVer);
+    setImportStatus('✓ '+newCustomers.length+' kunder importert. '+(skipped>0?'('+skipped+' rader hoppet over.)':''),'success');
+    // Oppdater telling
+    const cnt = document.getElementById('current-customer-count');
+    if(cnt) cnt.textContent = CUSTOMERS.length + ' kunder';
+    showToast('✓ '+newCustomers.length+' kunder importert');
+  } catch(e){
+    console.error(e);
+    setImportStatus('Klarte ikke lese filen: '+(e.message||e),'error');
+  }
+}
+
+function downloadCustomerTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('XLSX-biblioteket har ikke lastet ennå'); return; }
+  const headers = ['Navn','By','Kjede','L12','Budsjett','Konsept','Klasse','Prioritet','Notat'];
+  const exampleRows = [
+    ['INTERSPORT TRONDHEIM LEFSTAD','Trondheim','Intersport','485000','520000','PRO','A','Høy',''],
+    ['SPORT 1 STEINKJER','Steinkjer','Sport 1','125000','150000','SIS','B','Medium',''],
+    ['STADION NAMSOS','Namsos','Stadion','45000','60000','','C','Lav','Ny relasjon'],
+  ];
+  const data = [headers, ...exampleRows];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  // Sett kolonnebredder
+  ws['!cols'] = [{wch:30},{wch:15},{wch:15},{wch:10},{wch:10},{wch:10},{wch:8},{wch:10},{wch:25}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Kunder');
+  XLSX.writeFile(wb, 'kundeliste-mal.xlsx');
+  showToast('Mal lastet ned');
+}
+
+function exportCurrentCustomers(){
+  if(typeof XLSX==='undefined'){ showToast('XLSX-biblioteket har ikke lastet ennå'); return; }
+  if(!CUSTOMERS || CUSTOMERS.length===0){ showToast('Ingen kunder å eksportere'); return; }
+  const headers = ['Navn','By','Kjede','L12','Budsjett','Konsept','Klasse','Prioritet','Notat'];
+  const rows = CUSTOMERS.map(c=>[c.name||'',c.city||'',c.chain||'',c.l12||0,c.budget||0,c.concept||'',c.class||'',c.priority||'',c.note||'']);
+  const data = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:35},{wch:15},{wch:20},{wch:12},{wch:12},{wch:12},{wch:8},{wch:12},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Kunder');
+  const dateStr = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, 'kundeliste-eksport-'+dateStr+'.xlsx');
+  showToast('Kundeliste eksportert');
+}
+
