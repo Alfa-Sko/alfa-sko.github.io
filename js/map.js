@@ -45,35 +45,41 @@ function mapInitOverview() {
   }
 
   customers.forEach(c => {
-    const precise = c.geo === 'adresse';
-    const clsColor = c.class === 'A' ? '#C0392B' : c.class === 'B' ? '#1A5FA3' : '#5A9A4A';
+    try {
+      const precise = c.geo === 'adresse' || c.geo === 'manuell';
+      const clsColor = c.class === 'A' ? '#C0392B' : c.class === 'B' ? '#1A5FA3' : '#5A9A4A';
 
-    const marker = L.circleMarker([c.lat, c.lng], {
-      radius:      precise ? 7 : 8,
-      fillColor:   clsColor,
-      color:       precise ? clsColor : '#666',
-      weight:      precise ? 1.5 : 2,
-      fillOpacity: precise ? 0.80 : 0,   // fylt = adresse, hul = by-nivå
-    });
+      const marker = L.circleMarker([c.lat, c.lng], {
+        radius:      precise ? 7 : 8,
+        fillColor:   clsColor,
+        color:       precise ? clsColor : '#666',
+        weight:      precise ? 1.5 : 2,
+        fillOpacity: precise ? 0.80 : 0,   // fylt = adresse/manuell, hul = by-nivå
+      });
 
-    const l12str  = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
-    const clsBadge = c.class
-      ? `<span style="background:#E6F1FB;color:#0C447C;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700">${c.class}-kunde</span> `
-      : '';
-    const precTxt = precise ? '📍 adresse' : '○ by-nivå (omtrentlig)';
+      const l12str  = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
+      const clsBadge = c.class
+        ? `<span style="background:#E6F1FB;color:#0C447C;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700">${c.class}-kunde</span> `
+        : '';
+      const precTxt = c.geo === 'adresse' ? '📍 adresse'
+                    : c.geo === 'manuell'  ? '📍 manuelt koordinat'
+                    : '○ by-nivå (omtrentlig)';
 
-    marker.bindPopup(
-      `<div style="min-width:190px;font-family:inherit">` +
-      `<div style="font-weight:700;font-size:14px;margin-bottom:3px">${c.name}</div>` +
-      `<div style="font-size:12px;color:#555;margin-bottom:7px">${c.city || ''}${c.chain ? ' · ' + c.chain : ''}</div>` +
-      `<div style="font-size:12px;margin-bottom:4px">${clsBadge}<span style="color:#666">L12: ${l12str}</span></div>` +
-      `<div style="font-size:10px;color:#999;margin-top:4px;border-top:1px solid #eee;padding-top:4px">${precTxt}</div>` +
-      `</div>`,
-      { maxWidth: 260 }
-    );
+      marker.bindPopup(
+        `<div style="min-width:190px;font-family:inherit">` +
+        `<div style="font-weight:700;font-size:14px;margin-bottom:3px">${c.name}</div>` +
+        `<div style="font-size:12px;color:#555;margin-bottom:7px">${c.city || ''}${c.chain ? ' · ' + c.chain : ''}</div>` +
+        `<div style="font-size:12px;margin-bottom:4px">${clsBadge}<span style="color:#666">L12: ${l12str}</span></div>` +
+        `<div style="font-size:10px;color:#999;margin-top:4px;border-top:1px solid #eee;padding-top:4px">${precTxt}</div>` +
+        `</div>`,
+        { maxWidth: 260 }
+      );
 
-    marker.addTo(map);
-    _mapLayers.push(marker);
+      marker.addTo(map);
+      _mapLayers.push(marker);
+    } catch (e) {
+      console.warn('mapInitOverview: feil ved markør for', c.name, e);
+    }
   });
 
   const group = L.featureGroup(_mapLayers);
