@@ -13,11 +13,11 @@ let _mapLegend   = null; // Leaflet-control for tegnforklaring
 function _chainColor(chain) {
   if (!chain) return '#3A7A3A';
   const c = chain.toLowerCase();
-  if (c.includes('intersport')) return '#C0392B'; // rød
-  if (c.includes('jaktia'))     return '#8B5E3C'; // brun
-  if (c.includes('stadion'))    return '#1A2E5A'; // navy
-  if (/sport\s*1/.test(c))      return '#1A5FA3'; // blå
-  return '#3A7A3A';                               // grønn (frittstående/andre)
+  if (c.includes('intersport')) return '#DA291C'; // PMS 485
+  if (c.includes('jaktia'))     return '#693F23'; // PMS 469
+  if (c.includes('stadion'))    return '#002F6C'; // PMS 294
+  if (/sport\s*1/.test(c))      return '#005EB8'; // PMS 300
+  return '#00B140';                               // PMS 354 (frittstående/andre)
 }
 
 // ── Mørkere fargetone til skyggedelen av 3D-gradienten ───────────────────────
@@ -73,11 +73,11 @@ function _pinIcon(color) {
 // ── Tegnforklaring ────────────────────────────────────────────────────────────
 
 const _LEGEND_ITEMS = [
-  { label: 'Intersport',            color: '#C0392B' },
-  { label: 'Sport 1',               color: '#1A5FA3' },
-  { label: 'Stadion',               color: '#1A2E5A' },
-  { label: 'Jaktia',                color: '#8B5E3C' },
-  { label: 'Frittstående / andre',  color: '#3A7A3A' },
+  { label: 'Intersport',            color: '#DA291C' }, // PMS 485
+  { label: 'Sport 1',               color: '#005EB8' }, // PMS 300
+  { label: 'Stadion',               color: '#002F6C' }, // PMS 294
+  { label: 'Jaktia',                color: '#693F23' }, // PMS 469
+  { label: 'Frittstående / andre',  color: '#00B140' }, // PMS 354
 ];
 
 // ── Privat: initialiser eller gjenbruk kart ──────────────────────────────────
