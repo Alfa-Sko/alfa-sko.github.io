@@ -116,9 +116,10 @@ function mapInitOverview() {
     return;
   }
 
-  customers.forEach(c => {
+  const overviewCoords = _spreadDuplicates(customers.map(c => [c.lat, c.lng]));
+  customers.forEach((c, ci) => {
     try {
-      const marker = L.marker([c.lat, c.lng], { icon: _pinIcon(_chainColor(c.chain)) });
+      const marker = L.marker(overviewCoords[ci], { icon: _pinIcon(_chainColor(c.chain)) });
 
       const l12str   = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
       const clsBadge = c.class
@@ -238,6 +239,30 @@ async function _fetchOsrmRoute(latLngs) {
   }
 }
 
+// Spre pins med identisk/nær-identisk koordinat i en sirkel (spiderfy-lignende).
+// Input/output: array av [lat, lng]-par. Toleranse 4 desimaler ≈ 11 m.
+function _spreadDuplicates(coords) {
+  const key = ll => `${ll[0].toFixed(4)},${ll[1].toFixed(4)}`;
+  const groups = {};
+  coords.forEach((ll, i) => {
+    const k = key(ll);
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(i);
+  });
+  const out = coords.map(ll => [ll[0], ll[1]]);
+  Object.values(groups).forEach(idxs => {
+    if (idxs.length < 2) return;
+    const n = idxs.length;
+    const R = 0.003; // ~300 m offset-radius
+    idxs.forEach((i, j) => {
+      const a = (2 * Math.PI * j) / n - Math.PI / 2;
+      out[i][0] += R * Math.cos(a);
+      out[i][1] += R * Math.sin(a) * 0.6;
+    });
+  });
+  return out;
+}
+
 // Fjern alle eksisterende dagskart-instanser (kall FØR ny output.innerHTML)
 function _destroyDayMaps() {
   _dayMapInstances.forEach(m => { try { m.remove(); } catch (_) {} });
@@ -263,6 +288,8 @@ async function _initOneDayMap(day, dayIdx, homeBase, tripMeta) {
     const coord = (c.lat != null && c.lng != null) ? [c.lat, c.lng] : _cityCoord(c.city);
     return coord ? { coord, customer: c } : null;
   }).filter(Boolean);
+  // Spre duplikate by-senter-koordinater så alle pins er synlige og klikkbare
+  _spreadDuplicates(custStops.map(s => s.coord)).forEach((c, i) => { custStops[i].coord = c; });
 
   // ── Sluttpunkt (hotell/hjem) ─────────────────────────────────────────────────
   let endCity = null, endIsHome = false, endHotelName = '';
@@ -331,7 +358,7 @@ async function _initOneDayMap(day, dayIdx, homeBase, tripMeta) {
   const osrmWpts = [
     ...(startCoord ? [startCoord] : []),
     ...custStops.map(s => s.coord),
-    ...(endCoord && endCity !== startCity ? [endCoord] : []),
+    ...(endCoord ? [endCoord] : []),
   ];
   if (osrmWpts.length >= 2) {
     _fetchOsrmRoute(osrmWpts).then(routeLine => {
