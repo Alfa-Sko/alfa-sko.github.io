@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iIzJDMkMyQSIvPjxjaXJjbGUgY3g9IjkwIiBjeT0iOTAiIHI9IjU0IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMTIiLz48cGF0aCBkPSJNOTAgMzggTDEwNCA5MCBMOTAgMTQyIEw3NiA5MCBaIiBmaWxsPSIjRkZGRkZGIi8+PHBhdGggZD0iTTkwIDM4IEwxMDQgOTAgTDkwIDkwIFoiIGZpbGw9IiNEODVBMzAiLz48L3N2Zz4=">
 
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 </head>
 <body>
 <div id="login-overlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#2C2C2A;align-items:center;justify-content:center;padding:20px">
@@ -45,6 +46,7 @@
     <div class="nav-item" onclick="showSection('kalender',this)">&#128197; Kalender</div>
     <div class="nav-item" onclick="showSection('tidslinje',this)">&#128279; Tidslinje</div>
     <div class="nav-item" onclick="showSection('kunder',this)">&#127978; Kunder</div>
+    <div class="nav-item" onclick="showSection('kart',this)">&#128506; Kart</div>
     <div class="nav-item" onclick="showSection('oppfolging',this)">&#10003; Oppfølging</div>
     <div class="nav-item" onclick="showSection('lookbooks',this)">&#128213; Workbooks</div>
     <div class="nav-item" onclick="showSection('rabatt',this)">&#129518; Rabattkalk</div>
@@ -220,6 +222,11 @@
         <input type="text" id="notes-search" placeholder="Søk i notater..." style="flex:1;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px" oninput="renderNotes()">
       </div>
       <div id="notes-list"></div>
+    </div>
+
+    <!-- KART -->
+    <div id="sec-kart" class="section" style="display:none;padding:0;margin:-24px">
+      <div id="map-container" style="width:100%;height:calc(100vh - 60px)"></div>
     </div>
 
     <!-- OPPFØLGING -->
@@ -1090,6 +1097,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="js/data.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/state.js"></script>
@@ -1108,6 +1116,7 @@
 <script src="js/calculator.js"></script>
 <script src="js/workbooks.js"></script>
 <script src="js/orders.js"></script>
+<script src="js/map.js"></script>
 <script src="js/init.js"></script>
 </body>
 </html>

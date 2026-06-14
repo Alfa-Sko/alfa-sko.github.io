@@ -42,6 +42,7 @@ function showSection(id, el){
   if(id==='tidslinje'){ document.getElementById('free-note-date').value=TODAY_STR; renderTimeline(); }
   if(id==='profil'){ loadProfileIntoForm(); if(window._syncCardUpdate) window._syncCardUpdate(); }
   if(id==='rabatt'){ rkCalculate(); }
+  if(id==='kart') mapInitOverview();
 }
 
 function showCustomerListModal(title, customers){
