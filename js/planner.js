@@ -1772,6 +1772,74 @@ function plannerConfirmAddStop(dayIdx, name){
   showToast(name + ' lagt til');
 }
 
+// Sett inn en kunde på en bestemt plass i dagen (bruker splice-mønsteret fra drag-drop).
+// insertAt=0 → øverst, insertAt=day.customers.length → sist.
+function plannerInsertStop(dayIdx, insertAt, cust){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const day = days[dayIdx];
+  day.customers.splice(insertAt, 0, Object.assign({}, cust));
+  recomputeDayTimes(day);
+  const modal = document.getElementById('insert-pos-modal');
+  if(modal) modal.remove();
+  renderPlanFromData(days);
+  showToast(cust.name + ' lagt til som stopp ' + (insertAt + 1));
+}
+
+// Vis posisjonvelger: bruker velger plass i rekkefølgen, som kaller plannerInsertStop.
+// Kalles fra kartpopup (BOLK 2) og kan testes fra konsollen: showInsertPositionPicker(0, cust)
+function showInsertPositionPicker(dayIdx, cust){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const day = days[dayIdx];
+  // Ingen kunder ennå: sett inn direkte uten picker
+  if(day.customers.length === 0){ plannerInsertStop(dayIdx, 0, cust); return; }
+  // Lagre cust midlertidig for onclick-strenger i HTML
+  window._insertPickerCust = cust;
+  const existing = document.getElementById('insert-pos-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'insert-pos-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  const ft = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+  const n = day.customers.length;
+  let rows = '';
+  for(let i = 0; i <= n; i++){
+    const after  = day.customers[i-1];
+    const before = day.customers[i];
+    let lbl;
+    if(i === 0)    lbl = 'Før ' + escapeHtml(before.name.split(' ')[0]);
+    else if(i===n) lbl = 'Etter ' + escapeHtml(after.name.split(' ')[0]) + ' – sist';
+    else           lbl = 'Mellom ' + escapeHtml(after.name.split(' ')[0]) + ' og ' + escapeHtml(before.name.split(' ')[0]);
+    const timehint = before
+      ? '<span style="flex-shrink:0;font-size:11px;color:#888780">ca. '+ft(before._start||0)+'</span>'
+      : '';
+    rows +=
+      '<div onclick="plannerInsertStop('+dayIdx+','+i+',window._insertPickerCust)" '
+      + 'style="padding:10px 14px;border:1px solid #D3D1C7;border-radius:8px;margin-bottom:6px;'
+      + 'cursor:pointer;display:flex;align-items:center;gap:10px;background:#fff">'
+      + '<span style="background:#E6F1FB;color:#0C447C;min-width:26px;height:26px;border-radius:13px;'
+      + 'display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'
+      + (i+1) + '</span>'
+      + '<span style="flex:1;font-size:13px;color:#2C2C2A">' + escapeHtml(lbl) + '</span>'
+      + timehint
+      + '</div>';
+  }
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:420px;max-width:100%;max-height:80vh;display:flex;flex-direction:column">'
+    + '<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:center">'
+    + '<div><div style="font-size:15px;font-weight:700">Sett inn på plass</div>'
+    + '<div style="font-size:12px;color:#5F5E5A;margin-top:2px">'
+    + escapeHtml(cust.name) + ' · ' + escapeHtml(cust.city||'') + ' · ' + (cust.l12?Math.round(cust.l12/1000)+'k':'–')
+    + '</div></div>'
+    + '<button onclick="document.getElementById(\'insert-pos-modal\').remove()" '
+    + 'style="background:none;border:none;font-size:22px;cursor:pointer;color:#888780;padding:0 4px;line-height:1">×</button></div>'
+    + '<div style="padding:12px 16px;overflow-y:auto;flex:1">' + rows + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+}
+
 // Re-render planen fra (redigerte) data uten å kjøre planleggeren på nytt
 function renderPlanFromData(days){
   window._lastPlan = days;
