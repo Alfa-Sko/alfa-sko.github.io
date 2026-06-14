@@ -344,6 +344,7 @@ a{color:inherit;text-decoration:none}
 .rk-discount-pill.active{background:#0C447C;color:#fff;border-color:#0C447C}
 .planner-loading{text-align:center;padding:30px;color:#888780;font-size:13px}
 .planner-add-btn{margin-top:12px}
+.planner-day-map{height:220px;margin:10px 0 4px;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;position:relative;background:#E8E5DC}
 
 /* ═══════════════════════════════════════════════════════
    MOBILTILPASNINGER

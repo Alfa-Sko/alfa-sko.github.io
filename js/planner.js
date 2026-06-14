@@ -1282,14 +1282,20 @@ function runPlanner(){
     if(day.customers.length===0 && day.fixedCount===0){
       html+='<div style="color:#888780;font-size:13px;padding:14px;background:#F8F7F3;border-radius:8px;text-align:center;border:1px dashed #D3D1C7">Ingen kunder igjen i kundepoolen for denne dagen.<br><span style="font-size:11px">Velg færre dager, eller utvid området.</span></div>';
     }
+    if(!day.skippedReason && day.customers.length>0){
+      html+='<div id="plan-map-'+dayIdx+'" class="planner-day-map"></div>';
+    }
     html+='</div>';
   });
   window._lastPlan=days;
   window._lastTripMeta=tripMeta;
+  window._lastHomeBase=homeBase;
   html+='<div style="font-size:11px;color:#888780;margin:8px 0;text-align:center;font-style:italic">💡 Dra i ⠿ for å endre rekkefølge · × for å fjerne · knappen for å legge til</div>';
   html+='<button class="btn btn-dark planner-add-btn" onclick="plannerAddToCalendar(window._lastPlan)" style="width:100%;margin-top:8px">📅 Legg inn i kalender</button>';
   html+='</div>';
+  if(typeof _destroyDayMaps==='function') _destroyDayMaps();
   output.innerHTML=html;
+  setTimeout(()=>{ if(typeof initPlannerDayMaps==='function') initPlannerDayMaps(window._lastPlan,window._lastHomeBase,window._lastTripMeta); },0);
 }
 
 // ─── HOTELL PER DAG I PLANEN ────────────────────────────────────────────────
@@ -1869,12 +1875,17 @@ function renderPlanFromData(days){
     if(day.customers.length===0){
       html+='<div style="color:#888780;font-size:13px;padding:14px;background:#F8F7F3;border-radius:8px;text-align:center;border:1px dashed #D3D1C7;margin-top:6px">Ingen besøk denne dagen.</div>';
     }
+    if(!day.skippedReason && day.customers.length>0){
+      html+='<div id="plan-map-'+dayIdx+'" class="planner-day-map"></div>';
+    }
     html+='</div>';
   });
   html += '<div style="font-size:11px;color:#888780;margin:8px 0;text-align:center;font-style:italic">💡 Dra i ⠿ for å endre rekkefølge · × for å fjerne · knappen for å legge til</div>';
   html += '<button class="btn btn-dark planner-add-btn" onclick="plannerAddToCalendar(window._lastPlan)" style="width:100%;margin-top:8px">📅 Legg inn i kalender</button>';
   html += '</div>';
+  if(typeof _destroyDayMaps==='function') _destroyDayMaps();
   output.innerHTML = html;
+  setTimeout(()=>{ if(typeof initPlannerDayMaps==='function') initPlannerDayMaps(window._lastPlan,window._lastHomeBase,window._lastTripMeta); },0);
 }
 
 function plannerAddToCalendar(days){

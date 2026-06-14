@@ -174,3 +174,184 @@ function mapInitOverview() {
 function mapShowRoute(stops, options) {
   // TODO: rutelinje + stopp-markører
 }
+
+// ── PLANLEGGER-DAGSKART ───────────────────────────────────────────────────────
+// Viser én rute per plandag: start (hjem/hotell) → kunder i rekkefølge → slutt.
+// Kjørelinjen hentes fra OSRM (gratis, ingen nøkkel); fallback = rett stiplet linje.
+
+let _dayMapInstances = [];
+
+// Oppslag i CITY_COORDS (definert i planner-data.js)
+function _cityCoord(city) {
+  if (!city) return null;
+  const t = (typeof CITY_COORDS !== 'undefined') ? CITY_COORDS : {};
+  return t[city] ? [t[city][0], t[city][1]] : null;
+}
+
+// Nummerert ballong-pin (kjede-farge + hvitt tall)
+function _numberedPinIcon(n, color) {
+  const dark = _darken(color, 0.60);
+  const fs = n > 9 ? 10 : 13;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="34" viewBox="0 0 28 34">` +
+    `<circle cx="14" cy="13" r="12" fill="${color}" stroke="white" stroke-width="2"/>` +
+    `<polygon points="11,25 17,25 14,34" fill="${dark}"/>` +
+    `<text x="14" y="13" text-anchor="middle" dominant-baseline="central" ` +
+    `fill="white" font-size="${fs}" font-weight="700" font-family="Arial,sans-serif">${n}</text>` +
+    `</svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [28, 34], iconAnchor: [14, 34], popupAnchor: [0, -36] });
+}
+
+// Start- eller slutt-pin (bokstav + bakgrunnsfarge)
+function _labelPin(letter, bgColor) {
+  const dark = _darken(bgColor, 0.60);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="34" viewBox="0 0 28 34">` +
+    `<circle cx="14" cy="13" r="12" fill="${bgColor}" stroke="white" stroke-width="2"/>` +
+    `<polygon points="11,25 17,25 14,34" fill="${dark}"/>` +
+    `<text x="14" y="13" text-anchor="middle" dominant-baseline="central" ` +
+    `fill="white" font-size="10" font-weight="700" font-family="Arial,sans-serif">${letter}</text>` +
+    `</svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [28, 34], iconAnchor: [14, 34], popupAnchor: [0, -36] });
+}
+
+// Hent veirute fra OSRM (én samlet request per dag)
+async function _fetchOsrmRoute(latLngs) {
+  if (latLngs.length < 2) return null;
+  const coords = latLngs.map(ll => `${ll[1]},${ll[0]}`).join(';');
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`,
+      { signal: controller.signal }
+    );
+    clearTimeout(tid);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.routes || !json.routes[0]) return null;
+    // OSRM: [lng, lat] → Leaflet: [lat, lng]
+    return json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+  } catch (_) {
+    clearTimeout(tid);
+    return null;
+  }
+}
+
+// Fjern alle eksisterende dagskart-instanser (kall FØR ny output.innerHTML)
+function _destroyDayMaps() {
+  _dayMapInstances.forEach(m => { try { m.remove(); } catch (_) {} });
+  _dayMapInstances = [];
+}
+
+// Initialisér kart for én plandag
+async function _initOneDayMap(day, dayIdx, homeBase, tripMeta) {
+  const container = document.getElementById('plan-map-' + dayIdx);
+  if (!container) return;
+
+  // ── Startpunkt ──────────────────────────────────────────────────────────────
+  const startCity = day.startCity || (dayIdx === 0 ? homeBase : '');
+  const startCoord = _cityCoord(startCity);
+  const startIsHome = dayIdx === 0 || (day.sleepAtHome && dayIdx > 0);
+  const startIcon = _labelPin('A', startIsHome ? '#2C2C2A' : '#BA7517');
+  const startPopup = startIsHome
+    ? `<strong>🏠 Start: ${startCity || 'Hjem'}</strong>`
+    : `<strong>🏨 Hotell/start: ${startCity || ''}</strong>`;
+
+  // ── Kundestoppene ────────────────────────────────────────────────────────────
+  const custStops = day.customers.map(c => {
+    const coord = (c.lat != null && c.lng != null) ? [c.lat, c.lng] : _cityCoord(c.city);
+    return coord ? { coord, customer: c } : null;
+  }).filter(Boolean);
+
+  // ── Sluttpunkt (hotell/hjem) ─────────────────────────────────────────────────
+  let endCity = null, endIsHome = false, endHotelName = '';
+  if (day.returnHome) {
+    endCity = day.returnHome.to || homeBase; endIsHome = true;
+  } else if (day.eveningTransfer) {
+    endCity = day.eveningTransfer.to;
+  } else if (day.hotel && day.hotel.city) {
+    endCity = day.hotel.city; endHotelName = day.hotel.name || '';
+  } else if (day.sleepAtHome) {
+    endCity = homeBase; endIsHome = true;
+  } else if (day.sleepCity) {
+    endCity = day.sleepCity;
+  }
+  const endCoord = _cityCoord(endCity);
+  const endIcon = _labelPin('Z', endIsHome ? '#1A5C3A' : '#BA7517');
+  const endPopup = endIsHome
+    ? `<strong>🏠 Hjem: ${endCity || homeBase}</strong>`
+    : `<strong>🏨 ${endHotelName || 'Hotell'}: ${endCity || ''}</strong>`;
+
+  // ── Alle koordinater (for bounds) ───────────────────────────────────────────
+  const allCoords = [
+    ...(startCoord ? [startCoord] : []),
+    ...custStops.map(s => s.coord),
+    ...(endCoord && endCity !== startCity ? [endCoord] : []),
+  ];
+  if (allCoords.length === 0) { container.style.display = 'none'; return; }
+
+  // ── Leaflet-instans ──────────────────────────────────────────────────────────
+  const map = L.map(container, { zoomControl: false, attributionControl: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  _dayMapInstances.push(map);
+
+  // ── Startmarkør ─────────────────────────────────────────────────────────────
+  if (startCoord) {
+    L.marker(startCoord, { icon: startIcon }).bindPopup(startPopup).addTo(map);
+  }
+
+  // ── Kunde-pins (nummerert, kjede-farge) ─────────────────────────────────────
+  custStops.forEach((s, i) => {
+    const c = s.customer;
+    const color = _chainColor(c.chain);
+    const t = mins => `${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;
+    const l12str = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
+    const popup =
+      `<div style="min-width:160px;font-family:inherit">` +
+      `<div style="font-weight:700;font-size:13px">${i+1}. ${c.name}</div>` +
+      `<div style="font-size:11px;color:#555;margin:3px 0">${c.city||''}${c.chain ? ' · '+c.chain : ''}</div>` +
+      `<div style="font-size:11px">🕐 ${t(c._start)} – ${t(c._end)} · L12: ${l12str}</div>` +
+      `</div>`;
+    L.marker(s.coord, { icon: _numberedPinIcon(i+1, color) }).bindPopup(popup).addTo(map);
+  });
+
+  // ── Sluttmarkør (hotell / hjem) ─────────────────────────────────────────────
+  if (endCoord && endCity !== startCity) {
+    L.marker(endCoord, { icon: endIcon }).bindPopup(endPopup).addTo(map);
+  }
+
+  // ── Kart-bounds ─────────────────────────────────────────────────────────────
+  const boundsGroup = L.featureGroup(allCoords.map(c => L.marker(c, { opacity: 0 })));
+  map.fitBounds(boundsGroup.getBounds().pad(0.18));
+  setTimeout(() => map.invalidateSize(), 50);
+
+  // ── OSRM-rute (asynkron — tegnes etter at kartet er synlig) ─────────────────
+  const osrmWpts = [
+    ...(startCoord ? [startCoord] : []),
+    ...custStops.map(s => s.coord),
+    ...(endCoord && endCity !== startCity ? [endCoord] : []),
+  ];
+  if (osrmWpts.length >= 2) {
+    _fetchOsrmRoute(osrmWpts).then(routeLine => {
+      if (routeLine && routeLine.length > 1) {
+        L.polyline(routeLine, { color: '#1565C0', weight: 3, opacity: 0.75 }).addTo(map);
+      } else {
+        // Fallback: stiplet rett linje mellom stoppene
+        L.polyline(osrmWpts, { color: '#1565C0', weight: 2, opacity: 0.45, dashArray: '6 6' }).addTo(map);
+      }
+    });
+  }
+}
+
+// Initialisér alle dagskart etter at planen er rendret
+function initPlannerDayMaps(days, homeBase, tripMeta) {
+  _destroyDayMaps();
+  if (!days || !days.length) return;
+  days.forEach((day, idx) => {
+    if (!day.skippedReason && day.customers && day.customers.length > 0) {
+      _initOneDayMap(day, idx, homeBase || '', tripMeta || {});
+    }
+  });
+}
