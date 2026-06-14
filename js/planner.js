@@ -207,6 +207,20 @@ function estimateRoute(fromCity, toCity){
   return {min: driveMin, km: driveKm, estimated: true};
 }
 
+// Koordinat-basert estimat — brukes når faktisk lat/lng er kjent på begge punkter.
+// Erstatter fast sjablong (sameCityRoute) for kunder med presise posisjoner.
+// < 0.3 km: samme sted → sjablong; < 5 km: intra-by (× 1.3 / 25 km/t); ellers: norsk veifaktor.
+function _routeInfoFromCoords(lat1, lng1, lat2, lng2, fromCity){
+  const straightKm = haversineKm(lat1, lng1, lat2, lng2);
+  if(straightKm < 0.3) return sameCityRoute(fromCity||'');
+  if(straightKm < 5){
+    const km = Math.round(straightKm * 1.3 * 10) / 10;
+    return {min: Math.max(3, Math.round((km / 25) * 60)), km: Math.round(km), estimated: true};
+  }
+  const km = Math.round(straightKm * 1.5);
+  return {min: Math.round((km / 60) * 60), km, estimated: true};
+}
+
 // Innen samme by: sjablong avhengig av bystørrelse (storbyer har lengre internetapper)
 function sameCityRoute(city){
   const big = BIG_CITIES.some(b=>String(city||'').toLowerCase().includes(b.toLowerCase()));
@@ -537,9 +551,17 @@ function rpToggleTravelBox(){
   if(arr) arr.textContent = open?'▾':'▸';
 }
 
-function getRouteInfo(fromCity, toCity){
+// fromCoord/toCoord: valgfrie [lat,lng]-par — brukes til koordinatestimatet
+// når ROUTE_DATA ikke treffer. Alle eksisterende kallsteder uten koordinater
+// fungerer uendret (bakoverkompatibel).
+function getRouteInfo(fromCity, toCity, fromCoord, toCoord){
   if(!fromCity||!toCity) return null;
-  if(fromCity===toCity) return sameCityRoute(fromCity);
+  // Samme by: bruk koordinatestimatet hvis tilgjengelig, ellers sjablong
+  if(fromCity===toCity){
+    return (fromCoord && toCoord)
+      ? _routeInfoFromCoords(fromCoord[0],fromCoord[1],toCoord[0],toCoord[1],fromCity)
+      : sameCityRoute(fromCity);
+  }
   // Forsøk å normalisere: hvis brukeren har skrevet en full adresse (f.eks. "Storgata 1, 9000 Tromsø"),
   // skal vi gjenkjenne "Kvaløya" som by
   function normalizeCity(s){
@@ -553,19 +575,25 @@ function getRouteInfo(fromCity, toCity){
   }
   const f = normalizeCity(fromCity);
   const t = normalizeCity(toCity);
-  if(f===t) return sameCityRoute(f);
-  // 1. Eksakt match i ROUTE_DATA
+  if(f===t){
+    return (fromCoord && toCoord)
+      ? _routeInfoFromCoords(fromCoord[0],fromCoord[1],toCoord[0],toCoord[1],f)
+      : sameCityRoute(f);
+  }
+  // 1. Eksakt match i ROUTE_DATA (mest presist — egne oppmålte tall)
   const exact = ROUTE_DATA[f+'-'+t]||ROUTE_DATA[t+'-'+f];
   if(exact) return exact;
-  // 2. Estimat via koordinater
+  // 2. Koordinatestimatet hvis faktiske posisjoner er kjent
+  if(fromCoord && toCoord)
+    return _routeInfoFromCoords(fromCoord[0],fromCoord[1],toCoord[0],toCoord[1],f);
+  // 3. Estimat via CITY_COORDS (by-senter til by-senter)
   return estimateRoute(f, t);
 }
 
-function getDriveMin(fromCity, toCity){
+function getDriveMin(fromCity, toCity, fromCoord, toCoord){
   if(!fromCity||!toCity) return 20;
-  if(fromCity===toCity) return sameCityRoute(fromCity).min;
-  const r=getRouteInfo(fromCity,toCity);
-  return r?r.min:30;
+  const r = getRouteInfo(fromCity, toCity, fromCoord, toCoord);
+  return r ? r.min : (fromCity===toCity ? sameCityRoute(fromCity).min : 20);
 }
 
 function mapsLink(from, to){
@@ -1455,6 +1483,7 @@ function recomputeDayTimes(day){
   const weekday = day.date.getDay();
   let cursor = dayStartMin;
   let prevCity = day.startCity || '';
+  let prevCoord = _coordFor(day.startCity||'');
   // Faste hindringer: flyetapper (med byskifte) og tidsblokker (adm/lunsj/møter osv.).
   // Besøk som kolliderer skyves til etter hindringen.
   const legs = (day.flightLegs||[]).slice().sort((a,b)=>a.depMins-b.depMins);
@@ -1472,22 +1501,32 @@ function recomputeDayTimes(day){
       guard++;
       // Konsumér hindringer vi allerede har passert (fly bytter by)
       while(oIdx<obstacles.length && obstacles[oIdx].e<=cursor){
-        if(obstacles[oIdx].arrCity) prevCity = obstacles[oIdx].arrCity;
+        if(obstacles[oIdx].arrCity){
+          prevCity = obstacles[oIdx].arrCity;
+          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
+        }
         oIdx++;
       }
-      const drive = prevCity ? getDriveMin(prevCity, c.city||'') : 0;
+      const toCoord = (c.lat!=null&&c.lng!=null) ? [c.lat,c.lng] : _coordFor(c.city||'');
+      const drive = prevCity ? getDriveMin(prevCity, c.city||'', prevCoord, toCoord) : 0;
       const openMin = _gOpeningTimeMin(c, weekday);
       let t = Math.ceil(Math.max(cursor + drive, openMin)/30)*30;
       // Kolliderer besøket med neste hindring?
       if(oIdx<obstacles.length && t+dur > obstacles[oIdx].s && t < obstacles[oIdx].e){
         cursor = obstacles[oIdx].e;
-        if(obstacles[oIdx].arrCity) prevCity = obstacles[oIdx].arrCity;
+        if(obstacles[oIdx].arrCity){
+          prevCity = obstacles[oIdx].arrCity;
+          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
+        }
         oIdx++;
         continue;
       }
       // Hoppet helt forbi en hindring (sen åpningstid e.l.)? Konsumér den og prøv igjen.
       if(oIdx<obstacles.length && t >= obstacles[oIdx].e){
-        if(obstacles[oIdx].arrCity) prevCity = obstacles[oIdx].arrCity;
+        if(obstacles[oIdx].arrCity){
+          prevCity = obstacles[oIdx].arrCity;
+          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
+        }
         oIdx++;
         continue;
       }
@@ -1498,6 +1537,7 @@ function recomputeDayTimes(day){
       c.isPrio = c.l12>=150000;
       cursor = t + dur;
       prevCity = c.city || prevCity;
+      prevCoord = toCoord || prevCoord;
       placedOk = true;
     }
   });
