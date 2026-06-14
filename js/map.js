@@ -20,36 +20,67 @@ function _chainColor(chain) {
   return '#3A7A3A';                               // grønn (frittstående/andre)
 }
 
-// ── Pin-ikon (Leaflet divIcon med SVG) ───────────────────────────────────────
+// ── Mørkere fargetone til skyggedelen av 3D-gradienten ───────────────────────
+
+function _darken(hex, f = 0.52) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`;
+}
+
+// ── Knappenål-ikon (3D-kule + nål, SVG i L.divIcon) ─────────────────────────
+//
+// Oppbygning (topp → bunn):
+//   • radialGradient: hvitt høylys øverst til venstre → basisfarge → mørk skygge
+//   • polygon: tynn nål fra kule-bunnen ned til spissen (ankerpunkt)
+//   • ellipse: subtil skygge i overgangen kule/nål for dybdeeffekt
+//   • circle: den 3D-graderte kula
+//   • ellipse: lite høylys-flekk øverst til venstre på kula
+//
+// Alle markører med samme kjede-farge deler gradient-ID (identisk innhold → OK).
 
 function _pinIcon(color) {
+  const gid  = 'mpin_' + color.replace('#', '');
+  const dark = _darken(color);
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30">` +
-    `<path d="M11 0C4.925 0 0 4.925 0 11c0 7.5 11 19 11 19S22 18.5 22 11C22 4.925 17.075 0 11 0z" fill="${color}" stroke="rgba(0,0,0,0.22)" stroke-width="1"/>` +
-    `<circle cx="11" cy="11" r="4.5" fill="white" opacity="0.9"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="38" viewBox="0 0 20 38">` +
+    `<defs>` +
+    `<radialGradient id="${gid}" cx="36%" cy="28%" r="70%">` +
+    `<stop offset="0%"   stop-color="white"   stop-opacity="0.80"/>` +
+    `<stop offset="42%"  stop-color="${color}" stop-opacity="1"/>` +
+    `<stop offset="100%" stop-color="${dark}"  stop-opacity="1"/>` +
+    `</radialGradient>` +
+    `</defs>` +
+    // Nål (polygon: toppkant 9–11, spiss 10,37)
+    `<polygon points="9,18 11,18 10,37" fill="#2e2e2e"/>` +
+    // Subtil ellipse-skygge i kule/nål-overgangen
+    `<ellipse cx="10" cy="18" rx="5" ry="2" fill="rgba(0,0,0,0.18)"/>` +
+    // Kule
+    `<circle cx="10" cy="9.5" r="9" fill="url(#${gid})" stroke="rgba(0,0,0,0.22)" stroke-width="0.8"/>` +
+    // Høylys-flekk (liten lys ellipse øverst til venstre)
+    `<ellipse cx="7" cy="6.5" rx="3" ry="2.2" fill="white" opacity="0.52" transform="rotate(-20 7 6.5)"/>` +
     `</svg>`;
   return L.divIcon({
     html:        svg,
     className:   '',
-    iconSize:    [22, 30],
-    iconAnchor:  [11, 30],
-    popupAnchor: [0, -30],
+    iconSize:    [20, 38],
+    iconAnchor:  [10, 37],  // spissen av nålen
+    popupAnchor: [0, -38],
   });
 }
 
 // ── Tegnforklaring ────────────────────────────────────────────────────────────
 
 const _LEGEND_ITEMS = [
-  { label: 'Intersport',          color: '#C0392B' },
-  { label: 'Sport 1',             color: '#1A5FA3' },
-  { label: 'Stadion',             color: '#1A2E5A' },
-  { label: 'Jaktia',             color: '#8B5E3C' },
-  { label: 'Frittstående / andre', color: '#3A7A3A' },
+  { label: 'Intersport',            color: '#C0392B' },
+  { label: 'Sport 1',               color: '#1A5FA3' },
+  { label: 'Stadion',               color: '#1A2E5A' },
+  { label: 'Jaktia',                color: '#8B5E3C' },
+  { label: 'Frittstående / andre',  color: '#3A7A3A' },
 ];
 
 // ── Privat: initialiser eller gjenbruk kart ──────────────────────────────────
-// Må kalles etter at container-elementet er synlig (display:block),
-// ellers beregner Leaflet feil størrelse.
 
 function _ensureMap(containerId) {
   if (_mapInstance) {
@@ -72,8 +103,8 @@ function _clearLayers() {
 }
 
 // ── OVERSIKTSKART ────────────────────────────────────────────────────────────
-// Pin-farge basert på kjede. geo='adresse'/'manuell' = presis posisjon,
-// geo='by' = kommunesentrum (omtrentlig) — vist i popup.
+// Viser alle kunder med koordinater som 3D-knappenåler, fargekoda på kjede.
+// geo='adresse'/'manuell' = presis posisjon, geo='by' = kommunesentrum (omtrentlig).
 
 function mapInitOverview() {
   const map = _ensureMap('map-container');
@@ -87,8 +118,7 @@ function mapInitOverview() {
 
   customers.forEach(c => {
     try {
-      const color  = _chainColor(c.chain);
-      const marker = L.marker([c.lat, c.lng], { icon: _pinIcon(color) });
+      const marker = L.marker([c.lat, c.lng], { icon: _pinIcon(_chainColor(c.chain)) });
 
       const l12str   = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
       const clsBadge = c.class
