@@ -54,5 +54,4 @@ Alt ligger nå i én index.html (~7766 linjer). Mål:
 ## Backlog (etter refaktorering)
 
 - id=114 (TROMSØ OUTDOOR AS) har poststed="TROMØ" – skrivefeil for "TROMSØ" (postnr 9008 bekrefter). Rettes i datafyllingen til Supabase, ellers feiler geokoding.
-- Adressevisning i kundekort: data finnes (gate/postnr/poststed på alle 142), men visningen (customers.js ~linje 237 og 322) leser feil felt (c.address). Fiks med fallback: vis gate/postnr/poststed som primær, c.address kun hvis utfylt manuelt. IKKE kopier gate→address (unngå dobbel sannhet – geokoding trenger de strukturerte feltene). Liten fiks, tas rett etter fase 1.
 - Tidslinje viser ikke bildevedlegg. Kode (renderNotesWithPhotos → getPhotosForVisit) er identisk med original-main, så feilen er pre-eksisterende. Uavklart om det er reell feil eller bare manglende lagrede bilder. Undersøk når refaktorering er ferdig: verifiser at initPhotoDB faktisk åpner basen (sjekk schema-versjon / IndexedDB i DevTools → Application), og at et besøk med faktisk lagret bilde rendres i tidslinjen.
