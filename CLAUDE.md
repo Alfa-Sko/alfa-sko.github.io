@@ -46,8 +46,12 @@ Alt ligger nå i én index.html (~7766 linjer). Mål:
 - **Eierskap baseres på `district`** fordi `profiles` allerede har `district` per bruker.
 - **Kunder i egen `customers`-tabell** (strukturerte delte data), IKKE i `user_data` (som er per-bruker nøkkel-verdi).
 
-## Backlog (etter refaktorering)
+## Supabase-nøkler
 
+- **Appen (supabase.js):** bruker `sb_publishable_...`-format (ny nøkkeltype, ikke JWT). Skal ikke endres.
+- **Server-side skript (scripts/):** må bruke `sb_secret_...`-format fra Supabase → Settings → API → "Secret key". Den gamle legacy `eyJhbGci...` service_role JWT er deaktivert og gir 401. Nøkkelen settes alltid via miljøvariabel, aldri hardkodet.
+
+## Backlog (etter refaktorering)
 
 - id=114 (TROMSØ OUTDOOR AS) har poststed="TROMØ" – skrivefeil for "TROMSØ" (postnr 9008 bekrefter). Rettes i datafyllingen til Supabase, ellers feiler geokoding.
 - Adressevisning i kundekort: data finnes (gate/postnr/poststed på alle 142), men visningen (customers.js ~linje 237 og 322) leser feil felt (c.address). Fiks med fallback: vis gate/postnr/poststed som primær, c.address kun hvis utfylt manuelt. IKKE kopier gate→address (unngå dobbel sannhet – geokoding trenger de strukturerte feltene). Liten fiks, tas rett etter fase 1.
