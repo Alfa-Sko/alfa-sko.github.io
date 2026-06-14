@@ -46,7 +46,9 @@ document.querySelectorAll('input[type="date"]').forEach(el=>{ if(!el.value) el.v
   }, {passive:true});
 })();
 
-initPhotoDB().then(()=>renderOverview()).catch(()=>renderOverview());
+initPhotoDB().catch(()=>{})
+  .then(()=>fetchCustomersFromSupabase().catch(()=>{}))
+  .then(()=>renderOverview());
 // Synkronisér brukerprofil til planlegger-feltene ved oppstart
 setTimeout(()=>{ try{ syncProfileToPlanner(); }catch(e){} }, 100);
 

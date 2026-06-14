@@ -20,9 +20,42 @@
 let CUSTOMERS = loadCustomers();
 
 // Getter-lag: appen henter alltid kunder herfra.
-// Bytt implementasjon her når kilden flyttes til Supabase.
 function getCustomers()     { return CUSTOMERS; }
 function getCustomerSales() { return CUSTOMER_SALES; }
+
+// Henter kunder fra Supabase customers-tabellen ved oppstart.
+// Kalles av init.js før renderOverview(); CUSTOMERS fylles in-place så
+// getCustomers() forblir synkron og de 7 caller-filene trenger ikke endres.
+// Fallback: hvis ikke innlogget, fetch feiler, eller tabellen er tom,
+// beholdes eksisterende CUSTOMERS (BASE_CUSTOMERS eller localStorage-cache).
+async function fetchCustomersFromSupabase() {
+  const s = typeof _sbSession === 'function' ? _sbSession() : null;
+  if (!s || !s.access_token) return;
+
+  let res;
+  try {
+    res = await fetch(SUPA_URL + '/rest/v1/customers?select=*&order=name', {
+      headers: {
+        apikey:        SUPA_KEY,
+        Authorization: 'Bearer ' + s.access_token,
+      }
+    });
+  } catch (e) {
+    console.warn('fetchCustomersFromSupabase: nettverksfeil', e);
+    return;
+  }
+
+  if (!res.ok) {
+    console.warn('fetchCustomersFromSupabase: HTTP', res.status);
+    return;
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) return; // migrasjon ikke kjørt ennå → behold fallback
+
+  CUSTOMERS.length = 0;
+  CUSTOMERS.push(...data);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXCEL-IMPORT AV KUNDELISTE (mal: kundeoversikt_oppdatering_mal.xlsx)
