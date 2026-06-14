@@ -602,7 +602,7 @@ function matchesArea(c, area){
   const aLow=area.toLowerCase();
   const cityLow=(c.city||'').toLowerCase();
   const nameLow=(c.name||'').toLowerCase();
-  const addrLow=(c.address||'').toLowerCase();
+  const addrLow=((c.address||c.gate)||'').toLowerCase();
   // 1. Direkte match på fylke (kundens .city)
   if(cityLow===aLow || cityLow.includes(aLow)) return true;
   // 2. Bystedet ligger i kundenavnet (i parentes typisk)
@@ -856,6 +856,14 @@ function runPlanner(){
       }
     }
     let prevCity = dayStartCity;
+    // Dag 1 fra hjemmebase som er > 3t unna målområdet: anta at bruker er fremme
+    // (fly/bil kvelden før). Beregn kjøretider fra målbyen, ikke hjemmebasen.
+    if(d===0 && !customRouteActive && dayStartCity && area!=='Alle'){
+      if(getDriveMin(dayStartCity, area) > 180){
+        dayStartCity = area;
+        prevCity = area;
+      }
+    }
     let lastEndMin=dayStartMinEff;
     // Returfly: på avreisedagen (angitt dato, ellers siste plandag) må besøkene
     // slutte senest 1t 45min før flyavgang (innsjekk + kjøring til flyplassen).
