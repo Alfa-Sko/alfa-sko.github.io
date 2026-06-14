@@ -1,50 +1,34 @@
 // scripts/geocode.js — geokoder kundene i Supabase customers-tabellen via Nominatim.
 //
-// Autentisering: logger inn som bruker og bruker user-JWT i Authorization-headeren.
-// sb_secret_-nøkler er IKKE JWTs og fungerer ikke med PostgREST /rest/v1/.
-// User-JWT fungerer fordi brukeren har skrivetilgang til egne kunder via RLS.
+// Autentisering: sb_secret_-nøkkel sendes KUN som "apikey"-header.
+// Supabase sin API-gateway validerer den og gir service_role-tilgang (bypasser RLS).
+// IKKE send den som "Authorization: Bearer" – da prøver PostgREST å parse den som
+// JWT, feiler, og returnerer 401. (Kilde: supabase.com/docs/guides/api/api-keys)
 //
 // Kjør (PowerShell):
-//   $env:SUPA_EMAIL="jorn@alfa.no"
-//   $env:SUPA_PASSWORD="<passord>"
+//   $env:SUPA_SECRET_KEY="sb_secret_..."
 //   node scripts/geocode.js
 //
 // Krav: Node 18+ (innebygd fetch). Ingen npm-pakker nødvendig.
 
-const SUPA_URL         = 'https://oxwirhetgwcbsehyuaeq.supabase.co';
-const SUPA_PUBLISHABLE = 'sb_publishable_eflHUMlSGKaZIzb1YYjG3w_TTNKK1az';
+const SUPA_URL = 'https://oxwirhetgwcbsehyuaeq.supabase.co';
+const SUPA_KEY = process.env.SUPA_SECRET_KEY;
+if (!SUPA_KEY) {
+  console.error('Feil: SUPA_SECRET_KEY er ikke satt.');
+  console.error('Kjør: $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/geocode.js');
+  process.exit(1);
+}
 
 const DELAY_MS = 1100; // > 1 sek mellom requests (Nominatim fair-use policy)
 const UA       = 'AlfaKompass/1.0 (intern CRM, kontakt: jorn@alfa.no)';
 
-// ── Login → hent user-JWT ────────────────────────────────────────────────────
-// PostgREST validerer Authorization: Bearer <jwt> som et ekte JWT.
-// sb_secret_-tokens er ikke JWTs og avvises av PostgREST med 401.
+// ── Supabase REST-headers ─────────────────────────────────────────────────────
+// apikey-header alene: gatewayen validerer sb_secret_ og injiserer service_role.
+// Ingen Authorization-header – den ville forvirre PostgREST.
 
-async function getAccessToken() {
-  const email    = process.env.SUPA_EMAIL;
-  const password = process.env.SUPA_PASSWORD;
-  if (!email || !password) {
-    console.error('Feil: SUPA_EMAIL og SUPA_PASSWORD må være satt som miljøvariabler.');
-    process.exit(1);
-  }
-  const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
-    method:  'POST',
-    headers: { apikey: SUPA_PUBLISHABLE, 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ email, password }),
-  });
-  if (!res.ok) throw new Error(`Login feilet: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  console.log(`Innlogget som ${data.user.email}\n`);
-  return data.access_token;
-}
-
-// ── Supabase REST-headers (bruker user-JWT, ikke sb_secret_) ─────────────────
-
-function sbHeaders(accessToken, extra = {}) {
+function sbHeaders(extra = {}) {
   return {
-    apikey:         SUPA_PUBLISHABLE,
-    Authorization:  `Bearer ${accessToken}`,
+    apikey:         SUPA_KEY,
     'Content-Type': 'application/json',
     ...extra,
   };
@@ -52,12 +36,12 @@ function sbHeaders(accessToken, extra = {}) {
 
 // ── Hent kunder uten koordinater ─────────────────────────────────────────────
 // lat=is.null AND geo=is.null: kun kunder som ikke er forsøkt ennå.
-// For å re-kjøre "mangler"-merkede: fjern &geo=is.null.
+// For å re-kjøre "mangler"-merkede også: fjern &geo=is.null fra URL-en.
 
-async function fetchUngeocoded(accessToken) {
+async function fetchUngeocoded() {
   const res = await fetch(
     `${SUPA_URL}/rest/v1/customers?select=id,name,gate,postnr,poststed&lat=is.null&geo=is.null&order=name`,
-    { headers: sbHeaders(accessToken) }
+    { headers: sbHeaders() }
   );
   if (!res.ok) throw new Error(`Supabase fetch feilet: ${res.status} ${await res.text()}`);
   return res.json();
@@ -65,12 +49,12 @@ async function fetchUngeocoded(accessToken) {
 
 // ── PATCH lat/lng/geo på én kunde (UUID) ─────────────────────────────────────
 
-async function updateCustomer(accessToken, id, lat, lng, geo) {
+async function updateCustomer(id, lat, lng, geo) {
   const res = await fetch(
     `${SUPA_URL}/rest/v1/customers?id=eq.${id}`,
     {
       method:  'PATCH',
-      headers: sbHeaders(accessToken, { Prefer: 'return=minimal' }),
+      headers: sbHeaders({ Prefer: 'return=minimal' }),
       body:    JSON.stringify({ lat, lng, geo }),
     }
   );
@@ -92,9 +76,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // ── Hovedløkke ───────────────────────────────────────────────────────────────
 
 async function main() {
-  const accessToken = await getAccessToken();
-  const customers   = await fetchUngeocoded(accessToken);
-
+  const customers = await fetchUngeocoded();
   console.log(`Fant ${customers.length} kunder uten koordinater.\n`);
   if (customers.length === 0) { console.log('Ingenting å gjøre.'); return; }
 
@@ -124,12 +106,12 @@ async function main() {
     if (!result) {
       missingList.push(`${name} | gate="${gate || '–'}" poststed="${poststed || '–'}"`);
       console.log('INGEN TREFF');
-      await updateCustomer(accessToken, id, null, null, 'mangler');
+      await updateCustomer(id, null, null, 'mangler');
       continue;
     }
 
     console.log(`${precision} → ${result.lat.toFixed(5)}, ${result.lng.toFixed(5)}`);
-    await updateCustomer(accessToken, id, result.lat, result.lng, precision);
+    await updateCustomer(id, result.lat, result.lng, precision);
     okCount++;
   }
 
