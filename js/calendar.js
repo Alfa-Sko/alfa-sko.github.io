@@ -249,7 +249,7 @@ function calColClick(ev,key,colEl){
   if(ev.target!==colEl&&!ev.target.style.borderTop)return;
   const rect=colEl.getBoundingClientRect();
   const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
-  const h=Math.floor(((calView==='day'?5:7)*60+slot*15)/60);
+  const h=Math.floor(((calView==='day'?4:6)*60+slot*15)/60);
   openAppt(key,ev,h);
 }
 
