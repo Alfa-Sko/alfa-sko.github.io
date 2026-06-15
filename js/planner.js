@@ -1324,100 +1324,178 @@ function runPlanner(){
 
 // ─── HOTELL PER DAG I PLANEN ────────────────────────────────────────────────
 
-// Bygg hotellvelger-rad for en plandag. Viser forslag fra HOTELS_BY_CITY
-// sortert etter brukerens foretrukne kjeder (★ = preferert kjede).
 function dayHotelRowHtml(day, dayIdx, daysArr){
   if(!day || day.skippedReason) return '';
-  if(day.returnHome) return ''; // hjemtur — ingen overnatting
+  if(day.returnHome) return '';
   const days = daysArr || window._lastPlan || [];
-  // Siste dag: man reiser normalt hjem — ingen hotellrad som default
   if(days.length>0 && dayIdx>=days.length-1) return '';
   if((day.timeline||[]).some(x=>x.kind==='flight-return')) return '';
   const sleepCity = day.eveningTransfer ? day.eveningTransfer.to : day.sleepCity;
-  // Neste dags første by — relevant for å ligge i forkant
-  let nextCity = null;
   const nd = days[dayIdx+1];
-  if(nd && !nd.skippedReason){
-    nextCity = (nd.customers && nd.customers[0] && nd.customers[0].city) || nd.startCity || null;
-  }
+  const nextCity = nd && !nd.skippedReason
+    ? ((nd.customers&&nd.customers[0]&&nd.customers[0].city)||nd.startCity||null)
+    : null;
+  const baseCity = sleepCity || nextCity;
   const sel = day.hotel ? day.hotel.name : '';
   const selCity = day.hotel ? (day.hotel.city||'') : '';
-  // Bygg options: hoteller i overnattingsbyen + (hvis ulik) neste dags by
-  function cityOpts(city, label){
-    const sugg = suggestHotels(city);
-    if(sugg.length===0 && !label) return '';
-    let o = '<optgroup label="'+escapeHtml(label||('Hoteller i '+city))+'">';
-    sugg.forEach(h=>{
-      const val = h.name+'||'+city;
-      o += '<option value="'+escapeHtml(val)+'"'+(sel===h.name&&selCity===city?' selected':'')+'>'+(h.preferred?'★ ':'')+escapeHtml(h.name)+'</option>';
-    });
-    o += '</optgroup>';
-    return o;
-  }
-  // Hjemme-natt: tilby likevel hotell i neste dags by (ligge i forkant)
-  if(day.sleepAtHome && !day.eveningTransfer && !sel){
-    if(!nextCity) {
-      return '<div id="day-hotel-row-'+dayIdx+'" style="margin-top:6px;padding:8px 12px;background:#F1F7F3;border:1px solid #C8E0CF;border-radius:8px;font-size:12px;color:#1A5C3A">🏠 Overnatting: hjemme</div>';
-    }
-    let opts = '<option value="">🏠 Hjemme (standard)</option>';
-    opts += cityOpts(nextCity, 'Ligg i forkant — hoteller i '+nextCity);
-    opts += '<option value="__custom">Annet (skriv selv) ...</option>';
-    return '<div id="day-hotel-row-'+dayIdx+'" style="margin-top:6px;padding:8px 12px;background:#F1F7F3;border:1px solid #C8E0CF;border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-      '<span style="font-size:12px;color:#1A5C3A;font-weight:600;flex-shrink:0">🏠 Overnatting:</span>'+
-      '<select onchange="setDayHotel('+dayIdx+',this.value)" style="flex:1;min-width:170px;padding:7px 9px;border:1px solid #C8E0CF;border-radius:7px;font-size:12px;background:#fff">'+opts+'</select>'+
-      '</div>';
-  }
-  const baseCity = sleepCity || nextCity;
-  if(!baseCity && !sel) return '';
-  let opts = '<option value="">Velg hotell ...</option>';
-  if(sleepCity) opts += cityOpts(sleepCity);
-  if(nextCity && nextCity!==sleepCity) opts += cityOpts(nextCity, 'Ligg i forkant — hoteller i '+nextCity);
-  if(sel){
-    const selVal = sel+'||'+selCity;
-    // Hvis valgt hotell ikke er blant forslagene, vis det som eget valg
-    if(opts.indexOf('value="'+escapeHtml(selVal)+'"')===-1){
-      opts += '<option value="'+escapeHtml(selVal)+'" selected>'+escapeHtml(sel)+(selCity?' ('+escapeHtml(selCity)+')':'')+'</option>';
-    }
-  }
-  opts += '<option value="__custom">Annet (skriv selv) ...</option>';
-  const mapsLink2 = sel ? ' <a href="https://www.google.com/maps/search/'+encodeURIComponent(sel+', '+(selCity||baseCity||'')+', Norge')+'" target="_blank" style="color:#1565C0;text-decoration:underline;font-size:11px;flex-shrink:0">Maps ↗</a>' : '';
   const hb = day.hotel && day.hotel.booked;
-  const bookChk = sel ? '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#6D4C00"><input type="checkbox" '+(hb?'checked':'')+' onchange="toggleDayHotelBooked('+dayIdx+',this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label>' : '';
-  return '<div id="day-hotel-row-'+dayIdx+'" style="margin-top:6px;padding:8px 12px;background:#FFF6E6;border:1px solid #E6D9B8;border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap'+(sel&&!hb?';opacity:0.62':'')+'">'+
-    '<span style="font-size:12px;color:#6D4C00;font-weight:600;flex-shrink:0">'+(sel?'<span class="book-mark">'+(hb?'✅':'❌')+'</span> ':'')+'🏨 Overnatting:</span>'+
-    '<select onchange="setDayHotel('+dayIdx+',this.value)" style="flex:1;min-width:170px;padding:7px 9px;border:1px solid #D3D1C7;border-radius:7px;font-size:12px;background:#fff">'+opts+'</select>'+
-    mapsLink2+bookChk+
-    '</div>';
+  const isHome = day.sleepAtHome && !day.eveningTransfer && !sel;
+  if(!baseCity && !sel && !isHome) return '';
+
+  const borderColor = isHome ? '#C8E0CF' : '#E6D9B8';
+  const bgColor = isHome ? '#F1F7F3' : '#FFF6E6';
+  const labelColor = isHome ? '#1A5C3A' : '#6D4C00';
+  const icon = isHome ? '🏠' : '🏨';
+  const bookMark = sel ? '<span class="book-mark">'+(hb?'✅':'❌')+'</span> ' : '';
+  const placeholder = isHome ? '🏠 Hjemme — søk for å velge hotell ...' : 'Søk på hotell ...';
+  const mapsHref = sel
+    ? 'https://www.google.com/maps/search/'+encodeURIComponent(sel+', '+(selCity||baseCity||'')+', Norge')
+    : '';
+  const mapsLink = sel
+    ? '<a href="'+escapeHtml(mapsHref)+'" target="_blank" style="color:#1565C0;text-decoration:underline;font-size:11px;flex-shrink:0">Maps ↗</a>'
+    : '';
+  const bookChk = sel
+    ? '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#6D4C00"><input type="checkbox" '+(hb?'checked':'')+' onchange="toggleDayHotelBooked('+dayIdx+',this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label>'
+    : '';
+  const clearBtn = sel
+    ? '<button onclick="clearDayHotel('+dayIdx+')" style="background:none;border:none;color:#888780;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1" title="Fjern valgt hotell">×</button>'
+    : '';
+
+  return '<div id="day-hotel-row-'+dayIdx+'" style="margin-top:6px;padding:8px 12px;background:'+bgColor+';border:1px solid '+borderColor+';border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap'+(sel&&!hb?';opacity:0.62':'')+'">'
+    +'<span style="font-size:12px;color:'+labelColor+';font-weight:600;flex-shrink:0">'+bookMark+icon+' Overnatting:</span>'
+    +'<div style="position:relative;flex:1;min-width:180px">'
+      +'<input id="hotel-search-'+dayIdx+'" type="text"'
+        +' value="'+escapeHtml(sel)+'"'
+        +' placeholder="'+escapeHtml(placeholder)+'"'
+        +' autocomplete="off"'
+        +' oninput="hotelPickerSearch('+dayIdx+',this.value)"'
+        +' onfocus="hotelPickerSearch('+dayIdx+',this.value)"'
+        +' onblur="setTimeout(()=>hotelPickerHide('+dayIdx+'),200)"'
+        +' style="width:100%;padding:7px 9px;border:1px solid '+borderColor+';border-radius:7px;font-size:12px;background:#fff;box-sizing:border-box">'
+      +'<div id="hotel-picker-list-'+dayIdx+'" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #D3D1C7;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>'
+    +'</div>'
+    +clearBtn+mapsLink+bookChk
+    +'</div>';
 }
 
-function setDayHotel(dayIdx, value){
+// ─── HOTELLVELGER-SØKEFUNKSJONER ─────────────────────────────────────────────
+
+function hotelPickerSearch(dayIdx, q){
+  const listEl = document.getElementById('hotel-picker-list-'+dayIdx);
+  if(!listEl) return;
+  const days = window._lastPlan;
+  const day = days && days[dayIdx];
+  q = (q||'').trim().toLowerCase();
+
+  const pCities = new Set();
+  if(day){
+    if(day.sleepCity) pCities.add(day.sleepCity.toLowerCase());
+    if(day.eveningTransfer && day.eveningTransfer.to) pCities.add(day.eveningTransfer.to.toLowerCase());
+    if(day.startCity) pCities.add(day.startCity.toLowerCase());
+    (day.customers||[]).forEach(c=>{ if(c.city) pCities.add(c.city.toLowerCase()); });
+    const nd2 = days[dayIdx+1];
+    if(nd2 && !nd2.skippedReason){
+      const nc = (nd2.customers&&nd2.customers[0]&&nd2.customers[0].city)||nd2.startCity||'';
+      if(nc) pCities.add(nc.toLowerCase());
+    }
+  }
+
+  const source = (typeof HOTELS_OSM !== 'undefined') ? HOTELS_OSM : {};
+  const results = [];
+  for(const [city, hotels] of Object.entries(source)){
+    const cityLow = city.toLowerCase();
+    for(const h of hotels){
+      if(q && !h.name.toLowerCase().includes(q) && !cityLow.includes(q)) continue;
+      results.push({...h, city, _prio: pCities.has(cityLow) ? 0 : 1});
+    }
+  }
+  results.sort((a,b)=>{
+    if(a._prio!==b._prio) return a._prio-b._prio;
+    const cc = a.city.localeCompare(b.city,'no');
+    return cc!==0 ? cc : a.name.localeCompare(b.name,'no');
+  });
+
+  const show = results.slice(0,40);
+  if(show.length===0){
+    listEl.innerHTML='<div style="padding:10px;font-size:12px;color:#888780;text-align:center">Ingen hoteller funnet</div>';
+  } else {
+    let html='', lastCity=null;
+    for(const h of show){
+      if(h.city!==lastCity){
+        if(lastCity!==null) html+='</div>';
+        const isPrio = h._prio===0;
+        html+='<div style="padding:3px 10px;font-size:10px;font-weight:700;color:'+(isPrio?'#0C447C':'#888780')+';background:'+(isPrio?'#EAF2FB':'#F8F7F3')+';text-transform:uppercase;letter-spacing:0.04em;border-top:1px solid #F1EFE8">'+escapeHtml(h.city)+'</div><div>';
+        lastCity=h.city;
+      }
+      // Unngå anførselsteikn i onclick-streng — bruk data-attributtar via DOM-serialisering
+      const safeN = h.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      const safeC = h.city.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      html+='<div'
+        +' data-hi="'+dayIdx+'" data-hn="'+safeN+'" data-hc="'+safeC+'" data-hlat="'+h.lat+'" data-hlon="'+h.lon+'"'
+        +' onmousedown="hotelPickerSelectEl(this)"'
+        +' style="padding:8px 12px;border-bottom:1px solid #F1EFE8;cursor:pointer;font-size:12px"'
+        +' onmouseover="this.style.background=\'#F8F7F3\'" onmouseout="this.style.background=\'\'">'
+        +'<div style="font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(h.name)+'</div>'
+        +(h.type!=='hotel'?'<div style="font-size:10px;color:#888780">'+h.type+'</div>':'')
+        +'</div>';
+    }
+    if(lastCity!==null) html+='</div>';
+    if(results.length>40){
+      html+='<div style="padding:7px;font-size:11px;color:#888780;text-align:center">Viser 40 av '+results.length+' — skriv mer for å innsnevre</div>';
+    }
+    html+='<div onmousedown="setDayHotelCustom('+dayIdx+')" style="padding:9px 12px;font-size:12px;color:#0C447C;cursor:pointer;border-top:2px solid #E6D9B8;font-style:italic" onmouseover="this.style.background=\'#EAF2FB\'" onmouseout="this.style.background=\'\'">+ Legg til annet hotell manuelt ...</div>';
+    listEl.innerHTML=html;
+  }
+  listEl.style.display='block';
+}
+
+function hotelPickerHide(dayIdx){
+  const el = document.getElementById('hotel-picker-list-'+dayIdx);
+  if(el) el.style.display='none';
+}
+
+function hotelPickerSelectEl(el){
+  const dayIdx = parseInt(el.dataset.hi,10);
+  hotelPickerHide(dayIdx);
+  _applyDayHotel(dayIdx, el.dataset.hn, el.dataset.hc, parseFloat(el.dataset.hlat), parseFloat(el.dataset.hlon));
+}
+
+function clearDayHotel(dayIdx){
+  _applyDayHotel(dayIdx,'','',null,null);
+}
+
+function setDayHotelCustom(dayIdx){
+  hotelPickerHide(dayIdx);
   const days = window._lastPlan;
   if(!days || !days[dayIdx]) return;
   const day = days[dayIdx];
   const sleepCity = day.eveningTransfer ? day.eveningTransfer.to : day.sleepCity;
-  let name='', city='';
-  if(value==='__custom'){
-    name = (prompt('Hotellnavn:','')||'').trim();
-    if(name){
-      city = (prompt('Hvilken by ligger hotellet i?', sleepCity||'')||'').trim();
-    }
-  } else if(value){
-    const parts = value.split('||');
-    name = parts[0]; city = parts[1]||sleepCity||'';
-  }
-  // 1) Rydd opp tidligere hotellgenerert kveldsetappe og neste-dags-endring
+  const name = (prompt('Hotellnavn:','')||'').trim();
+  if(!name) return;
+  const city = (prompt('Hvilken by ligger hotellet i?', sleepCity||'')||'').trim();
+  _applyDayHotel(dayIdx, name, city, null, null);
+}
+
+function _applyDayHotel(dayIdx, name, city, lat, lon){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const day = days[dayIdx];
+  const prevBooked = day.hotel && day.hotel.booked;
+
+  // 1) Rydd opp tidlegare hotellgenerert kveldsetappe og neste-dags-endring
   day.timeline = (day.timeline||[]).filter(x=>!(x.kind==='drive-evening' && x.byHotel));
-  if(day._hotelSetEveningTransfer){ day.eveningTransfer = null; day._hotelSetEveningTransfer = false; }
-  if(day._hotelPrevSleepAtHome!==undefined){ day.sleepAtHome = day._hotelPrevSleepAtHome; delete day._hotelPrevSleepAtHome; }
+  if(day._hotelSetEveningTransfer){ day.eveningTransfer=null; day._hotelSetEveningTransfer=false; }
+  if(day._hotelPrevSleepAtHome!==undefined){ day.sleepAtHome=day._hotelPrevSleepAtHome; delete day._hotelPrevSleepAtHome; }
   const nd = days[dayIdx+1];
   if(day._hotelPrevNextStart!==undefined && nd){
-    nd.startCity = day._hotelPrevNextStart;
-    delete day._hotelPrevNextStart;
+    nd.startCity=day._hotelPrevNextStart; delete day._hotelPrevNextStart;
     if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd);
   }
-  // 2) Sett hotellet
-  day.hotel = name ? {name:name, city:city} : null;
-  // 3) Hotell i annen by enn dagens slutt? Legg automatisk kveldsetappe dit.
+
+  // 2) Sett hotellet (lat/lon er null for manuelt inntasta hotell)
+  day.hotel = name ? {name, city, lat: lat||null, lon: lon||null, booked: prevBooked||false} : null;
+
+  // 3) Hotell i annan by enn slutten av dagen? Legg automatisk kveldsetappe.
   if(name && city){
     const lastV = day.customers && day.customers.length>0 ? day.customers[day.customers.length-1] : null;
     const endCity = (lastV && lastV.city) || day.startCity || '';
@@ -1425,29 +1503,40 @@ function setDayHotel(dayIdx, value){
     if(endCity && city!==endCity && !alreadyThere){
       const evDrive = getDriveMin(endCity, city);
       if(evDrive>0){
-        const evStart = lastV ? lastV._end : (17*60);
+        const evStart = lastV ? lastV._end : 17*60;
         day.timeline = day.timeline||[];
         day.timeline.push({kind:'drive-evening', byHotel:true, startMins:evStart, endMins:evStart+evDrive, from:endCity, to:city, min:evDrive});
         day.timeline.sort((a,b)=>a.startMins-b.startMins);
-        if(!day.eveningTransfer){ day.eveningTransfer = {from:endCity, to:city, min:evDrive}; day._hotelSetEveningTransfer = true; }
-        if(day.sleepAtHome){ day._hotelPrevSleepAtHome = day.sleepAtHome; day.sleepAtHome = false; }
-        // Neste dag starter fra hotellbyen
+        if(!day.eveningTransfer){ day.eveningTransfer={from:endCity,to:city,min:evDrive}; day._hotelSetEveningTransfer=true; }
+        if(day.sleepAtHome){ day._hotelPrevSleepAtHome=day.sleepAtHome; day.sleepAtHome=false; }
         if(nd && !nd.skippedReason && nd.startCity!==city){
-          day._hotelPrevNextStart = nd.startCity;
-          nd.startCity = city;
+          day._hotelPrevNextStart=nd.startCity; nd.startCity=city;
           if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd);
         }
         showToast('🚗 Kveldsetappe '+endCity+' → '+city+' lagt til ('+evDrive+' min)');
       }
     }
   }
-  // 4) Re-render hele planen så etappen og neste dags tider vises
+
+  // 4) Re-render
   if(typeof renderPlanFromData==='function' && window._lastPlan){
     renderPlanFromData(days);
   } else {
     const row = document.getElementById('day-hotel-row-'+dayIdx);
     if(row) row.outerHTML = dayHotelRowHtml(day, dayIdx, days);
   }
+}
+
+function setDayHotel(dayIdx, value){
+  // Bakoverkompatibilitet — kallast framleis frå eventuelle eldre name||city-kodar
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  if(value==='__custom'){ setDayHotelCustom(dayIdx); return; }
+  if(!value){ _applyDayHotel(dayIdx,'','',null,null); return; }
+  const day = days[dayIdx];
+  const sleepCity = day.eveningTransfer ? day.eveningTransfer.to : day.sleepCity;
+  const parts = value.split('||');
+  _applyDayHotel(dayIdx, parts[0], parts[1]||sleepCity||'', null, null);
 }
 
 // ─── REDIGERING AV RUTEFORSLAG ──────────────────────────────────────────────
