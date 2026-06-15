@@ -216,6 +216,37 @@ function _labelPin(letter, bgColor) {
   return L.divIcon({ html: svg, className: '', iconSize: [28, 34], iconAnchor: [14, 34], popupAnchor: [0, -36] });
 }
 
+// Liten grå +-pin for "nearby"-kunder som ikke er i planen ennå
+function _grayNearbyPinIcon() {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="28" viewBox="0 0 22 28">` +
+    `<circle cx="11" cy="10" r="9" fill="#888780" stroke="white" stroke-width="1.5"/>` +
+    `<polygon points="9,19 13,19 11,28" fill="#5F5E5A"/>` +
+    `<text x="11" y="10" text-anchor="middle" dominant-baseline="central" ` +
+    `fill="white" font-size="13" font-weight="700" font-family="Arial,sans-serif">+</text>` +
+    `</svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [22, 28], iconAnchor: [11, 28], popupAnchor: [0, -30] });
+}
+
+// Finn kunder som ikke er i noen dag i planen, men er nær dagens rute.
+// "Nær" = samme by som et av dagens stopp ELLER ≤ 60 min kjøring unna.
+function _computeNearbyCustomers(day, days) {
+  if (typeof getCustomers !== 'function' || typeof getDriveMin !== 'function') return [];
+  const inPlan = new Set();
+  days.forEach(d => (d.customers || []).forEach(c => inPlan.add(c.id != null ? c.id : c.name)));
+  const dayCities = new Set((day.customers || []).map(c => c.city).filter(Boolean));
+  if (day.startCity) dayCities.add(day.startCity);
+  if (dayCities.size === 0) return [];
+  return getCustomers().filter(c => {
+    if (!c.city || inPlan.has(c.id != null ? c.id : c.name)) return false;
+    if (dayCities.has(c.city)) return true;
+    for (const city of dayCities) {
+      if (getDriveMin(city, c.city) <= 60) return true;
+    }
+    return false;
+  });
+}
+
 // Hent veirute fra OSRM (én samlet request per dag)
 async function _fetchOsrmRoute(latLngs) {
   if (latLngs.length < 2) return null;
@@ -267,10 +298,11 @@ function _spreadDuplicates(coords) {
 function _destroyDayMaps() {
   _dayMapInstances.forEach(m => { try { m.remove(); } catch (_) {} });
   _dayMapInstances = [];
+  window._nearbyPinMap = {};
 }
 
 // Initialisér kart for én plandag
-async function _initOneDayMap(day, dayIdx, homeBase, tripMeta) {
+async function _initOneDayMap(day, dayIdx, homeBase, tripMeta, days) {
   const container = document.getElementById('plan-map-' + dayIdx);
   if (!container) return;
 
@@ -354,6 +386,38 @@ async function _initOneDayMap(day, dayIdx, homeBase, tripMeta) {
   map.fitBounds(boundsGroup.getBounds().pad(0.18));
   setTimeout(() => map.invalidateSize(), 50);
 
+  // ── Nearby-pins: kunder nær ruta som ikke er i planen ────────────────────────
+  if (days) {
+    const nearby = _computeNearbyCustomers(day, days);
+    const nearbyCoords = _spreadDuplicates(nearby.map(c =>
+      (c.lat != null && c.lng != null) ? [c.lat, c.lng] : (_cityCoord(c.city) || null)
+    ).filter(Boolean));
+    let ni = 0;
+    nearby.forEach(c => {
+      const rawCoord = (c.lat != null && c.lng != null) ? [c.lat, c.lng] : _cityCoord(c.city);
+      if (!rawCoord) return;
+      const coord = nearbyCoords[ni++];
+      const key = 'np_' + dayIdx + '_' + ni;
+      window._nearbyPinMap = window._nearbyPinMap || {};
+      window._nearbyPinMap[key] = c;
+      const l12str = c.l12 > 0 ? c.l12.toLocaleString('no-NO') + ' kr' : '–';
+      const popup =
+        `<div style="min-width:170px;font-family:inherit">` +
+        `<div style="font-weight:700;font-size:13px;margin-bottom:2px">${c.name}</div>` +
+        `<div style="font-size:11px;color:#555;margin-bottom:5px">${c.city||''}${c.chain?' · '+c.chain:''}</div>` +
+        `<div style="font-size:11px;color:#666;margin-bottom:8px">L12: ${l12str}</div>` +
+        `<button onclick="if(typeof showInsertPositionPicker==='function')` +
+        ` showInsertPositionPicker(${dayIdx},window._nearbyPinMap['${key}'])" ` +
+        `style="width:100%;padding:6px 10px;background:#2C2C2A;color:#fff;border:none;` +
+        `border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">` +
+        `+ Legg til i dag ${dayIdx + 1}</button>` +
+        `</div>`;
+      const marker = L.marker(coord, { icon: _grayNearbyPinIcon(), opacity: 0.55 });
+      marker.bindPopup(popup, { maxWidth: 220 });
+      marker.addTo(map);
+    });
+  }
+
   // ── OSRM-rute (asynkron — tegnes etter at kartet er synlig) ─────────────────
   const osrmWpts = [
     ...(startCoord ? [startCoord] : []),
@@ -378,7 +442,7 @@ function initPlannerDayMaps(days, homeBase, tripMeta) {
   if (!days || !days.length) return;
   days.forEach((day, idx) => {
     if (!day.skippedReason && day.customers && day.customers.length > 0) {
-      _initOneDayMap(day, idx, homeBase || '', tripMeta || {});
+      _initOneDayMap(day, idx, homeBase || '', tripMeta || {}, days);
     }
   });
 }
