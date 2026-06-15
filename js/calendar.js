@@ -230,7 +230,7 @@ function calDrop(ev,newKey,colEl){
   if(_roGuard()){_calDrag=null;return;}
   const rect=colEl.getBoundingClientRect();
   const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
-  const HSTART=6;
+  const HSTART=(calView==='day')?4:6;
   const newStart=HSTART*60+slot*15;
   const newEnd=newStart+_calDrag.dur;
   const oldKey=_calDrag.key;
@@ -249,7 +249,7 @@ function calColClick(ev,key,colEl){
   if(ev.target!==colEl&&!ev.target.style.borderTop)return;
   const rect=colEl.getBoundingClientRect();
   const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
-  const h=Math.floor((7*60+slot*15)/60);
+  const h=Math.floor(((calView==='day'?5:7)*60+slot*15)/60);
   openAppt(key,ev,h);
 }
 
@@ -264,7 +264,7 @@ function calResizeStart(ev,key,eEnc){
 function calResizeMove(ev){
   if(!_calResize)return;
   const deltaSlots=Math.round((ev.clientY-_calResize.startY)/15);
-  const newEnd=Math.max(_calResize.origEnd-(_calResize.origEnd-_calResize.e.startMins)+15,Math.min(_calResize.origEnd+deltaSlots*15,22*60));
+  const newEnd=Math.max(_calResize.origEnd-(_calResize.origEnd-_calResize.e.startMins)+15,Math.min(_calResize.origEnd+deltaSlots*15,24*60));
   const evs=calEvents[_calResize.key]||[];
   const live=evs.find(e=>e.label===_calResize.e.label&&(e.startMins===_calResize.e.startMins||e.h===_calResize.e.h));
   if(live){live.endMins=newEnd;live.hEnd=Math.ceil(newEnd/60);}
@@ -358,7 +358,7 @@ function renderDay(body){
   const col=mb(new Date(y,m,d).getDay());
   document.getElementById('cal-title').textContent=NO_LONG[col]+' '+d+'. '+NO_MONTHS[m]+' '+y;
   const key=dk(y,m,d);
-  const HSTART=6,HEND=22,SPH=4,SPX=15;
+  const HSTART=4,HEND=24,SPH=4,SPX=15;
   const totalSlots=(HEND-HSTART)*SPH;
   const rawEvs=getEventsForDay(key);
   const allEvs=calAutoAddDrives(rawEvs,key);

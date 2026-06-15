@@ -514,15 +514,10 @@ function rpBuildRoute(){
 
   // VIS via den FELLES planlegger-rendreren — identisk utseende som automatisk plan
   const out = document.getElementById('rp-route-result');
-  const plannerOut = document.getElementById('planner-output');
-  // renderPlanFromData skriver til #planner-output; vi midlertidig peker den hit
-  if(plannerOut){
-    renderPlanFromData(days);
-    out.innerHTML = plannerOut.innerHTML;
-    plannerOut.innerHTML = '';
-  } else {
-    renderPlanFromData(days);
-  }
+  // La renderPlanFromData skrive direkte til rp-route-result — unngår innerHTML-kopi
+  // som brøt re-rendering ved klikk på "Avtalt/Uanmeldt"-knapper.
+  window._planOutputTarget = 'rp-route-result';
+  renderPlanFromData(days);
   window._lastPlan = days;
 
   // Utsatte kunder (kapasitet sprengt) — lavest omsetning først
@@ -662,6 +657,7 @@ function getFixedAppointmentsForDate(dt){
 }
 
 function runPlanner(){
+  window._planOutputTarget = null; // Auto-planlegger skriver alltid til #planner-output
   const area=document.getElementById('planner-area').value;
   const dateStr=document.getElementById('planner-date').value||TODAY_STR;
   const startT=document.getElementById('planner-start').value||'08:00';
@@ -1883,7 +1879,7 @@ function showInsertPositionPicker(dayIdx, cust){
 // Re-render planen fra (redigerte) data uten å kjøre planleggeren på nytt
 function renderPlanFromData(days){
   window._lastPlan = days;
-  const output = document.getElementById('planner-output');
+  const output = document.getElementById(window._planOutputTarget || 'planner-output');
   if(!output) return;
   let html = '<div class="planner-result">';
   const totalVisits = days.reduce((s,d)=>s+d.customers.length,0);
