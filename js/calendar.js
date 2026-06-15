@@ -77,12 +77,12 @@ function clearAllCalendar(){
     if(typeof calEvents === 'object' && calEvents){
       for(const k in calEvents) delete calEvents[k];
     }
-    if(Array.isArray(visits)) visits.length = 0;
-    // Slett også direkte fra localStorage
-    localStorage.removeItem('alfa_events');
-    localStorage.removeItem('alfa_visits');
-    localStorage.setItem('alfa_events','{}');
-    localStorage.setItem('alfa_visits','[]');
+    if(Array.isArray(visits))    visits.length    = 0;
+    if(Array.isArray(followups)) followups.length = 0;
+    // saveData skriver localStorage OG pusher tom tilstand til Supabase
+    saveData('alfa_events',    {});
+    saveData('alfa_visits',    []);
+    saveData('alfa_followups', []);
   }catch(e){ console.error('clear error', e); }
   try{ showToast('✓ Kalenderen er tømt'); }catch(e){}
   try{ renderCal(); }catch(e){ console.error(e); }
