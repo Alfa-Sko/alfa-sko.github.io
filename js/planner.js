@@ -1563,19 +1563,25 @@ function _applyDayHotel(dayIdx, name, city, lat, lon){
     }
   }
 
-  // 4) Gi neste dag hotellets eksakte koordinat som morgen-startpunkt — uavhengig
-  //    av om bynavnet endrer seg. Uten dette ble morgenkjøringen til første kunde
-  //    estimert fra byens senterkoordinat (eller forsvant helt når hotellet lå i
-  //    samme by som første kunde), selv om vi har hotellets faktiske posisjon.
-  if(nd && !nd.skippedReason){
-    nd.startHotel = (name && lat!=null && lon!=null) ? {name, lat, lon} : null;
-    if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd);
-    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> nd(dayIdx+1).startHotel=', nd.startHotel,
-      '| nd.startCity=', nd.startCity,
-      '| nd.timeline drive-home item=', (nd.timeline||[]).find(x=>x.kind==='drive-home'),
-      '| nd.customers[0]=', nd.customers && nd.customers[0] && {name:nd.customers[0].name, city:nd.customers[0].city, lat:nd.customers[0].lat, lng:nd.customers[0].lng, _drive:nd.customers[0]._drive});
+  // 4) Gi neste ARBEIDSDAG hotellets eksakte koordinat som morgen-startpunkt —
+  //    uavhengig av om bynavnet endrer seg. Hopper forbi fridager/helligdager
+  //    (days[dayIdx+1] kan ha skippedReason og dermed ingen kunder å starte mot),
+  //    slik at startpunktet alltid lander på dagen som faktisk skal kjøre ut.
+  //    Uten dette ble morgenkjøringen til første kunde estimert fra byens
+  //    senterkoordinat (eller forsvant helt når hotellet lå i samme by som
+  //    første kunde), selv om vi har hotellets faktiske posisjon.
+  let ndIdx = dayIdx+1;
+  while(days[ndIdx] && days[ndIdx].skippedReason) ndIdx++;
+  const nd2 = days[ndIdx];
+  if(nd2){
+    nd2.startHotel = (name && lat!=null && lon!=null) ? {name, lat, lon} : null;
+    if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd2);
+    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> nd(idx='+ndIdx+').startHotel=', nd2.startHotel,
+      '| nd.startCity=', nd2.startCity,
+      '| nd.timeline drive-home item=', (nd2.timeline||[]).find(x=>x.kind==='drive-home'),
+      '| nd.customers[0]=', nd2.customers && nd2.customers[0] && {name:nd2.customers[0].name, city:nd2.customers[0].city, lat:nd2.customers[0].lat, lng:nd2.customers[0].lng, _drive:nd2.customers[0]._drive});
   } else {
-    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> ingen nd, eller nd.skippedReason=', nd && nd.skippedReason);
+    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> ingen påfølgende arbeidsdag funnet');
   }
 
   // 5) Re-render
