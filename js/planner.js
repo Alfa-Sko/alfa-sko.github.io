@@ -1417,7 +1417,7 @@ function dayHotelRowHtml(day, dayIdx, daysArr){
         +' onfocus="hotelPickerSearch('+dayIdx+',this.value)"'
         +' onblur="setTimeout(()=>hotelPickerHide('+dayIdx+'),200)"'
         +' style="width:100%;padding:7px 9px;border:1px solid '+borderColor+';border-radius:7px;font-size:12px;background:#fff;box-sizing:border-box">'
-      +'<div id="hotel-picker-list-'+dayIdx+'" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #D3D1C7;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>'
+      +'<div id="hotel-picker-list-'+dayIdx+'" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #D3D1C7;border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;z-index:2000;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>'
     +'</div>'
     +clearBtn+mapsLink+bookChk
     +'</div>';
