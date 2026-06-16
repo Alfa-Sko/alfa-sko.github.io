@@ -182,11 +182,11 @@ function calEvDim(e){
   return '';
 }
 function calEvClass(type){
-  const m={visit:'cev-visit',phone:'cev-phone',nydalen:'cev-nydalen',teams:'cev-teams',clinic:'cev-clinic',external:'cev-external',dinner:'cev-dinner',drive:'cev-d','drive-auto':'cev-drive-auto',hotel:'cev-h',flight:'cev-h',rental:'cev-d'};
+  const m={visit:'cev-visit',phone:'cev-phone',nydalen:'cev-nydalen',teams:'cev-teams',clinic:'cev-clinic',external:'cev-external',dinner:'cev-dinner',drive:'cev-d','drive-auto':'cev-drive-auto',hotel:'cev-h','hotel-start':'cev-h',flight:'cev-h',rental:'cev-d'};
   return m[type]||'cev-v';
 }
 function calEvEmoji(type){
-  const m={visit:'🏪',phone:'📞',nydalen:'🏢',teams:'👥',clinic:'🎓',external:'📈',dinner:'🍽️',drive:'🚗','drive-auto':'🚗',hotel:'🏨',flight:'✈',adm:'💻',lunch:'🍽️',training:'🏃',leisure:'🌿',rental:'🚙',other:'📌'};
+  const m={visit:'🏪',phone:'📞',nydalen:'🏢',teams:'👥',clinic:'🎓',external:'📈',dinner:'🍽️',drive:'🚗','drive-auto':'🚗',hotel:'🏨','hotel-start':'🏨',flight:'✈',adm:'💻',lunch:'🍽️',training:'🏃',leisure:'🌿',rental:'🚙',other:'📌'};
   return m[type]||'📅';
 }
 function calFmt(m){
@@ -663,7 +663,7 @@ function openEvPopup(evt, dateKey, e){
   closeEvPopup();
   const popup = document.getElementById('ev-popup');
   const dateStr = dateKey.split('-').reverse().join('.');
-  const SIMPLE_TYPES = ['adm','lunch','dinner','training','leisure','teams','phone','external','nydalen','clinic','drive','drive-auto','other'];
+  const SIMPLE_TYPES = ['adm','lunch','dinner','training','leisure','teams','phone','external','nydalen','clinic','drive','drive-auto','other','hotel-start'];
   if(e.type==='hotel' || e.type==='flight' || e.type==='rental'){
     const isBooked = e.booked===true;
     const icon = e.type==='hotel' ? '🏨' : (e.type==='rental' ? '🚙' : '✈');

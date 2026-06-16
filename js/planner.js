@@ -1200,6 +1200,13 @@ function runPlanner(){
       return;
     }
     let prevCity = day.startCity || (area==='Alle'?'':area);
+    if(day.startHotel && day.startHotel.name){
+      html+='<div class="planner-stop" style="background:#FFF6E6;border:1px solid #E6D9B8;border-radius:8px;padding:8px 12px;margin:4px 0;opacity:0.92">'+
+        '<div class="planner-stop-time" style="color:#6D4C00">08:00</div>'+
+        '<div class="planner-stop-icon">🏨</div>'+
+        '<div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A">Start: '+escapeHtml(day.startHotel.name)+'</div>'+
+        '<div class="planner-stop-meta" style="color:#6D4C00">Dagen starter fra overnattingsstedet</div></div></div>';
+    }
     day.timeline.forEach(item=>{
       const hh=String(Math.floor(item.startMins/60)).padStart(2,'0');
       const mm=String(item.startMins%60).padStart(2,'0');
@@ -1209,11 +1216,13 @@ function runPlanner(){
         html+='<div class="planner-stop" style="opacity:0.85"><div class="planner-stop-time">'+hh+':'+mm+'</div><div class="planner-stop-icon">🍽️</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#5F5E5A;font-weight:500">Lunsj</div><div class="planner-stop-meta">'+hh+':'+mm+' – '+ehh+':'+emm+'</div></div></div>';
       } else if(item.kind==='drive-home'){
         const dur=item.endMins-item.startMins;
-        const driveRouteInfo=getRouteInfo(item.from, item.to);
+        const driveRouteInfo=(item.fromCoord&&item.toCoord)
+          ? getRouteInfo(item.from, item.to, item.fromCoord, item.toCoord)
+          : getRouteInfo(item.from, item.to);
         const _kmInfo=driveRouteInfo&&driveRouteInfo.km?' · '+(driveRouteInfo.estimated?'≈':'')+driveRouteInfo.km+' km':'';
         const durStr=(dur>=60?(Math.floor(dur/60)+'t '+(dur%60?(dur%60)+'min':'')).trim():dur+' min')+_kmInfo;
         const mapsHref='https://www.google.com/maps/dir/'+encodeURIComponent((item.from||'')+', Norge')+'/'+encodeURIComponent((item.to||'')+', Norge');
-        const fromLabel = item.from===homeBase ? '🏠 Hjem ('+(homeBase.split(',')[0])+')' : escapeHtml(item.from);
+        const fromLabel = item.fromHotel ? '🏨 '+escapeHtml(item.from) : (item.from===homeBase ? '🏠 Hjem ('+(homeBase.split(',')[0])+')' : escapeHtml(item.from));
         const driveFerry=driveRouteInfo?driveRouteInfo.ferry:null;
         let ferryHtml='';
         if(driveFerry){
@@ -1554,7 +1563,16 @@ function _applyDayHotel(dayIdx, name, city, lat, lon){
     }
   }
 
-  // 4) Re-render
+  // 4) Gi neste dag hotellets eksakte koordinat som morgen-startpunkt — uavhengig
+  //    av om bynavnet endrer seg. Uten dette ble morgenkjøringen til første kunde
+  //    estimert fra byens senterkoordinat (eller forsvant helt når hotellet lå i
+  //    samme by som første kunde), selv om vi har hotellets faktiske posisjon.
+  if(nd && !nd.skippedReason){
+    nd.startHotel = (name && lat!=null && lon!=null) ? {name, lat, lon} : null;
+    if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd);
+  }
+
+  // 5) Re-render
   if(typeof renderPlanFromData==='function' && window._lastPlan){
     renderPlanFromData(days);
   } else {
@@ -1604,7 +1622,8 @@ function recomputeDayTimes(day){
   const weekday = day.date.getDay();
   let cursor = dayStartMin;
   let prevCity = day.startCity || '';
-  let prevCoord = _coordFor(day.startCity||'');
+  const _startHotelCoord = (day.startHotel && day.startHotel.lat!=null && day.startHotel.lon!=null) ? [day.startHotel.lat, day.startHotel.lon] : null;
+  let prevCoord = _startHotelCoord || _coordFor(day.startCity||'');
   // Faste hindringer: flyetapper (med byskifte) og tidsblokker (adm/lunsj/møter osv.).
   // Besøk som kolliderer skyves til etter hindringen.
   const legs = (day.flightLegs||[]).slice().sort((a,b)=>a.depMins-b.depMins);
@@ -1675,12 +1694,22 @@ function recomputeDayTimes(day){
   blocks.forEach(b=>{
     day.timeline.push({kind:'time-block', id:b.id, startMins:b.startMins, endMins:b.endMins, type:b.type, label:b.label});
   });
-  // Gjenskap drive-home (morgenkjøring) hvis dagen starter fra et sted og første kunde har kjøretid
-  if(day.startCity && day.customers.length>0){
+  // Gjenskap drive-home (morgenkjøring) hvis dagen starter fra et sted og første kunde har kjøretid.
+  // Når dagen starter fra et valgt hotell (eksakt koordinat) viser vi etappen selv om
+  // hotellet ligger i samme by som første kunde — bynavn-sammenligning er for grovkornet
+  // til å fange en reell kjøretur fra en konkret adresse.
+  if((day.startCity || _startHotelCoord) && day.customers.length>0){
     const firstC = day.customers[0];
-    if(firstC._drive>0 && firstC.city && firstC.city!==day.startCity){
+    if(firstC._drive>0 && firstC.city && (firstC.city!==day.startCity || _startHotelCoord)){
       const driveStart = Math.max(8*60, firstC._start - firstC._drive);
-      day.timeline.push({kind:'drive-home', startMins:driveStart, endMins:firstC._start, from:day.startCity, to:firstC.city, min:firstC._drive});
+      day.timeline.push({
+        kind:'drive-home', startMins:driveStart, endMins:firstC._start,
+        from: _startHotelCoord ? day.startHotel.name : day.startCity,
+        to:firstC.city, min:firstC._drive,
+        fromHotel: !!_startHotelCoord,
+        fromCoord: _startHotelCoord,
+        toCoord: (firstC.lat!=null&&firstC.lng!=null) ? [firstC.lat, firstC.lng] : null
+      });
     }
   }
   day.timeline.sort((a,b)=>a.startMins-b.startMins);
@@ -2165,6 +2194,21 @@ function plannerAddToCalendar(days){
     // Erstatt: fjern eksisterende auto-planlagte oppføringer på denne dagen
     if(overwrite){
       calEvents[dateStr]=calEvents[dateStr].filter(e=>!(e.agenda&&e.agenda.startsWith('Planlagt')));
+    }
+    // Legg inn hotell-startpunkt om morgenen (dag 2+, når dagen starter fra valgt hotell)
+    if(day.startHotel && day.startHotel.name){
+      const hsExists=calEvents[dateStr].some(e=>e.type==='hotel-start' && (e.label||'').includes(day.startHotel.name));
+      if(!hsExists){
+        calEvents[dateStr].push({
+          type:'hotel-start',
+          label:'🏨 Start: '+day.startHotel.name,
+          startMins: 8*60,
+          endMins: 8*60+15,
+          h: 8,
+          hEnd: Math.ceil((8*60+15)/60),
+          agenda: 'Dagen starter fra overnattingsstedet'+tripTag
+        });
+      }
     }
     // Legg inn morgen-kjøring fra hjem hvis det er på timeline
     const driveHomeItem = (day.timeline||[]).find(x=>x.kind==='drive-home');
