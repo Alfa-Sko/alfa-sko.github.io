@@ -414,12 +414,21 @@ function rpBuildRoute(){
   const wStart = (userProfile&&userProfile.workStart)||'08:00';
   const [wh,wm] = wStart.split(':').map(Number);
   const dayStartMin = wh*60+wm;
+  // Arbeidstidens SLUTT — samme kilde som auto-planleggeren (#planner-end,
+  // som igjen synkroniseres fra userProfile.workEnd i profile.js). Brukes som
+  // hard cutoff slik at besøk ikke presses inn på kvelden (jf. runPlanner/findSlot).
+  const endEl = document.getElementById('planner-end');
+  const wEnd = (endEl && endEl.value) || (userProfile&&userProfile.workEnd) || '17:00';
+  const [weh,wem] = wEnd.split(':').map(Number);
+  const dayEndMin = weh*60+wem;
 
-  // Kapasitet: tak per dag × antall dager. For mange? Utsett lavest omsetning først.
+  // Kapasitet: tak per dag × antall dager er en øvre grense for hvor mange vi
+  // i det hele tatt forsøker å rute. Faktisk overskytende (pga. ANTALL eller TID)
+  // avgjøres etterpå når dagene bygges — se dayChunks-løkken nedenfor.
   const capacity = maxPerDay * numDays;
   const sortedByL12 = allSel.slice().sort((a,b)=>(b.l12||0)-(a.l12||0));
   const planned = sortedByL12.slice(0, capacity);
-  const deferred = sortedByL12.slice(capacity);
+  let deferred = sortedByL12.slice(capacity);
 
   const hub = flyCity || REGION_HUB[region] || (planned[0] && planned[0].city) || '';
   const startCity = useFly ? hub : (typedStart || homeCity || (planned[0] && planned[0].city) || '');
@@ -427,9 +436,36 @@ function rpBuildRoute(){
   // Nærmeste-nabo gjennom de planlagte
   const route = rpNearestNeighborRoute(startCity, planned);
 
-  // Del i dager (maks N besøk/dag) og bygg renderPlanFromData-kompatibel struktur
+  // Del i dager: maks N besøk/dag OG arbeidstidens slutt som hard cutoff —
+  // samme prinsipp som findSlot() i auto-planleggeren. Hvis neste besøk
+  // (kjøring + varighet) ville passere dayEndMin, utsettes det til neste dag
+  // (eller til "utsatte kunder" om dagene tar slutt).
   const dayChunks=[];
-  for(let i=0;i<route.length;i+=maxPerDay){ dayChunks.push(route.slice(i,i+maxPerDay)); }
+  let _ri=0;
+  for(let di=0; di<numDays && _ri<route.length; di++){
+    const chunk=[];
+    let dayClock=dayStartMin;
+    while(_ri<route.length && chunk.length<maxPerDay){
+      const leg=route[_ri];
+      const dur=rpVisitLen(leg.customer);
+      // Speiler oppsettet i days.map() nedenfor: første besøk i dagen starter
+      // ved dayClock uten eget kjøretidstillegg, senere besøk legger til leg.legMin.
+      const start = chunk.length>0 ? dayClock+leg.legMin : dayClock;
+      const end = start+dur;
+      // Hard cutoff — men tving inn FØRSTE besøk i dagen uansett, slik at vi
+      // aldri står fast i en uendelig løkke hvis ett enkelt besøk er lenger
+      // enn hele arbeidsdagen (svært usannsynlig i praksis).
+      if(end>dayEndMin && chunk.length>0){ break; }
+      chunk.push(leg);
+      dayClock=end;
+      _ri++;
+    }
+    dayChunks.push(chunk);
+  }
+  if(_ri<route.length){
+    // Rakk ikke plass innen numDays eller arbeidstiden — utsett resten
+    deferred = route.slice(_ri).map(leg=>leg.customer).concat(deferred);
+  }
 
   const days = dayChunks.map((legs, di)=>{
     const dateObj = startDate ? rpAddDays(startDate, di) : new Date(Date.now()+di*864e5);
