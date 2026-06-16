@@ -1570,6 +1570,12 @@ function _applyDayHotel(dayIdx, name, city, lat, lon){
   if(nd && !nd.skippedReason){
     nd.startHotel = (name && lat!=null && lon!=null) ? {name, lat, lon} : null;
     if(typeof recomputeDayTimes==='function') recomputeDayTimes(nd);
+    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> nd(dayIdx+1).startHotel=', nd.startHotel,
+      '| nd.startCity=', nd.startCity,
+      '| nd.timeline drive-home item=', (nd.timeline||[]).find(x=>x.kind==='drive-home'),
+      '| nd.customers[0]=', nd.customers && nd.customers[0] && {name:nd.customers[0].name, city:nd.customers[0].city, lat:nd.customers[0].lat, lng:nd.customers[0].lng, _drive:nd.customers[0]._drive});
+  } else {
+    console.log('[hotel-debug] _applyDayHotel: dayIdx='+dayIdx+' -> ingen nd, eller nd.skippedReason=', nd && nd.skippedReason);
   }
 
   // 5) Re-render
@@ -2195,6 +2201,10 @@ function plannerAddToCalendar(days){
     if(overwrite){
       calEvents[dateStr]=calEvents[dateStr].filter(e=>!(e.agenda&&e.agenda.startsWith('Planlagt')));
     }
+    console.log('[hotel-debug] plannerAddToCalendar: dateStr='+dateStr,
+      '| day.startHotel=', day.startHotel,
+      '| day.timeline kinds=', (day.timeline||[]).map(x=>x.kind),
+      '| drive-home item=', (day.timeline||[]).find(x=>x.kind==='drive-home'));
     // Legg inn hotell-startpunkt om morgenen (dag 2+, når dagen starter fra valgt hotell)
     if(day.startHotel && day.startHotel.name){
       const hsExists=calEvents[dateStr].some(e=>e.type==='hotel-start' && (e.label||'').includes(day.startHotel.name));
