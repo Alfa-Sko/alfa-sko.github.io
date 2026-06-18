@@ -64,8 +64,8 @@ function saveVisit(){
   const [eh,em]=timeEnd.split(':').map(Number);
   if(eh*60+em<=sh*60+sm){ showToast('Slutttidspunkt må være etter start'); return; }
   const id=Date.now();
-  savePhotos(id, files).then(photoIds=>{
-    const v={id,customer,type,date,time,timeEnd,contact,notes,followup,photoCount:photoIds.length};
+  sbUploadVisitPhotos(id, files).then(({count,paths})=>{
+    const v={id,customer,type,date,time,timeEnd,contact,notes,followup,photoCount:count,photoPaths:paths};
     if(otherLabel) v.otherLabel=otherLabel;
     visits.push(v);
     saveData('alfa_visits',visits);
@@ -78,7 +78,7 @@ function saveVisit(){
       saveData('alfa_events',calEvents);
     }
     if(followup){followups.push({id:id+1,customer,task:followup,due:date,priority:'medium',done:false});saveData('alfa_followups',followups);}
-    showToast('Aktivitet lagret'+(photoIds.length?' med '+photoIds.length+' bilde(r)':'')+'!');
+    showToast('Aktivitet lagret'+(count?' med '+count+' bilde(r)':'')+'!');
     clearVisitForm();
   });
 }
