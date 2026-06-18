@@ -1,6 +1,11 @@
 // scripts/enrich-customers.js
 // Beriker customers-tabellen i Supabase med kontaktinfo fra jorn_kunde_beriking.json.
 //
+// Autentisering: sb_secret_-nøkkel sendes KUN som "apikey"-header.
+// Supabase sin API-gateway validerer den og gir service_role-tilgang (bypasser RLS).
+// IKKE send den som "Authorization: Bearer" – da prøver PostgREST å parse den som
+// JWT, feiler, og returnerer 401. (Kilde: supabase.com/docs/guides/api/api-keys)
+//
 // Kjør (PowerShell - tørrkjøring / vis matching):
 //   $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/enrich-customers.js
 //
@@ -12,7 +17,8 @@
 //   - Skriver KUN felt med verdi i JSON-fila.
 //   - Overskriver ALDRI eksisterende data med tom verdi.
 //   - Advarer (og hopper over) hvis Supabase allerede har en annen verdi.
-//   - eier_konstellasjon: scriptet sjekker om kolonnen finnes og stopper med DDL-instruksjon hvis ikke.
+//   - eier_konstellasjon leses IKKE frå Supabase (PostgREST schema-cache ser den ikke),
+//     men skrives blindt frå JSON-fila viss verdi finst.
 //
 // Krav: Node 18+ (innebygd fetch). Ingen npm-pakker.
 
@@ -86,7 +92,9 @@ async function main() {
   console.log(`Modus: ${WRITE ? '⚠️  SKRIV' : '🔍 tørrkjøring (ingen endringer)'}\n`);
 
   // 1. Hent Supabase-kunder
-  const sbCols = 'id,name,phone,email,eier_konstellasjon';
+  // eier_konstellasjon er utelatt: PostgREST sin schema-cache ser ikke kolonnen
+  // og gir 401 ved select. Vi skriver den blindt via PATCH uten å lese den først.
+  const sbCols = 'id,name,phone,email';
   const sbCustomers = await fetchCustomers(sbCols);
   console.log(`Supabase: ${sbCustomers.length} kunder hentet.`);
   console.log(`JSON-fil: ${rawJson.length} oppslag, ${jsonEntries.length} etter de-duplikering.\n`);
@@ -209,27 +217,56 @@ async function main() {
   console.log(`SKRIVER ${toWrite.length} OPPDATERINGER`);
   console.log(`══════════════════════════════════════════════\n`);
 
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, ekOk = 0, ekFail = 0;
   for (const { sb, patch } of toWrite) {
-    const res = await fetch(
-      `${SUPA_URL}/rest/v1/customers?id=eq.${sb.id}`,
-      {
-        method:  'PATCH',
-        headers: sbHeaders({ Prefer: 'return=minimal' }),
-        body:    JSON.stringify(patch),
+    // Splitt: phone/email i éin PATCH, eier_konstellasjon separat.
+    // Grunn: PostgREST schema-cache ser ikkje eier_konstellasjon – ein kombinert
+    // PATCH ville feile for alle felt viss kolonnen ikkje er i cachen.
+    const corePatch = {};
+    const ekPatch   = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === 'eier_konstellasjon') ekPatch[k] = v;
+      else corePatch[k] = v;
+    }
+
+    if (Object.keys(corePatch).length > 0) {
+      const res = await fetch(
+        `${SUPA_URL}/rest/v1/customers?id=eq.${sb.id}`,
+        { method: 'PATCH', headers: sbHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(corePatch) }
+      );
+      if (res.ok) {
+        ok++;
+        console.log(`  ✅ "${sb.name.trim()}" → ${Object.entries(corePatch).map(([k,v])=>`${k}="${v}"`).join(', ')}`);
+      } else {
+        fail++;
+        console.error(`  ❌ "${sb.name.trim()}" feilet: ${res.status} ${await res.text()}`);
       }
-    );
-    if (res.ok) {
-      ok++;
-      const fields = Object.entries(patch).map(([k, v]) => `${k}="${v}"`).join(', ');
-      console.log(`  ✅ "${sb.name.trim()}" → ${fields}`);
-    } else {
-      fail++;
-      console.error(`  ❌ "${sb.name.trim()}" feilet: ${res.status} ${await res.text()}`);
+    }
+
+    if (Object.keys(ekPatch).length > 0) {
+      const res = await fetch(
+        `${SUPA_URL}/rest/v1/customers?id=eq.${sb.id}`,
+        { method: 'PATCH', headers: sbHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(ekPatch) }
+      );
+      if (res.ok) {
+        ekOk++;
+        console.log(`  ✅ "${sb.name.trim()}" → eier_konstellasjon="${ekPatch.eier_konstellasjon}"`);
+      } else {
+        const text = await res.text();
+        ekFail++;
+        if (res.status === 400) {
+          console.warn(`  ⚠️  "${sb.name.trim()}" eier_konstellasjon SKIP (schema-cache): ${text}`);
+        } else {
+          console.error(`  ❌ "${sb.name.trim()}" eier_konstellasjon feilet: ${res.status} ${text}`);
+        }
+      }
     }
   }
 
-  console.log(`\nFerdig: ${ok} oppdatert, ${fail} feilet.`);
+  console.log(`\nFerdig: ${ok} kunder oppdatert (phone/email), ${fail} feilet.`);
+  if (ekOk + ekFail > 0) {
+    console.log(`eier_konstellasjon: ${ekOk} skrevet, ${ekFail} feilet (sjå ⚠️ over for schema-cache-feil).`);
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
