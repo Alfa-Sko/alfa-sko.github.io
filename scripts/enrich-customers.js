@@ -74,16 +74,6 @@ async function fetchCustomers(cols) {
   return all;
 }
 
-// ── Sjekk om kolonne finnes ───────────────────────────────────────────────────
-
-async function columnExists(col) {
-  const res = await fetch(
-    `${SUPA_URL}/rest/v1/customers?select=${col}&limit=0`,
-    { headers: sbHeaders() }
-  );
-  return res.ok;
-}
-
 // ── Hjelpere ──────────────────────────────────────────────────────────────────
 
 function isEmpty(v) { return v === null || v === undefined || v === ''; }
@@ -95,20 +85,7 @@ async function main() {
   console.log(`\n=== Alfa Kompass – customer enrichment ===`);
   console.log(`Modus: ${WRITE ? '⚠️  SKRIV' : '🔍 tørrkjøring (ingen endringer)'}\n`);
 
-  // 1. Sjekk eier_konstellasjon-kolonne
-  const hasEk = await columnExists('eier_konstellasjon');
-  if (!hasEk) {
-    console.log('⚠️  Kolonnen eier_konstellasjon finnes IKKE i customers-tabellen.');
-    console.log('Kjør dette i Supabase SQL Editor (Dashboard → SQL Editor):');
-    console.log();
-    console.log('  ALTER TABLE customers ADD COLUMN IF NOT EXISTS eier_konstellasjon text;');
-    console.log();
-    console.log('Kjør deretter scriptet på nytt.');
-    process.exit(1);
-  }
-  console.log('✅ Kolonne eier_konstellasjon finnes.\n');
-
-  // 2. Hent Supabase-kunder
+  // 1. Hent Supabase-kunder
   const sbCols = 'id,name,phone,email,eier_konstellasjon';
   const sbCustomers = await fetchCustomers(sbCols);
   console.log(`Supabase: ${sbCustomers.length} kunder hentet.`);
