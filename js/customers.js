@@ -57,6 +57,21 @@ async function fetchCustomersFromSupabase() {
   CUSTOMERS.push(...data);
 }
 
+// PATCH éin eller fleire felt direkte på customers-tabellen (delt).
+// Bruker sbFetch (apikey + Bearer access_token, auto-retry på 401).
+// Fallback: feilen loggast men stoppar ikkje flyten.
+async function _sbPatchCustomerField(id, patch){
+  if(!id || typeof sbFetch==='undefined') return;
+  try{
+    const r=await sbFetch('/rest/v1/customers?id=eq.'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(patch),
+    });
+    if(!r.ok) console.warn('customers PATCH feilet',r.status,await r.text());
+  }catch(e){ console.warn('customers PATCH feil',e); }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EXCEL-IMPORT AV KUNDELISTE (mal: kundeoversikt_oppdatering_mal.xlsx)
 // Hver selger importerer sitt distrikts kundeliste i sin egen konto.
@@ -376,6 +391,10 @@ function openCustomer(name){
           <div style="font-size:10px;color:#0C447C;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Telefon</div>
           <a href="tel:${c.phone}" style="font-size:14px;font-weight:600;color:#0C447C;text-decoration:none;margin-top:2px;display:block">${c.phone}</a>
         </div>`:''}
+        ${c.email?`<div style="background:#E6F1FB;border-radius:8px;padding:10px 12px">
+          <div style="font-size:10px;color:#0C447C;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">E-post</div>
+          <a href="mailto:${c.email}" style="font-size:13px;font-weight:600;color:#0C447C;text-decoration:none;margin-top:2px;display:block;overflow:hidden;text-overflow:ellipsis">${c.email}</a>
+        </div>`:''}
       </div>
       <hr class="divider">
       <div class="section-label">Rediger kundeopplysninger</div>
@@ -384,7 +403,10 @@ function openCustomer(name){
         <div class="form-group" style="margin-bottom:8px"><label>Telefon</label><input type="tel" id="edit-phone" value="${(c.phone||'').replace(/"/g,'&quot;')}" placeholder="+47 900 00 000"></div>
       </div>
       <div class="form-row-2" style="margin-bottom:8px">
+        <div class="form-group" style="margin-bottom:8px"><label>E-post</label><input type="email" id="edit-email" value="${(c.email||'').replace(/"/g,'&quot;')}" placeholder="butikk@kjede.no"></div>
         <div class="form-group" style="margin-bottom:8px"><label>Rabatt (%)</label><input type="text" id="edit-discount" value="${(c.discount||'').replace(/"/g,'&quot;')}" placeholder="F.eks. 52%"></div>
+      </div>
+      <div class="form-row-2" style="margin-bottom:8px">
         <div class="form-group" style="margin-bottom:8px"><label>Type butikk</label>
           <select id="edit-storetype">
             <option value="">Ingen</option>
@@ -393,11 +415,13 @@ function openCustomer(name){
             <option value="Pop-up"${(c.storetype||'')==='Pop-up'?' selected':''}>Pop-up</option>
           </select>
         </div>
+        <div></div>
       </div>
-      <div class="form-group" style="margin-bottom:8px"><label>Kontaktperson</label><input type="text" id="edit-contact-name" value="${primaryContact?(primaryContact.name||'').replace(/"/g,'&quot;'):''}" placeholder="Navn, Butikksjef"></div>
       <div class="form-group" style="margin-bottom:10px"><label>Notat</label><textarea id="edit-note" style="min-height:60px">${c.note||''}</textarea></div>
       <button class="btn btn-dark btn-sm" onclick="saveCustomerEdits('${safeName}')">Lagre endringer</button>
-      ${c.contacts&&c.contacts.length>0?`<hr class="divider"><div class="section-label">Kontaktpersoner</div><div class="contact-grid">${c.contacts.map(p=>`<div class="contact-card"><div class="contact-name">${p.name}</div><div class="contact-role">${p.role||''}</div>${p.phone?`<div style="font-size:11px;color:#0C447C;margin-top:3px"><a href="tel:${p.phone}" style="color:#0C447C">${p.phone}</a></div>`:''}<span class="contact-type ${typeClass[p.type]||'ct-influence'}">${typeLabel[p.type]||p.type}</span></div>`).join('')}</div>`:''}
+      <hr class="divider">
+      <div class="section-label">Kontaktpersoner</div>
+      <div id="contacts-editor"></div>
       ${c.note?`<div style="margin-top:12px;font-size:12px;color:#5F5E5A;background:#F8F7F3;padding:8px 10px;border-radius:7px;line-height:1.5">📋 ${c.note}</div>`:''}
       <hr class="divider">
       <div class="section-label">Topp 20 mest kjøpte artikler</div>
@@ -417,6 +441,7 @@ function openCustomer(name){
       <hr class="divider">
       <button class="btn btn-dark" onclick="startNewVisit('${safeName}')">+ Registrer ny aktivitet</button>
     </div>`;
+  renderContactsEditor(name);
   const osContainer = document.getElementById('os-widget-container');
   if(osContainer) osContainer.appendChild(osWidget(name));
   // Scroll to top on mobile
@@ -428,12 +453,12 @@ function saveCustomerEdits(name){
   if(!c) return;
   c.address=document.getElementById('edit-address').value.trim();
   c.phone=document.getElementById('edit-phone').value.trim();
+  c.email=document.getElementById('edit-email').value.trim();
   c.discount=document.getElementById('edit-discount').value.trim();
   c.storetype=document.getElementById('edit-storetype').value;
   c.note=document.getElementById('edit-note').value.trim();
-  const contactName=document.getElementById('edit-contact-name').value.trim();
-  if(contactName){if(c.contacts&&c.contacts.length>0){c.contacts[0].name=contactName;}else{c.contacts=[{name:contactName,role:'',type:'decision',phone:c.phone||''}];}}
   saveData('alfa_customers',CUSTOMERS);
+  _sbPatchCustomerField(c.id,{phone:c.phone,email:c.email});
   openCustomer(name);
   showToast('Kundekortet er oppdatert!');
 }
@@ -443,6 +468,97 @@ function closeCustomerDetail(){ renderCustomers(); window.scrollTo(0,0); }
 function startNewVisit(name){
   showSection('nytt-besok', document.querySelectorAll('.nav-item')[3]);
   setTimeout(()=>{const sel=document.getElementById('visit-customer');populateVisitCustomers();sel.value=name;},100);
+}
+
+// ─── KONTAKTPERSONER ────────────────────────────────────────────────────────
+
+function renderContactsEditor(name){
+  const container=document.getElementById('contacts-editor');
+  if(!container) return;
+  const c=getCustomers().find(x=>x.name===name);
+  if(!c) return;
+  const contacts=c.contacts||[];
+  const safeName=name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const typeLabel={decision:'Beslutningstaker',buyer:'Innkjøper',influence:'Påvirker'};
+  const typeClass={decision:'ct-decision',buyer:'ct-buyer',influence:'ct-influence'};
+  let html='<div style="display:flex;flex-direction:column;gap:6px">';
+  contacts.forEach((p,idx)=>{
+    html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:#F8F7F3;border-radius:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#2C2C2A">${escapeHtml(p.name||'')}${p.type?` <span class="contact-type ${typeClass[p.type]||'ct-influence'}" style="margin-left:4px">${typeLabel[p.type]||''}</span>`:''}</div>
+        ${p.role?`<div style="font-size:11px;color:#888780;margin-top:1px">${escapeHtml(p.role)}</div>`:''}
+        <div style="font-size:11px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap">
+          ${p.phone?`<a href="tel:${escapeHtml(p.phone)}" style="color:#0C447C;text-decoration:none">📞 ${escapeHtml(p.phone)}</a>`:''}
+          ${p.email?`<a href="mailto:${escapeHtml(p.email)}" style="color:#0C447C;text-decoration:none">✉ ${escapeHtml(p.email)}</a>`:''}
+        </div>
+      </div>
+      <button onclick="deleteContact('${safeName}',${idx})" style="background:none;border:none;font-size:18px;color:#B4B2A9;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0" title="Slett">×</button>
+    </div>`;
+  });
+  html+=`<div id="contact-add-form" style="display:none;padding:10px 12px;background:#F0EEF8;border-radius:8px">
+    <div class="form-row-2" style="margin-bottom:6px">
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:10px">Navn</label><input type="text" id="cnew-name" placeholder="Kari Nordmann"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:10px">Rolle / tittel</label><input type="text" id="cnew-role" placeholder="Butikksjef"></div>
+    </div>
+    <div class="form-row-2" style="margin-bottom:6px">
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:10px">Telefon</label><input type="tel" id="cnew-phone" placeholder="+47 900 00 000"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:10px">E-post</label><input type="email" id="cnew-email" placeholder="kari@butikk.no"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px"><label style="font-size:10px">Type</label>
+      <select id="cnew-type">
+        <option value="decision">Beslutningstaker</option>
+        <option value="buyer">Innkjøper</option>
+        <option value="influence">Påvirker</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-dark btn-sm" onclick="_saveNewContact('${safeName}')">Lagre kontakt</button>
+      <button class="btn btn-sm" onclick="document.getElementById('contact-add-form').style.display='none';document.getElementById('contact-add-btn').style.display=''">Avbryt</button>
+    </div>
+  </div>`;
+  html+=`<button class="btn btn-sm" id="contact-add-btn" onclick="addContact('${safeName}')" style="align-self:flex-start;margin-top:2px">+ Legg til kontaktperson</button>`;
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+function addContact(name){
+  const form=document.getElementById('contact-add-form');
+  const btn=document.getElementById('contact-add-btn');
+  if(!form) return;
+  form.style.display='block';
+  if(btn) btn.style.display='none';
+  const inp=document.getElementById('cnew-name');
+  if(inp) inp.focus();
+}
+
+function _saveNewContact(name){
+  const c=getCustomers().find(x=>x.name===name);
+  if(!c) return;
+  const newName=(document.getElementById('cnew-name')||{value:''}).value.trim();
+  if(!newName){ showToast('Navn er påkrevd'); return; }
+  const p={
+    name:newName,
+    role:(document.getElementById('cnew-role')||{value:''}).value.trim(),
+    type:(document.getElementById('cnew-type')||{value:'decision'}).value||'decision',
+    phone:(document.getElementById('cnew-phone')||{value:''}).value.trim(),
+    email:(document.getElementById('cnew-email')||{value:''}).value.trim(),
+  };
+  if(!c.contacts) c.contacts=[];
+  c.contacts.push(p);
+  saveData('alfa_customers',CUSTOMERS);
+  _sbPatchCustomerField(c.id,{contacts:c.contacts});
+  renderContactsEditor(name);
+  showToast('Kontaktperson lagt til');
+}
+
+function deleteContact(name,idx){
+  const c=getCustomers().find(x=>x.name===name);
+  if(!c||!c.contacts) return;
+  c.contacts.splice(idx,1);
+  saveData('alfa_customers',CUSTOMERS);
+  _sbPatchCustomerField(c.id,{contacts:c.contacts});
+  renderContactsEditor(name);
+  showToast('Kontaktperson fjernet');
 }
 
 // ─── KUNDELISTE-IMPORT ──────────────────────────────────────────────────────
