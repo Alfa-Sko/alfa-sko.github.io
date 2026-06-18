@@ -50,6 +50,7 @@ Alt ligger nå i én index.html (~7766 linjer). Mål:
 
 - **Appen (supabase.js):** bruker `sb_publishable_...`-format (ny nøkkeltype, ikke JWT). Skal ikke endres.
 - **Server-side skript (scripts/):** må bruke `sb_secret_...`-format fra Supabase → Settings → API → "Secret key". Den gamle legacy `eyJhbGci...` service_role JWT er deaktivert og gir 401. Nøkkelen settes alltid via miljøvariabel, aldri hardkodet.
+- **⚠️ Nøkkel slettet (juni 2025):** `sb_secret_0Erl...`-nøkkelen ble eksponert og er slettet i Supabase. Opprett ny nøkkel under Settings → API → Secret key før du kjører geocode.js, enrich-customers.js eller migrate-customers.js.
 
 ## Backlog (etter refaktorering)
 
