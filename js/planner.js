@@ -1,5 +1,9 @@
 // ─── AI PLANNER ─────────────────────────────────────────────────────────────
 
+// Tid (min) ein må vere på flyplassen FØR avgang (innsjekk + buffer).
+// Brukes av BEGGE planleggarne for å sette dayEndEff på flydag.
+const FLIGHT_BUFFER_MIN = 90;
+
 let _plannerDays = 1;
 let _plannerMaxVisits = 5;  // 0 = ingen grense, fyll opp dagen
 let _plannerHomeBase = '';  // Brukerens hjemmebase (settes fra Min profil)
@@ -441,10 +445,16 @@ function rpBuildRoute(){
   // (kjøring + varighet) ville passere dayEndMin, utsettes det til neste dag
   // (eller til "utsatte kunder" om dagene tar slutt).
   const dayChunks=[];
+  // Flydag: berekn avgangstidspunkt éin gong for bruk i cutoff-logikken
+  const _rpRetMins = returnHome && retTime
+    ? (parseInt(retTime.split(':')[0])*60 + parseInt(retTime.split(':')[1])) : 0;
   let _ri=0;
   for(let di=0; di<numDays && _ri<route.length; di++){
     const chunk=[];
     let dayClock=dayStartMin;
+    const _rpDayDate = startDate ? rpAddDays(startDate,di) : null;
+    const _rpDayKey = _rpDayDate ? (_rpDayDate.getFullYear()+'-'+String(_rpDayDate.getMonth()+1).padStart(2,'0')+'-'+String(_rpDayDate.getDate()).padStart(2,'0')) : null;
+    const isFlightDay = returnHome && (retDate ? (_rpDayKey===retDate) : di===numDays-1);
     while(_ri<route.length && chunk.length<maxPerDay){
       const leg=route[_ri];
       const dur=rpVisitLen(leg.customer);
@@ -452,10 +462,17 @@ function rpBuildRoute(){
       // ved dayClock uten eget kjøretidstillegg, senere besøk legger til leg.legMin.
       const start = chunk.length>0 ? dayClock+leg.legMin : dayClock;
       const end = start+dur;
+      // Flydag: cutoff = avgangstid − oppmøtetid − kjøretid(denne kunde → flyplass).
+      // Vanleg dag: cutoff = dayEndMin.
+      let effectiveCutoff = dayEndMin;
+      if(isFlightDay && _rpRetMins>0){
+        const driveToAP = getDriveMin(leg.customer.city||'', retCity);
+        effectiveCutoff = Math.min(dayEndMin, roundTo30(_rpRetMins - FLIGHT_BUFFER_MIN - driveToAP));
+      }
       // Hard cutoff — men tving inn FØRSTE besøk i dagen uansett, slik at vi
       // aldri står fast i en uendelig løkke hvis ett enkelt besøk er lenger
       // enn hele arbeidsdagen (svært usannsynlig i praksis).
-      if(end>dayEndMin && chunk.length>0){ break; }
+      if(end>effectiveCutoff && chunk.length>0){ break; }
       chunk.push(leg);
       dayClock=end;
       _ri++;
@@ -926,17 +943,20 @@ function runPlanner(){
     }
     let lastEndMin=dayStartMinEff;
     // Returfly: på avreisedagen (angitt dato, ellers siste plandag) må besøkene
-    // slutte senest 1t 45min før flyavgang (innsjekk + kjøring til flyplassen).
+    // slutte senest FLIGHT_BUFFER_MIN + kjøretid(siste kunde→flyplass) før flyavgang.
+    // dayEndEff oppdateras per kandidat i placement-løkka (dynamisk kjøretid).
     const isLastDay = customRouteActive ? (_groupIdx===customDayGroups.length-1) : (d===effDays-1);
     let returnFlightToday = false;
     let dayEndEff = dayEndMin;
+    let retMinsToday = 0; // flyavgangstid (min frå midnatt) for denna dagen
     if(tripMeta.hasReturn){
       const retOnThisDay = tripMeta.retDate ? (tripMeta.retDate===dayKey) : isLastDay;
       if(retOnThisDay){
         returnFlightToday = true;
         const [rh,rm]=tripMeta.retTime.split(':').map(Number);
-        const retMins = rh*60+rm;
-        dayEndEff = Math.min(dayEndMin, roundTo30(retMins-105));
+        retMinsToday = rh*60+rm;
+        // Konservativt startestimat (utan kjøretid) — overskrives per kandidat under
+        dayEndEff = Math.min(dayEndMin, roundTo30(retMinsToday - FLIGHT_BUFFER_MIN));
       }
     }
     // Hjelp: finn ledig slot for et besøk med kjøretid + varighet
@@ -987,6 +1007,12 @@ function runPlanner(){
     let placed=0;
     while(dIdx<dayPool.length && placed<maxPerDay){
       const c=dayPool[dIdx];
+      // Flydag: oppdater dayEndEff dynamisk basert på DENNE kundens avstand til flyplassen.
+      // Garanterer at om denne kunden er den siste på dagen, rekker vi flyet.
+      if(returnFlightToday){
+        const driveToAP = getDriveMin(c.city||area, tripMeta.retCity);
+        dayEndEff = Math.min(dayEndMin, roundTo30(retMinsToday - FLIGHT_BUFFER_MIN - driveToAP));
+      }
       // Kjøring til første kunde: bruk dayStartCity (hjem på dag 1, eller forrige dags sluttsted).
       // Hvis dayStartCity er tom (ingen valgt startpunkt), behandles det som "allerede der".
       let drive;
@@ -1060,8 +1086,7 @@ function runPlanner(){
     const timeline=[];
     // Returfly: legg hjemreise-blokken på slutten av dagen
     if(returnFlightToday && tripMeta.retCity){
-      const [rh,rm]=tripMeta.retTime.split(':').map(Number);
-      const retMins=rh*60+rm;
+      const retMins=retMinsToday; // allereie berekna ovanfor
       const lastV = dayCustomers.length>0 ? dayCustomers[dayCustomers.length-1] : null;
       const fromC = lastV ? (lastV.city||dayStartCity) : dayStartCity;
       const sameCity = !fromC || fromC===tripMeta.retCity;
