@@ -229,19 +229,28 @@ function _grayNearbyPinIcon() {
 }
 
 // Finn kunder som ikke er i noen dag i planen, men er nær dagens rute.
-// "Nær" = samme by som et av dagens stopp ELLER ≤ 60 min kjøring unna.
+// "Nær" = same by som eit stopp ELLER ≤ 60 min kjøring unna ELLER
+// ≤ 60 min koordinatavstand frå dagens hotell-startpunkt (dag 2+).
 function _computeNearbyCustomers(day, days) {
   if (typeof getCustomers !== 'function' || typeof getDriveMin !== 'function') return [];
   const inPlan = new Set();
   days.forEach(d => (d.customers || []).forEach(c => inPlan.add(c.id != null ? c.id : c.name)));
   const dayCities = new Set((day.customers || []).map(c => c.city).filter(Boolean));
   if (day.startCity) dayCities.add(day.startCity);
-  if (dayCities.size === 0) return [];
+  const hotelCoord = (day.startHotel && day.startHotel.lat != null && day.startHotel.lon != null)
+    ? [day.startHotel.lat, day.startHotel.lon] : null;
+  if (dayCities.size === 0 && !hotelCoord) return [];
   return getCustomers().filter(c => {
     if (!c.city || inPlan.has(c.id != null ? c.id : c.name)) return false;
     if (dayCities.has(c.city)) return true;
     for (const city of dayCities) {
       if (getDriveMin(city, c.city) <= 60) return true;
+    }
+    // Koordinatavstand frå hotell-startpunkt (fangar kunder langs hotell→første-stopp)
+    if (hotelCoord && c.lat != null && c.lng != null &&
+        typeof _routeInfoFromCoords === 'function') {
+      const info = _routeInfoFromCoords(hotelCoord[0], hotelCoord[1], c.lat, c.lng, '');
+      if (info && info.min <= 60) return true;
     }
     return false;
   });
@@ -307,13 +316,18 @@ async function _initOneDayMap(day, dayIdx, homeBase, tripMeta, days) {
   if (!container) return;
 
   // ── Startpunkt ──────────────────────────────────────────────────────────────
+  // Dag 2+: bruk hotell-koordinat om tilgjengeleg (eksakt adresse, ikkje by-sentrum)
   const startCity = day.startCity || (dayIdx === 0 ? homeBase : '');
-  const startCoord = _cityCoord(startCity);
-  const startIsHome = dayIdx === 0 || (day.sleepAtHome && dayIdx > 0);
+  const hotelStartCoord = (day.startHotel && day.startHotel.lat != null && day.startHotel.lon != null)
+    ? [day.startHotel.lat, day.startHotel.lon] : null;
+  const startCoord = hotelStartCoord || _cityCoord(startCity);
+  const startIsHome = dayIdx === 0 || (day.sleepAtHome && !hotelStartCoord && dayIdx > 0);
   const startIcon = _labelPin('A', startIsHome ? '#2C2C2A' : '#BA7517');
-  const startPopup = startIsHome
-    ? `<strong>🏠 Start: ${startCity || 'Hjem'}</strong>`
-    : `<strong>🏨 Hotell/start: ${startCity || ''}</strong>`;
+  const startPopup = hotelStartCoord
+    ? `<strong>🏨 Start: ${day.startHotel.name}</strong>`
+    : startIsHome
+      ? `<strong>🏠 Start: ${startCity || 'Hjem'}</strong>`
+      : `<strong>🏨 Hotell/start: ${startCity || ''}</strong>`;
 
   // ── Kundestoppene ────────────────────────────────────────────────────────────
   const custStops = day.customers.map(c => {
