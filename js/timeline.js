@@ -207,8 +207,14 @@ async function renderNotesWithPhotos(){
   if(filtered.length===0){document.getElementById('notes-list').innerHTML='<div class="empty-state">Ingen aktiviteter funnet. Registrer en aktivitet for å komme i gang.</div>';return;}
   const tMap={visit:{ico:'🏪',lbl:'Kundebesøk'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen'},phone:{ico:'📞',lbl:'Telefonsamtale'},clinic:{ico:'🎓',lbl:'Clinic'},dinner:{ico:'🍽️',lbl:'Kundemiddag'}};
   const items = await Promise.all(filtered.map(async v=>{
-    const photos = await getPhotosForVisit(v.id);
-    const photoHtml = photos.length>0?`<div style="margin-top:12px"><div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${photos.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">${photos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer" onclick="viewPhoto('${p.data.replace(/'/g,"\\'")}','${p.name}')"><img src="${p.data}" style="width:100%;height:100%;object-fit:cover" alt="${p.name}"></div>`).join('')}</div></div>`:'';
+    // Storage-bilder (innlogget, photoPaths) → IndexedDB som fallback for eldre lokale bilder
+    const storagePhotos = await getStoragePhotosForVisit(v);
+    const localPhotos = storagePhotos.length===0 ? await getPhotosForVisit(v.id) : [];
+    const allPhotos = [
+      ...storagePhotos.map(p=>({src:p.url, name:p.name})),
+      ...localPhotos.map(p=>({src:p.data, name:p.name})),
+    ];
+    const photoHtml = allPhotos.length>0?`<div style="margin-top:12px"><div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${allPhotos.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">${allPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer" onclick="viewPhoto('${p.src.replace(/'/g,"\\'")}','${p.name}')"><img src="${p.src}" style="width:100%;height:100%;object-fit:cover" alt="${p.name}"></div>`).join('')}</div></div>`:'';
     const t=tMap[v.type]||tMap.visit;
     const typePill=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#F1EFE8;color:#444441;font-weight:600;margin-left:6px">${t.ico} ${t.lbl}</span>`;
     const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6">${v.notes}</div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';

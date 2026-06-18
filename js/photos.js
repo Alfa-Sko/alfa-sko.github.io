@@ -46,6 +46,33 @@ function deletePhotosForVisit(visitId){
   all.onsuccess = () => { all.result.filter(p=>p.visitId===visitId).forEach(p=>{ store.delete(p.id); }); };
 }
 
+// ─── SUPABASE STORAGE – VISNING ──────────────────────────────────────────────
+
+// Hent signerte URL-er for alle bilder på eit besøk (ein batch-request per besøk).
+// Tek heile besøksobjektet for å lese photoPaths. Returnerer [{url, name}].
+// Signed URL-ar er gyldige i 1 time; genererte på nytt kvar gong tidslinjen rendras.
+async function getStoragePhotosForVisit(visit){
+  var paths=(visit&&visit.photoPaths)||[];
+  if(!paths.length||!window._sbUser) return [];
+  try{
+    var r=await sbFetch('/storage/v1/object/sign/besoksbilder',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paths:paths, expiresIn:3600}),
+    });
+    if(!r.ok) return [];
+    var items=await r.json();
+    return items
+      .filter(function(it){ return it.signedURL&&!it.error; })
+      .map(function(it){
+        return {url:SUPA_URL+it.signedURL, name:(it.path||'').split('/').pop()||'bilde'};
+      });
+  }catch(e){
+    console.warn('getStoragePhotosForVisit feilet:',e);
+    return [];
+  }
+}
+
 // ─── SUPABASE STORAGE UPLOAD ─────────────────────────────────────────────────
 
 // Komprimer ett bilde til ≤maxBytes via Canvas/JPEG.
