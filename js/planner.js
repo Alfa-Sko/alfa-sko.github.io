@@ -543,7 +543,7 @@ function rpBuildRoute(){
     const rm = retTime ? (parseInt(retTime.split(':')[0])*60+parseInt(retTime.split(':')[1])) : (17*60);
     const lastCity = ld.customers.length ? ld.customers[ld.customers.length-1].city : retCity;
     const driveMin = (lastCity===retCity?15:getDriveMin(lastCity,retCity));
-    ld.timeline.push({kind:'flight-return', startMins:Math.max(0,rm-45-driveMin), endMins:rm, from:lastCity, to:retCity, retMins:rm, driveMin:driveMin});
+    ld.timeline.push({kind:'flight-return', startMins:Math.max(0,rm-FLIGHT_BUFFER_MIN-driveMin), endMins:rm, from:lastCity, to:retCity, retMins:rm, driveMin:driveMin});
   }
 
   // Lagre trip-meta så plannerAddToCalendar (felles m/auto) tar med fly/hotell/leiebil
@@ -1091,7 +1091,7 @@ function runPlanner(){
       const fromC = lastV ? (lastV.city||dayStartCity) : dayStartCity;
       const sameCity = !fromC || fromC===tripMeta.retCity;
       const driveToAirport = sameCity ? 15 : getDriveMin(fromC, tripMeta.retCity);
-      const blockStart = Math.max(lastV?lastV._end:dayStartMinEff, retMins-45-driveToAirport);
+      const blockStart = Math.max(lastV?lastV._end:dayStartMinEff, retMins-FLIGHT_BUFFER_MIN-driveToAirport);
       timeline.push({kind:'flight-return', startMins:blockStart, endMins:retMins, from:fromC, to:tripMeta.retCity, retMins:retMins, driveMin:driveToAirport});
     }
     dayCustomers.forEach(c=>timeline.push({kind:'visit',customer:c,startMins:c._start,endMins:c._end}));
@@ -1293,7 +1293,7 @@ function runPlanner(){
           '<div class="planner-stop-icon">✈</div>'+
           '<div class="planner-stop-body">'+
             '<div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(item.to)+' kl. '+f2(item.retMins)+'</div>'+
-            '<div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f2(item.retMins-45)+'</div>'+
+            '<div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f2(item.retMins-FLIGHT_BUFFER_MIN)+'</div>'+
           '</div>'+
           '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
       } else if(item.kind==='drive-home-return'){
@@ -1655,6 +1655,14 @@ function _gOpeningTimeMin(c, weekday){
 
 // Re-beregn start/slutt-tider for alle besøk på en dag etter redigering
 function recomputeDayTimes(day){
+  // Cutoff: arbeidstid-slutt (same kjelde som rpBuildRoute/runPlanner)
+  const _endEl = document.getElementById('planner-end');
+  const _wEnd = (_endEl && _endEl.value) || (userProfile && userProfile.workEnd) || '17:00';
+  const [_eh, _em] = _wEnd.split(':').map(Number);
+  const dayEndMin = roundTo30(_eh*60 + _em);
+  // Flydag? Hent flight-return frå timeline (satt av rpBuildRoute/runPlanner ved bygging).
+  const _frItem = (day.timeline||[]).find(x=>x.kind==='flight-return');
+
   const dayStartMin = 8*60;
   const weekday = day.date.getDay();
   let cursor = dayStartMin;
@@ -1670,8 +1678,17 @@ function recomputeDayTimes(day){
   blocks.forEach(b=>obstacles.push({s:b.startMins, e:b.endMins}));
   obstacles.sort((a,b)=>a.s-b.s);
   let oIdx = 0;
+  const placed = [];
   day.customers.forEach((c)=>{
-    const dur = _gVisitDuration(c);
+    // Bevar opprinnelig _duration (satt av rpBuildRoute/runPlanner ved bygging).
+    // Fall tilbake til _gVisitDuration berre for nyleg-lagt-til kundar utan preset.
+    const dur = (c._duration != null) ? c._duration : _gVisitDuration(c);
+    // Effektiv cutoff per kandidat: flyfrist – oppmøtetid – kjøretid til flyplass.
+    let effectiveCutoff = dayEndMin;
+    if(_frItem && _frItem.retMins){
+      const _driveToAP = getDriveMin(c.city||'', _frItem.to||'');
+      effectiveCutoff = Math.min(dayEndMin, roundTo30(_frItem.retMins - FLIGHT_BUFFER_MIN - _driveToAP));
+    }
     let placedOk = false;
     let guard = 0;
     while(!placedOk && guard<40){
@@ -1707,6 +1724,8 @@ function recomputeDayTimes(day){
         oIdx++;
         continue;
       }
+      // Cutoff-sjekk: besøket får ikkje plass før grensa → utsett (same prinsipp som rpBuildRoute).
+      if(t + dur > effectiveCutoff) break;
       c._drive = drive;
       c._duration = dur;
       c._start = t;
@@ -1716,8 +1735,19 @@ function recomputeDayTimes(day){
       prevCity = c.city || prevCity;
       prevCoord = toCoord || prevCoord;
       placedOk = true;
+      placed.push(c);
     }
   });
+  day.customers = placed;
+  // Oppdater flight-return sin startMins etter reberegning (brukar FLIGHT_BUFFER_MIN, ikkje hardkoda 45).
+  if(_frItem && _frItem.retMins){
+    const _lastV = placed.length>0 ? placed[placed.length-1] : null;
+    const _fromC = (_lastV && _lastV.city) || day.startCity || '';
+    const _driveToAP = getDriveMin(_fromC, _frItem.to||'');
+    _frItem.driveMin = _driveToAP;
+    _frItem.from = _fromC;
+    _frItem.startMins = Math.max(_lastV ? _lastV._end : dayStartMin, roundTo30(_frItem.retMins - FLIGHT_BUFFER_MIN - _driveToAP));
+  }
   // Oppdater drive-home timeline-element hvis det finnes
   if(day.timeline){
     day.timeline = day.timeline.filter(x=>x.kind!=='drive-home' && x.kind!=='drive-home-return' && x.kind!=='adm' && x.kind!=='flight-leg' && x.kind!=='time-block');
@@ -2152,7 +2182,7 @@ function renderPlanFromData(days){
       const f4=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
       const driveTxt = _fr.from && _fr.from!==_fr.to ? '🚗 Kjør '+escapeHtml(_fr.from)+' → '+escapeHtml(_fr.to)+' ('+_fr.driveMin+' min) · ' : '';
       const _retB2 = (window._lastTripMeta||{}).retBooked;
-      html+='<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(_retB2?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f4(_fr.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB2?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(_fr.to)+' kl. '+f4(_fr.retMins)+'</div><div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f4(_fr.retMins-45)+'</div></div><label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB2?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
+      html+='<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(_retB2?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f4(_fr.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB2?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(_fr.to)+' kl. '+f4(_fr.retMins)+'</div><div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f4(_fr.retMins-FLIGHT_BUFFER_MIN)+'</div></div><label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB2?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
     }
     html+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button onclick="plannerAddStopPrompt('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#F1EFE8;border:1px dashed #888780;border-radius:8px;color:#5F5E5A;font-size:12px;font-weight:600;cursor:pointer">+ Kunde</button><button onclick="addFlightLegPrompt('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#E6F1FB;border:1px dashed #0C447C;border-radius:8px;color:#0C447C;font-size:12px;font-weight:600;cursor:pointer">✈ Flyetappe</button><button onclick="showTimeBlockModal('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#F1EFE8;border:1px dashed #5F5E5A;border-radius:8px;color:#5F5E5A;font-size:12px;font-weight:600;cursor:pointer">🕐 Legg til tid</button></div>';
     // Vis kveldsetappe (transport til neste dags område / hotellby)
