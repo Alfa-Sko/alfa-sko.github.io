@@ -38,6 +38,7 @@ function clearVisitForm(){
   document.getElementById('visit-date').value=TODAY_STR;
   document.getElementById('visit-time').value='09:00';
   document.getElementById('visit-time-end').value='10:00';
+  const fp=document.getElementById('visit-photos'); if(fp) fp.value='';
 }
 
 function saveVisit(){
