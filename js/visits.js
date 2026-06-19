@@ -99,6 +99,8 @@ async function addPhotoToVisit(visitId, input){
     v.photoCount = (v.photoCount||0)+result.count;
     saveData('alfa_visits', visits);
     showToast('Bilde lagret!');
+    var ph = document.getElementById('ev-popup-photos');
+    if(ph && typeof _loadEvPopupPhotos === 'function') _loadEvPopupPhotos(v);
   } else {
     showToast('Opplasting feilet – sjekk konsollen');
   }
