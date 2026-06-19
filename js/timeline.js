@@ -1,5 +1,18 @@
 // ─── TIDSLINJE ──────────────────────────────────────────────────────────────
 
+async function _loadTlPhotos(it){
+  var el = document.getElementById('tl-photos-'+it.id);
+  if(!el) return;
+  var photos = await getStoragePhotosForVisit({photoPaths:it.photoPaths});
+  if(!photos.length) return;
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
+    + photos.map(function(p){
+        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
+          +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+      }).join('')
+    + '</div>';
+}
+
 function saveFreeNote(){
   if(_roGuard()) return;
   const text=document.getElementById('free-note-text').value.trim();
@@ -44,6 +57,7 @@ function renderTimeline(){
       notes:v.notes,
       followup:v.followup,
       id:v.id,
+      photoPaths:v.photoPaths||[],
       sortKey:v.date+'T'+(v.time||'00:00')
     });
   });
@@ -116,10 +130,12 @@ function renderTimeline(){
       html+='</div>';
       if(it.notes){html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px">'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</div>';}
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
+      if(it.kind==='activity' && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
       html+='</div>';
     });
   });
   list.innerHTML=html;
+  filtered.forEach(function(it){ if(it.kind==='activity' && it.photoPaths && it.photoPaths.length) _loadTlPhotos(it); });
 }
 // ─── FELLES TEAM-TIDSLINJE (ledervisning) ──────────────────────────────────
 

@@ -347,6 +347,51 @@ function renderTopArticles(customerName){
   return html;
 }
 
+async function _renderCustHistory(name, filter){
+  filter=filter||'all';
+  var el=document.getElementById('cust-history-list');
+  if(!el) return;
+  document.querySelectorAll('[id^="chf-"]').forEach(function(b){
+    b.className=b.id==='chf-'+filter?'btn btn-dark btn-sm':'btn btn-light btn-sm';
+    b.style.fontSize='11px';
+  });
+  var tMap={
+    visit:{ico:'🏪',lbl:'Kundebesøk'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen'},
+    phone:{ico:'📞',lbl:'Telefonsamtale'},clinic:{ico:'🎓',lbl:'Clinic'},
+    dinner:{ico:'🍽️',lbl:'Kundemiddag'},training:{ico:'🏃',lbl:'Trening'},
+    teams:{ico:'👥',lbl:'Teamsmøte'},lunch:{ico:'🥪',lbl:'Lunsj med kunde'},
+    other:{ico:'📌',lbl:'Annet'}
+  };
+  var all=visits.filter(function(v){return v.customer===name;}).sort(function(a,b){return b.date.localeCompare(a.date);});
+  var shown=filter==='bilder'?all.filter(function(v){return v.photoPaths&&v.photoPaths.length;})
+           :filter==='all'?all
+           :all.filter(function(v){return (v.type||'visit')===filter;});
+  if(!shown.length){el.innerHTML='<div class="empty-state" style="padding:12px">Ingen aktiviteter for dette filteret</div>';return;}
+  el.innerHTML=shown.map(function(v){
+    var t=tMap[v.type]||tMap.visit;
+    var ph=(v.photoPaths&&v.photoPaths.length)?'<div id="ch-photos-'+v.id+'" style="margin-top:8px"></div>':'';
+    return '<div class="tl-item"><div class="tl-dot tl-dot-visit">'+t.ico+'</div><div class="tl-body">'
+      +'<div class="tl-date">'+v.date.split('-').reverse().join('.')+' · '+(v.time||'')+(v.timeEnd?' – '+v.timeEnd:'')+' · '+(v.contact||'')+'</div>'
+      +'<div class="tl-title">'+t.lbl+'</div>'
+      +(v.notes?'<div class="tl-text">'+v.notes+'</div>':'')
+      +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
+      +ph+'</div></div>';
+  }).join('');
+  shown.forEach(function(v){if(v.photoPaths&&v.photoPaths.length)_loadChPhotos(v);});
+}
+
+async function _loadChPhotos(v){
+  var el=document.getElementById('ch-photos-'+v.id);
+  if(!el) return;
+  var photos=await getStoragePhotosForVisit(v);
+  if(!photos.length) return;
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
+    +photos.map(function(p){
+      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
+        +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+    }).join('')+'</div>';
+}
+
 function openCustomer(name){
   const c=getCustomers().find(c=>c.name===name);
   if(!c) return;
@@ -360,6 +405,11 @@ function openCustomer(name){
   const bLbl=c.class==='A'?'A-kunde':c.class==='B'?'B-kunde':c.class==='C'?'C-kunde':'Ny relasjon';
   const safeName=name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   const primaryContact=c.contacts&&c.contacts[0]?c.contacts[0]:null;
+  const _htl={visit:'Besøk',nydalen:'Nydalen',phone:'Telefon',clinic:'Clinic',dinner:'Middag',training:'Trening',teams:'Møte',lunch:'Lunsj',other:'Annet'};
+  const _hat=[...new Set(custVisits.map(v=>v.type||'visit'))];
+  let histFilterBtns='<button class="btn btn-dark btn-sm" id="chf-all" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\'all\')">Alle</button>';
+  _hat.forEach(t=>{histFilterBtns+='<button class="btn btn-light btn-sm" id="chf-'+t+'" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\''+t+'\')">'+(_htl[t]||t)+'</button>';});
+  if(custVisits.some(v=>v.photoPaths&&v.photoPaths.length>0)) histFilterBtns+='<button class="btn btn-light btn-sm" id="chf-bilder" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\'bilder\')">📷 Bilder</button>';
 
   document.getElementById('customer-detail-content').innerHTML=`
     <div class="card">
@@ -428,11 +478,8 @@ function openCustomer(name){
       ${renderTopArticles(c.name)}
       <hr class="divider">
       <div class="section-label">Aktivitetshistorikk</div>
-      ${custVisits.length===0?'<div class="empty-state" style="padding:16px">Ingen aktiviteter registrert</div>':custVisits.map(v=>{
-        const tMap={visit:{ico:'🏪',lbl:'Kundebesøk'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen'},phone:{ico:'📞',lbl:'Telefonsamtale'},clinic:{ico:'🎓',lbl:'Clinic'},dinner:{ico:'🍽️',lbl:'Kundemiddag'}};
-        const t=tMap[v.type]||tMap.visit;
-        return `<div class="tl-item"><div class="tl-dot tl-dot-visit">${t.ico}</div><div class="tl-body"><div class="tl-date">${v.date.split('-').reverse().join('.')} · ${v.time||''}${v.timeEnd?' – '+v.timeEnd:''} · ${v.contact||''}</div><div class="tl-title">${t.lbl}</div>${v.notes?`<div class="tl-text">${v.notes}</div>`:''}${v.followup?`<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: ${v.followup}</div>`:''}</div></div>`;
-      }).join('')}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${histFilterBtns}</div>
+      <div id="cust-history-list"></div>
       <hr class="divider">
       <div class="section-label">Åpen oppfølging</div>
       ${custFollows.length===0?'<div class="empty-state" style="padding:12px">Ingen åpen oppfølging</div>':custFollows.map(f=>followItem(f)).join('')}
@@ -441,6 +488,7 @@ function openCustomer(name){
       <hr class="divider">
       <button class="btn btn-dark" onclick="startNewVisit('${safeName}')">+ Registrer ny aktivitet</button>
     </div>`;
+  _renderCustHistory(name, 'all');
   renderContactsEditor(name);
   const osContainer = document.getElementById('os-widget-container');
   if(osContainer) osContainer.appendChild(osWidget(name));
