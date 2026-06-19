@@ -125,7 +125,13 @@ async function _sbUploadOnePhoto(visitId, file){
     headers:{'Content-Type':'image/jpeg'},
     body:blob,
   });
-  if(!r.ok) throw new Error('HTTP '+r.status+': '+await r.text());
+  if(!r.ok){
+    var body = await r.text();
+    console.error('[photos] Storage-opplasting feilet', r.status, body,
+      '| sti:', encodedPath,
+      '| auth:', r.status===401?'MANGLER/UGYLDIG TOKEN':'ok');
+    throw new Error('HTTP '+r.status+': '+body);
+  }
   return uid+'/'+String(visitId)+'/'+safeName;
 }
 
@@ -144,7 +150,7 @@ async function sbUploadVisitPhotos(visitId, files){
       var path = await _sbUploadOnePhoto(visitId, files[i]);
       paths.push(path);
     }catch(e){
-      console.warn('Foto-opplasting feilet:',files[i].name,e);
+      console.error('[photos] sbUploadVisitPhotos feilet for', files[i].name, ':', e.message);
     }
   }
   return {count:paths.length, paths:paths};

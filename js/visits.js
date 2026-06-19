@@ -84,6 +84,26 @@ function saveVisit(){
   });
 }
 
+async function addPhotoToVisit(visitId, input){
+  if(_roGuard()) return;
+  var files = input.files;
+  if(!files||!files.length) return;
+  input.value='';
+  var v = visits.find(function(x){ return x.id===visitId; });
+  if(!v){ showToast('Besøk ikke funnet'); return; }
+  showToast('Laster opp …');
+  var result = await sbUploadVisitPhotos(visitId, files);
+  if(result.count>0){
+    v.photoPaths = (v.photoPaths||[]).concat(result.paths);
+    v.photoCount = (v.photoCount||0)+result.count;
+    saveData('alfa_visits', visits);
+    showToast('Bilde lagret!');
+  } else {
+    showToast('Opplasting feilet – sjekk konsollen');
+  }
+  renderNotes();
+}
+
 function deleteVisit(id){
   if(!confirm('Slett dette besøket og alle tilhørende bilder?')) return;
   deletePhotosForVisit(id);

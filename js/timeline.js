@@ -214,7 +214,10 @@ async function renderNotesWithPhotos(){
       ...storagePhotos.map(p=>({src:p.url, name:p.name})),
       ...localPhotos.map(p=>({src:p.data, name:p.name})),
     ];
-    const photoHtml = allPhotos.length>0?`<div style="margin-top:12px"><div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${allPhotos.length})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px">${allPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer" onclick="viewPhoto('${p.src.replace(/'/g,"\\'")}','${p.name}')"><img src="${p.src}" style="width:100%;height:100%;object-fit:cover" alt="${p.name}"></div>`).join('')}</div></div>`:'';
+    const thumbsHtml = allPhotos.length>0
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:8px">${allPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer" onclick="viewPhoto('${p.src.replace(/'/g,"\\'")}','${p.name}')"><img src="${p.src}" style="width:100%;height:100%;object-fit:cover" alt="${p.name}"></div>`).join('')}</div>`
+      : '';
+    const photoHtml = `<div style="margin-top:12px">${allPhotos.length>0?`<div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${allPhotos.length})</div>`:''}${thumbsHtml}<input type="file" accept="image/*" multiple id="vpi-${v.id}" style="display:none" onchange="addPhotoToVisit(${v.id},this)"><button class="btn btn-light btn-sm" style="font-size:11px" onclick="document.getElementById('vpi-${v.id}').click()">+ Legg til bilde</button></div>`;
     const t=tMap[v.type]||tMap.visit;
     const typePill=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#F1EFE8;color:#444441;font-weight:600;margin-left:6px">${t.ico} ${t.lbl}</span>`;
     const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6">${v.notes}</div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';
