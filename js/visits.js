@@ -85,10 +85,11 @@ function saveVisit(){
 }
 
 async function addPhotoToVisit(visitId, input){
+  console.log('[photos] addPhotoToVisit kalt', visitId);
   if(_roGuard()) return;
-  var files = input.files;
-  if(!files||!files.length) return;
+  var files = Array.from(input.files);  // snapshot før input.value='' tømmer live FileList
   input.value='';
+  if(!files.length) return;
   var v = visits.find(function(x){ return x.id===visitId; });
   if(!v){ showToast('Besøk ikke funnet'); return; }
   showToast('Laster opp …');
