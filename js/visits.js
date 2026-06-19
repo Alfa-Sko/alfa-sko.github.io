@@ -109,9 +109,19 @@ async function addPhotoToVisit(visitId, input){
 
 function deleteVisit(id){
   if(!confirm('Slett dette besøket og alle tilhørende bilder?')) return;
-  deletePhotosForVisit(id);
-  visits=visits.filter(v=>v.id!==id);
+  var v = visits.find(function(x){ return x.id===id; });
+  deletePhotosForVisit(id);                          // IndexedDB-bilder (lokale)
+  if(v && v.photoPaths && v.photoPaths.length){
+    _sbDeleteStoragePhotos(v.photoPaths);            // Storage-bilder, fire-and-forget
+  }
+  visits=visits.filter(function(x){ return x.id!==id; });
   saveData('alfa_visits',visits);
   renderNotes();
+  renderTimeline();
+  var calEl=document.getElementById('sec-kalender');
+  if(calEl && getComputedStyle(calEl).display!=='none'){
+    if(typeof closeEvPopup==='function') closeEvPopup();
+    if(typeof renderCal==='function') renderCal();
+  }
   showToast('Besøk slettet');
 }

@@ -74,6 +74,22 @@ async function getStoragePhotosForVisit(visit){
   return results.filter(Boolean);
 }
 
+// Slett en liste med Storage-stier fra besoksbilder-bucketen (batch DELETE).
+// Kalles fra deleteVisit – fire-and-forget, logger feil men stopper ikke slettingen.
+async function _sbDeleteStoragePhotos(paths){
+  if(!paths||!paths.length||!window._sbUser) return;
+  try{
+    var r=await sbFetch('/storage/v1/object/besoksbilder',{
+      method:'DELETE',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prefixes:paths}),
+    });
+    if(!r.ok) console.error('[photos] Storage-sletting feilet: HTTP '+r.status, await r.text());
+  }catch(e){
+    console.error('[photos] Storage-sletting krasjet:', e);
+  }
+}
+
 // ─── SUPABASE STORAGE UPLOAD ─────────────────────────────────────────────────
 
 // Komprimer ett bilde til ≤maxBytes via Canvas/JPEG.
