@@ -54,23 +54,24 @@ function deletePhotosForVisit(visitId){
 async function getStoragePhotosForVisit(visit){
   var paths=(visit&&visit.photoPaths)||[];
   if(!paths.length||!window._sbUser) return [];
-  try{
-    var r=await sbFetch('/storage/v1/object/sign/besoksbilder',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({paths:paths, expiresIn:3600}),
-    });
-    if(!r.ok) return [];
-    var items=await r.json();
-    return items
-      .filter(function(it){ return it.signedURL&&!it.error; })
-      .map(function(it){
-        return {url:SUPA_URL+it.signedURL, name:(it.path||'').split('/').pop()||'bilde'};
-      });
-  }catch(e){
-    console.warn('getStoragePhotosForVisit feilet:',e);
-    return [];
-  }
+  var results = await Promise.all(paths.map(async function(p){
+    try{
+      // Bruker authenticated-endepunkt + blob URL (samme mønster som workbooks.js).
+      // Signed URLs trigget CORB fordi besoksbilder-bucketen mangler SELECT-policy for tokens.
+      var encodedPath = p.split('/').map(encodeURIComponent).join('/');
+      var r = await sbFetch('/storage/v1/object/authenticated/besoksbilder/'+encodedPath, {method:'GET'});
+      if(!r.ok){
+        console.error('[photos] getStoragePhotosForVisit HTTP '+r.status+' for sti:', p, await r.text());
+        return null;
+      }
+      var blob = await r.blob();
+      return {url: URL.createObjectURL(blob), name: p.split('/').pop()||'bilde'};
+    }catch(e){
+      console.warn('[photos] getStoragePhotosForVisit feilet for', p, e);
+      return null;
+    }
+  }));
+  return results.filter(Boolean);
 }
 
 // ─── SUPABASE STORAGE UPLOAD ─────────────────────────────────────────────────
