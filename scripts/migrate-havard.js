@@ -1,18 +1,26 @@
 // Engangs-skript: migrerer Håvards kunder (havard_kunder_migrasjon.json) til Supabase customers-tabellen.
-// Kjør: SUPA_SERVICE_KEY=<din_service_role_key> node scripts/migrate-havard.js
+// Tørrkjøring (default): viser hva som vil skje – skriver ingenting.
+// Skriving:              legg til --write for å faktisk sette inn nye kunder.
+//
+// PowerShell:
+//   $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/migrate-havard.js
+//   $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/migrate-havard.js --write
+//
 // Krav: Node 18+ (innebygd fetch). Ingen npm-pakker nødvendig.
 // Nøkkel hentes KUN fra miljøvariabel – aldri hardkod den her.
 
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
 
 const SUPA_URL = 'https://oxwirhetgwcbsehyuaeq.supabase.co';
-const SUPA_KEY = process.env.SUPA_SERVICE_KEY;
+const SUPA_KEY = process.env.SUPA_SECRET_KEY;
 if (!SUPA_KEY) {
-  console.error('Feil: SUPA_SERVICE_KEY er ikke satt.');
-  console.error('Kjør: SUPA_SERVICE_KEY=<nøkkel> node scripts/migrate-havard.js');
+  console.error('Feil: SUPA_SECRET_KEY er ikke satt.');
+  console.error('Kjør: $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/migrate-havard.js');
   process.exit(1);
 }
+
+const DRY_RUN = !process.argv.includes('--write');
 
 // Parse l12_raw-strenger som "kr  343,181" → 343181 (heltall NOK, komma = tusenskille)
 function parseL12(raw) {
@@ -27,36 +35,37 @@ const src = JSON.parse(fs.readFileSync(path.join(__dirname, 'havard_kunder_migra
 console.log(`Leste ${src.length} kunder fra havard_kunder_migrasjon.json.`);
 
 // ── Bygg rader ────────────────────────────────────────────────────────────────
-// Feltene matches customers-tabellens skjema (se migrate-customers.js).
-// email og eier_konstellasjon finnes i JSON men er ikke egne kolonner – utelates.
-// poststed settes til city (samme verdi i Håvards data).
 
 const rows = src.map(c => ({
-  name:          c.name,
-  legacy_id:     null,
-  city:          c.city          || null,
-  chain:         c.chain         || null,
-  l12:           parseL12(c.l12_raw),
-  budget:        0,
-  concept:       null,
-  class:         null,
-  priority:      null,
-  contacts:      [],
-  note:          '',
-  gate:          null,
-  postnr:        c.postal        || null,
-  poststed:      c.city          || null,
-  address:       c.address       || null,
-  phone:         c.phone         || null,
-  discount:      null,
-  storetype:     null,
-  district:      'Vest/Sør Norge',
-  assigned_user: null,
+  name:               c.name,
+  legacy_id:          null,
+  city:               c.city               || null,
+  chain:              c.chain              || null,
+  l12:                parseL12(c.l12_raw),
+  budget:             0,
+  concept:            null,
+  class:              null,
+  priority:           null,
+  contacts:           [],
+  note:               '',
+  gate:               null,
+  postnr:             c.postal             || null,
+  poststed:           c.city               || null,
+  address:            c.address            || null,
+  phone:              c.phone              || null,
+  email:              c.email              || null,
+  eier_konstellasjon: c.eier_konstellasjon || null,
+  discount:           null,
+  storetype:          null,
+  district:           'Vest/Sør Norge',
+  assigned_user:      null,
 }));
 
 // ── Kjør ──────────────────────────────────────────────────────────────────────
 
 async function run() {
+  if (DRY_RUN) console.log('\n[TØRRKJØRING – ingen data skrives. Legg til --write for å utføre.]\n');
+
   // 1. Hent alle eksisterende kundenavn fra Supabase
   const existRes = await fetch(
     `${SUPA_URL}/rest/v1/customers?select=name`,
@@ -69,37 +78,52 @@ async function run() {
   const existingRows = await existRes.json();
   const existingNames = new Set(existingRows.map(c => c.name));
 
-  // 2. Rapporter overlapp
-  const matches  = rows.filter(r =>  existingNames.has(r.name));
-  const newOnes  = rows.filter(r => !existingNames.has(r.name));
+  // 2. Del i nye og eksisterende (eksisterende røres IKKE)
+  const skipped = rows.filter(r =>  existingNames.has(r.name));
+  const toInsert = rows.filter(r => !existingNames.has(r.name));
 
-  console.log('\n── Matches mot eksisterende kunder (' + matches.length + ') ──');
-  if (matches.length === 0) {
-    console.log('  Ingen – alle er nye.');
+  // 3. Rapporter hoppet-over
+  console.log('── Finnes allerede – hoppes over (' + skipped.length + ') ──');
+  if (skipped.length === 0) {
+    console.log('  Ingen overlapp.');
   } else {
-    matches.forEach(r => console.log('  ~ ' + r.name));
-    console.log('  (disse oppdateres med upsert)');
+    skipped.forEach(r => console.log('  ~ ' + r.name));
   }
 
-  console.log('\n── Nye kunder (' + newOnes.length + ') ──');
-  const preview = newOnes.slice(0, 10);
-  preview.forEach(r => console.log('  + ' + r.name));
-  if (newOnes.length > 10) console.log('  ... og ' + (newOnes.length - 10) + ' til');
+  // 4. Rapporter nye
+  console.log('\n── Nye kunder som vil settes inn (' + toInsert.length + ') ──');
+  if (toInsert.length === 0) {
+    console.log('  Ingen nye kunder.');
+  } else {
+    const preview = toInsert.slice(0, 15);
+    preview.forEach(r => console.log('  + ' + r.name + (r.city ? ' (' + r.city + ')' : '')));
+    if (toInsert.length > 15) console.log('  ... og ' + (toInsert.length - 15) + ' til');
+  }
 
-  // 3. Bekreft før skriving
-  console.log('\nSamlet: ' + rows.length + ' kunder (' + newOnes.length + ' nye, ' + matches.length + ' oppdateres)');
+  console.log('\nSamlet: ' + rows.length + ' i JSON → ' + toInsert.length + ' nye, ' + skipped.length + ' hoppet over');
 
-  // 4. Upsert (slår på name-unique-constraint i tabellen)
-  console.log('\nSkriver til Supabase...');
+  if (DRY_RUN) {
+    console.log('\nKjør med --write for å sette inn de ' + toInsert.length + ' nye kundene:');
+    console.log('  $env:SUPA_SECRET_KEY="sb_secret_..."; node scripts/migrate-havard.js --write');
+    return;
+  }
+
+  if (toInsert.length === 0) {
+    console.log('\nIngenting å gjøre.');
+    return;
+  }
+
+  // 5. Sett kun inn NYE (ingen upsert – eksisterende påvirkes ikke)
+  console.log('\nSkriver ' + toInsert.length + ' nye kunder til Supabase...');
   const res = await fetch(`${SUPA_URL}/rest/v1/customers`, {
     method: 'POST',
     headers: {
       apikey:          SUPA_KEY,
       Authorization:   `Bearer ${SUPA_KEY}`,
       'Content-Type':  'application/json',
-      Prefer:          'resolution=merge-duplicates,return=representation',
+      Prefer:          'return=representation',
     },
-    body: JSON.stringify(rows),
+    body: JSON.stringify(toInsert),
   });
 
   if (!res.ok) {
@@ -108,10 +132,8 @@ async function run() {
   }
 
   const inserted = await res.json();
-  console.log('\n✓ ' + inserted.length + ' kunder skrevet til Supabase.');
-  console.log('  Nye:       ' + newOnes.length);
-  console.log('  Oppdatert: ' + matches.length);
-  console.log('\nHusk: roter service role key i Supabase Dashboard etter at du har bekreftet migreringen.');
+  console.log('\n✓ ' + inserted.length + ' nye kunder satt inn i Supabase.');
+  console.log('\nHusk: roter SUPA_SECRET_KEY i Supabase Dashboard etter bruk.');
 }
 
 run().catch(err => { console.error(err); process.exit(1); });
