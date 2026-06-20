@@ -29,6 +29,11 @@ function getCustomerSales() { return CUSTOMER_SALES; }
 // Fallback: hvis ikke innlogget, fetch feiler, eller tabellen er tom,
 // beholdes eksisterende CUSTOMERS (BASE_CUSTOMERS eller localStorage-cache).
 async function fetchCustomersFromSupabase() {
+  if(window._DEMO_ACTIVE){
+    CUSTOMERS.length = 0;
+    CUSTOMERS.push(...(typeof DEMO_CUSTOMERS !== 'undefined' ? DEMO_CUSTOMERS : []).map(function(c){ return Object.assign({},c); }));
+    return;
+  }
   const s = typeof _sbSession === 'function' ? _sbSession() : null;
   if (!s || !s.access_token) return;
 
@@ -61,6 +66,7 @@ async function fetchCustomersFromSupabase() {
 // Bruker sbFetch (apikey + Bearer access_token, auto-retry på 401).
 // Fallback: feilen loggast men stoppar ikkje flyten.
 async function _sbPatchCustomerField(id, patch){
+  if(window._DEMO_ACTIVE) return;
   if(!id || typeof sbFetch==='undefined') return;
   try{
     const r=await sbFetch('/rest/v1/customers?id=eq.'+encodeURIComponent(id),{

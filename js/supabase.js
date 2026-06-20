@@ -6,16 +6,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const APP_VERSION = 'v2026.06.11-36';
+
+// ── Gjeste-demomodus (?demo=1) ─────────────────────────────────────────────
+// Fryst og uforanderleg – kan aldri skruast av via UI.
+// Blokkerer ALL Supabase-tilkobling, auth og lagring.
+(function(){
+  const _isDemoURL = (new URLSearchParams(location.search)).get('demo') === '1';
+  try{
+    Object.defineProperty(window, '_DEMO_ACTIVE', { value: _isDemoURL, writable: false, configurable: false });
+  }catch(e){ window._DEMO_ACTIVE = _isDemoURL; }
+  if(_isDemoURL) window._demoMode = true; // blokkerer saveData + sbPushKey allereie no
+})();
+
 // Husket rolle fra forrige økt (settes ved profil-lasting). Gjør at leder-
 // kontoer kan sperres og ryddes SYNKRONT ved oppstart — før UI er klikkbart.
 window._bootLeader = false;
-try{
-  const _cachedRole = localStorage.getItem('sb_role');
-  if(_cachedRole==='sjef' || _cachedRole==='ceo'){
-    window._bootLeader = true;
-    Object.keys(localStorage).forEach(k=>{ if(k.startsWith('alfa_')) localStorage.removeItem(k); });
-  }
-}catch(e){}
+if(!window._DEMO_ACTIVE){
+  try{
+    const _cachedRole = localStorage.getItem('sb_role');
+    if(_cachedRole==='sjef' || _cachedRole==='ceo'){
+      window._bootLeader = true;
+      Object.keys(localStorage).forEach(k=>{ if(k.startsWith('alfa_')) localStorage.removeItem(k); });
+    }
+  }catch(e){}
+}
 
 const SUPA_URL = 'https://oxwirhetgwcbsehyuaeq.supabase.co';
 const SUPA_KEY = 'sb_publishable_eflHUMlSGKaZIzb1YYjG3w_TTNKK1az';
@@ -219,6 +233,25 @@ function sbSkipLogin(){
 }
 
 async function sbInitAuth(){
+  if(window._DEMO_ACTIVE){
+    const ov = document.getElementById('login-overlay');
+    if(ov) ov.style.display='none';
+    // Banner
+    if(!document.getElementById('demo-active-banner')){
+      const b = document.createElement('div');
+      b.id = 'demo-active-banner';
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#1A5C3A;color:#fff;font-size:12px;font-weight:700;padding:8px 16px;text-align:center;letter-spacing:0.04em;pointer-events:none;user-select:none';
+      b.textContent = '🧪 DEMOMODUS — fiktive data, ingenting lagres';
+      document.body.appendChild(b);
+      document.body.style.paddingTop = '34px';
+    }
+    // Skjul login-knapp, logout-knapp og gammel anonymiserings-demo-toggle
+    ['sync-login-btn','sync-logout-btn','demo-toggle-btn'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.style.display='none';
+    });
+    return;
+  }
   const ov = document.getElementById('login-overlay');
   const s = _sbSession();
   if(s && s.user){

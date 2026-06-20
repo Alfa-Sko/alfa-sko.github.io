@@ -224,6 +224,7 @@ function _demoFactor(i){ return 0.6 + ((i*37)%80)/100; }
 function _demoRound(n){ return Math.round(n/1000)*1000; }
 
 function toggleDemoMode(){
+  if(window._DEMO_ACTIVE) return; // gjeste-demo: kan ikkje toggast av
   if(window._demoMode){ _demoOff(); } else { _demoOn(); }
 }
 
