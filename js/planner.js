@@ -1554,9 +1554,11 @@ function _applyDayHotel(dayIdx, name, city, lat, lon){
   const day = days[dayIdx];
   const prevBooked = day.hotel && day.hotel.booked;
 
-  // 1) Rydd opp tidlegare hotellgenerert kveldsetappe og neste-dags-endring
-  day.timeline = (day.timeline||[]).filter(x=>!(x.kind==='drive-evening' && x.byHotel));
-  if(day._hotelSetEveningTransfer){ day.eveningTransfer=null; day._hotelSetEveningTransfer=false; }
+  // 1) Fjern alle drive-evening (byHotel og anonyme frå runPlanner) + nullstill eveningTransfer.
+  // _applyDayHotel kallast berre frå hotell-UI – dagar utan hotell vert aldri rørte.
+  day.timeline = (day.timeline||[]).filter(x=>x.kind!=='drive-evening');
+  day.eveningTransfer = null;
+  day._hotelSetEveningTransfer = false;
   if(day._hotelPrevSleepAtHome!==undefined){ day.sleepAtHome=day._hotelPrevSleepAtHome; delete day._hotelPrevSleepAtHome; }
   const nd = days[dayIdx+1];
   if(day._hotelPrevNextStart!==undefined && nd){
