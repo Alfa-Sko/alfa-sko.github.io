@@ -414,7 +414,7 @@ function jumpToDay(y,m,d){
 
 // ─── DRIVE MODAL ────────────────────────────────────────────────────────────
 
-function openDriveModal(title, from, to, dist, dateKey){
+function openDriveModal(title, from, to, dist, dateKey, startMins, evType, evLabel){
   const r = getRouteInfo(from, to);
   const min = r?r.min:0;
   const km = r?r.km:0;
@@ -477,6 +477,11 @@ function openDriveModal(title, from, to, dist, dateKey){
   // Maps-knapp
   const url = 'https://www.google.com/maps/dir/'+encodeURIComponent((from||'')+', Norge')+'/'+encodeURIComponent((to||'')+', Norge');
   html += '<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener" style="text-decoration:none;display:block;margin-bottom:8px"><button class="maps-btn-big" type="button">🗺 Åpne i Google Maps →</button></a>';
+  if(evType && startMins !== undefined && !window._viewOnlyMode){
+    const _evStart = startMins !== undefined ? startMins : 0;
+    const _safeDelLbl = (evLabel||title||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html += '<button type="button" class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8;width:100%;margin-bottom:8px" onclick="closeDriveModal();deleteCalEventGeneric(\''+dateKey+'\','+_evStart+',\''+evType+'\',\''+_safeDelLbl+'\')">🗑 Fjern kjøreetappe fra kalender</button>';
+  }
   html += '<button class="modal-close" type="button" id="drive-modal-close-btn">Lukk</button>';
   box.innerHTML = html;
 
@@ -636,7 +641,7 @@ function handleEvClick(evt, dateKey, evJsonEncoded){
       from = from || parts[0] || '';
       to = to || parts[1] || '';
     }
-    openDriveModal(e.label||'Kjøring', from, to, e.dist||'', dateKey);
+    openDriveModal(e.label||'Kjøring', from, to, e.dist||'', dateKey, e.startMins, e.type, e.label);
     return;
   }
   openEvPopup(evt, dateKey, e);
