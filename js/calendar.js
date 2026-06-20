@@ -743,8 +743,11 @@ function toggleCalAppointed(dateKey, startMins, label){
 }
 function closeEvPopup(){ const p=document.getElementById('ev-popup'); if(p) p.style.display='none'; document.removeEventListener('click',outsideClose); }
 function deleteCalEvent(dateKey, startMins, label){
+  console.log('[deleteCalEvent] kalt med:', {dateKey, startMins, startMinsType:typeof startMins, label});
+  console.log('[deleteCalEvent] calEvents[dateKey]:', JSON.stringify(calEvents[dateKey]||[]));
   if(!confirm('Fjern det planlagte besøket hos '+label+' fra kalenderen?')) return;
   calEvents[dateKey]=(calEvents[dateKey]||[]).filter(function(e){ return !(e.type==='visit'&&e.startMins===startMins&&e.label===label); });
+  console.log('[deleteCalEvent] etter filter:', JSON.stringify(calEvents[dateKey]));
   saveData('alfa_events',calEvents);
   closeEvPopup();
   renderCal();
