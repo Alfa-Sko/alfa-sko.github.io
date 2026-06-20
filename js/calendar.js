@@ -681,9 +681,14 @@ function openEvPopup(evt, dateKey, e){
     const isBooked = e.booked===true;
     const icon = e.type==='hotel' ? '🏨' : (e.type==='rental' ? '🚙' : '✈');
     const bookBtn = '<button class="btn btn-sm" onclick="toggleCalBooked(\''+dateKey+'\','+e.startMins+',\''+(e.label||'').replace(/'/g,"\\'")+'\')" style="'+(isBooked?'background:#1A5C3A;color:#fff':'background:#FFF6E6;color:#6D4C00;border:1px solid #E6D9B8')+'">'+(isBooked?'✓ Bestilt':'Merk som bestilt')+'</button>';
-    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#185FA5"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${icon} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr}${isBooked?' · ✓ bestilt':' · ikke bestilt'}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px">${bookBtn}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
+    const delBtnTravel = '<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEventGeneric(\''+dateKey+'\','+e.startMins+',\''+e.type+'\',\''+(e.label||'').replace(/'/g,"\\'")+'\')">🗑 Fjern</button>';
+    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#185FA5"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${icon} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr}${isBooked?' · ✓ bestilt':' · ikke bestilt'}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px">${bookBtn}${delBtnTravel}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
   } else if(SIMPLE_TYPES.includes(e.type)){
-    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#5F5E5A"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${calEvEmoji(e.type)} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr} · ${calFmt(e.startMins)}–${calFmt(e.endMins)}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px"><button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
+    const _safeEvLbl = (e.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const _delOrNote = e.type==='drive-auto'
+      ? '<div style="font-size:11px;color:#888780;padding:4px 0 2px">Kjøretid beregnes automatisk mellom besøk og kan ikke slettes direkte — flytt eller slett ett av besøkene.</div>'
+      : '<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEventGeneric(\''+dateKey+'\','+e.startMins+',\''+e.type+'\',\''+_safeEvLbl+'\')">🗑 Fjern</button>';
+    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#5F5E5A"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${calEvEmoji(e.type)} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr} · ${calFmt(e.startMins)}–${calFmt(e.endMins)}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px;flex-wrap:wrap">${_delOrNote}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
   } else {
     const cname = e.label;
     const c = getCustomers().find(c=>c.name===cname)||{};
@@ -744,6 +749,45 @@ function deleteCalEvent(dateKey, startMins, label){
   calEvents[dateKey]=(calEvents[dateKey]||[]).filter(function(ev){
     var evStart=ev.startMins!==undefined?ev.startMins:(ev.h||0)*60;
     return !(ev.type==='visit'&&evStart===startMins&&ev.label===label);
+  });
+  saveData('alfa_events',calEvents);
+  closeEvPopup();
+  renderCal();
+}
+
+function deleteCalEventGeneric(dateKey, startMins, type, label){
+  if(_roGuard()) return;
+  // For hotel: finn og slett tilknyttede hotel-start oppføringer (deler hotellnavn i label)
+  const alsoDelete = [];
+  if(type==='hotel' && label){
+    const hotelName = (label||'').replace(/^🏨\s*/,'').trim();
+    Object.keys(calEvents).forEach(dk=>{
+      (calEvents[dk]||[]).forEach(ev=>{
+        if(ev.type==='hotel-start' && (ev.label||'').includes(hotelName)){
+          const evS = ev.startMins!==undefined ? ev.startMins : (ev.h||0)*60;
+          alsoDelete.push({dk, evS, label:ev.label});
+        }
+      });
+    });
+  }
+  const typeNames = {drive:'kjøring','hotel-start':'hotell-startmarkering',hotel:'hotell-innsjekk',flight:'flyoppføring',rental:'leiebil',adm:'adm-blokk',lunch:'lunsj',dinner:'middag',phone:'telefonsamtale',teams:'Teams-møte',nydalen:'Nydalen-besøk',clinic:'clinic',external:'ekstern avtale',training:'treningsøkt',leisure:'fritidstid',other:'oppføring'};
+  const typeLbl = typeNames[type] || type;
+  let msg = 'Fjern '+typeLbl+' «'+(label||'')+'» fra '+dateKey.split('-').reverse().join('.')+' fra kalenderen?';
+  if(alsoDelete.length) msg += '\n\nFjerner også hotell-startmarkering for tilknyttede dager.\nKjøreetapper til/fra hotellet slettes ikke automatisk.';
+  if(!confirm(msg)) return;
+  // Slett hovedoppføringen (robust matching: normaliser startMins via h-fallback)
+  calEvents[dateKey]=(calEvents[dateKey]||[]).filter(ev=>{
+    const evStart=ev.startMins!==undefined?ev.startMins:(ev.h||0)*60;
+    return !(ev.type===type && evStart===startMins && (ev.label||'')===(label||''));
+  });
+  if(calEvents[dateKey] && !calEvents[dateKey].length) delete calEvents[dateKey];
+  // Slett tilknyttede hotel-start oppføringer
+  alsoDelete.forEach(({dk, evS, label:aLbl})=>{
+    calEvents[dk]=(calEvents[dk]||[]).filter(ev=>{
+      const evStart=ev.startMins!==undefined?ev.startMins:(ev.h||0)*60;
+      return !(ev.type==='hotel-start' && evStart===evS && ev.label===aLbl);
+    });
+    if(calEvents[dk] && !calEvents[dk].length) delete calEvents[dk];
   });
   saveData('alfa_events',calEvents);
   closeEvPopup();
