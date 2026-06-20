@@ -623,7 +623,11 @@ async function _loadEvPopupPhotos(v){
 function handleEvClick(evt, dateKey, evJsonEncoded){
   evt.stopPropagation();
   const e = JSON.parse(decodeURIComponent(evJsonEncoded));
-  if(e.type==='drive' || e.type==='drive-auto'){
+  if(e.type==='drive-auto'){
+    openEvPopup(evt, dateKey, e);
+    return;
+  }
+  if(e.type==='drive'){
     // Bygg from/to: bruk mapsFrom/mapsTo først, ellers parse label "X → Y"
     let from = e.from || e.mapsFrom || '';
     let to = e.to || e.mapsTo || '';
