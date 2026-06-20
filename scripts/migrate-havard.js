@@ -51,6 +51,7 @@ const rows = src.map(c => ({
   gate:               null,
   postnr:             c.postal             || null,
   poststed:           c.city               || null,
+  gate:               c.address            || null,   // geocode.js leser gate, ikke address
   address:            c.address            || null,
   phone:              c.phone              || null,
   email:              c.email              || null,
