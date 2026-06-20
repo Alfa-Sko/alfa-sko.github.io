@@ -2,3 +2,4 @@
 backup/
 .claude/
 scripts/*.json
+CLAUDE.md
