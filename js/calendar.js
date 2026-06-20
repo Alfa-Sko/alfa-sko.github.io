@@ -362,9 +362,6 @@ function renderDay(body){
   const totalSlots=(HEND-HSTART)*SPH;
   const rawEvs=getEventsForDay(key);
   const allEvs=calAutoAddDrives(rawEvs,key);
-  console.log('[hotel-debug] renderDay: key='+key,
-    '| calEvents[key] (raw, before auto-drives)=', JSON.parse(JSON.stringify(calEvents[key]||[])),
-    '| types after calAutoAddDrives=', allEvs.map(e=>e.type+':'+(e.label||'')));
   const normEvs=allEvs.map(e=>{if(e.startMins!==undefined)return e;return{...e,startMins:(e.h||8)*60,endMins:(e.hEnd?e.hEnd*60:((e.h||8)+1)*60)};});
   const laid=calLayoutOverlap(normEvs,HSTART,HEND);
   const totalH=totalSlots*SPX;
