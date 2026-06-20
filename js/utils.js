@@ -1,4 +1,4 @@
-﻿function loadData(key, def){ try{ const d=localStorage.getItem(key); return d?JSON.parse(d):def; }catch(e){ return def; } }
+﻿function loadData(key, def){ if(window._DEMO_ACTIVE && key && key.startsWith('alfa_')) return def; try{ const d=localStorage.getItem(key); return d?JSON.parse(d):def; }catch(e){ return def; } }
 
 function calculateNorwegianHolidays(year){
   const out = {};

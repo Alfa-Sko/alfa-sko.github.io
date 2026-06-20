@@ -7,17 +7,7 @@
 
 const APP_VERSION = 'v2026.06.11-36';
 
-// ── Gjeste-demomodus (?demo=1) ─────────────────────────────────────────────
-// Fryst og uforanderleg – kan aldri skruast av via UI.
-// Blokkerer ALL Supabase-tilkobling, auth og lagring.
-(function(){
-  const _isDemoURL = (new URLSearchParams(location.search)).get('demo') === '1';
-  try{
-    Object.defineProperty(window, '_DEMO_ACTIVE', { value: _isDemoURL, writable: false, configurable: false });
-  }catch(e){ window._DEMO_ACTIVE = _isDemoURL; }
-  if(_isDemoURL) window._demoMode = true; // blokkerer saveData + sbPushKey allereie no
-})();
-
+// _DEMO_ACTIVE + _demoMode er sett av inline-snutt i index.html (før alle moduler).
 // Husket rolle fra forrige økt (settes ved profil-lasting). Gjør at leder-
 // kontoer kan sperres og ryddes SYNKRONT ved oppstart — før UI er klikkbart.
 window._bootLeader = false;

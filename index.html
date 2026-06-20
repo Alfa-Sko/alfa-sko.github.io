@@ -1098,6 +1098,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>/* Gjeste-demomodus: sett _DEMO_ACTIVE og _demoMode TIDLEGST – før alle moduler */
+(function(){var d=(new URLSearchParams(location.search)).get('demo')==='1';try{Object.defineProperty(window,'_DEMO_ACTIVE',{value:d,writable:false,configurable:false});}catch(e){window._DEMO_ACTIVE=d;}if(d)window._demoMode=true;})();</script>
 <script src="js/data.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/state.js"></script>
