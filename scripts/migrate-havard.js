@@ -57,7 +57,7 @@ const rows = src.map(c => ({
   eier_konstellasjon: c.eier_konstellasjon || null,
   discount:           null,
   storetype:          null,
-  district:           'Vest/Sør Norge',
+  district:           'Vest/Sør-Norge',
   assigned_user:      null,
 }));
 
