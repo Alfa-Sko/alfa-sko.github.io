@@ -1358,12 +1358,14 @@ function runPlanner(){
           html+='<div class="planner-drive" style="background:#F8F7F3;color:#888780">🚗 '+driveMin+' min'+_kmS+'</div>';
         }
         const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
-        const durBadge='<span style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">'+c._duration+' min</span>';
+        const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
         const custIndex = day.customers.indexOf(c);
+        const _durOpts=[30,45,60,90,120].map(m=>'<option value="'+m+'"'+(c._duration===m?' selected':'')+'>'+m+' min</option>').join('');
+        const durBadge='<select onchange="setPlanStopDuration('+dayIdx+','+custIndex+',+this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 4px;border-radius:10px;font-weight:600;margin-left:4px;border:1px solid #D3D1C7;cursor:pointer">'+_durOpts+'</select>';
         html+='<div class="planner-stop editable-stop" draggable="true" data-day="'+dayIdx+'" data-cust="'+custIndex+'" ondragstart="plannerDragStart(event,'+dayIdx+','+custIndex+')" ondragover="plannerDragOver(event)" ondrop="plannerDrop(event,'+dayIdx+','+custIndex+')" ondragend="plannerDragEnd(event)" style="cursor:grab;position:relative'+(c.appointed===true?'':';opacity:0.62')+'">'+
           '<div class="planner-stop-time">'+hh+':'+mm+'</div>'+
           '<div class="planner-stop-icon" style="cursor:grab" title="Dra for å endre rekkefølge">⠿</div>'+
-          '<div class="planner-stop-body"><div class="planner-stop-name">'+c.name+' '+badge+durBadge+'</div><div class="planner-stop-meta">'+( c.city||'')+' · L12: '+nok(c.l12)+'</div><div class="planner-stop-meta" style="color:#888780">'+hh+':'+mm+' – '+ehh+':'+emm+'</div></div>'+
+          '<div class="planner-stop-body"><div class="planner-stop-name">'+c.name+' '+badge+newBadge+durBadge+'</div><div class="planner-stop-meta">'+( c.city||'')+' · L12: '+nok(c.l12)+'</div><div class="planner-stop-meta" style="color:#888780">'+hh+':'+mm+' – '+ehh+':'+emm+'</div></div>'+
           '<button onclick="toggleVisitAppointed('+dayIdx+','+custIndex+')" style="background:'+(c.appointed===true?'#1A5C3A':'#FFF6E6')+';color:'+(c.appointed===true?'#fff':'#6D4C00')+';border:1px solid '+(c.appointed===true?'#1A5C3A':'#E6D9B8')+';border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 8px;flex-shrink:0;white-space:nowrap" title="Trykk for å endre avtalestatus">'+(c.appointed===true?'✓ Avtalt':'Uanmeldt')+'</button>'+
           '<button onclick="plannerRemoveStop('+dayIdx+','+custIndex+')" style="background:none;border:none;color:#A23B27;font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0" title="Fjern besøk">×</button>'+
           '</div>';
@@ -1783,6 +1785,65 @@ function recomputeDayTimes(day){
   day.zones = [...new Set(day.customers.map(c=>c.city).filter(Boolean))];
 }
 
+// Effektiv dagslutt: flydag bruker flight-return.startMins (oppdatert av recomputeDayTimes).
+function _getDayEndEff(day){
+  const endEl = document.getElementById('planner-end');
+  const wEnd = (endEl && endEl.value) || (userProfile && userProfile.workEnd) || '17:00';
+  const [eh, em] = wEnd.split(':').map(Number);
+  const dayEndMin = roundTo30(eh*60 + em);
+  const frItem = (day.timeline||[]).find(x=>x.kind==='flight-return');
+  return (frItem && frItem.startMins > 60) ? Math.min(dayEndMin, frItem.startMins) : dayEndMin;
+}
+
+// Fyll ledig tid på slutten av dagen med uplanlagte nærkunder (≤60 min fra dagens byer).
+// Rekkefølge: nærmest siste stopp, deretter l12 descending. Stopper når det ikke er plass.
+function tryAutoFill(dayIdx){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return [];
+  const day = days[dayIdx];
+  if(!day.customers.length) return [];
+
+  const inPlan = new Set();
+  days.forEach(d=>d.customers.forEach(c=>inPlan.add(c.name)));
+  const dayCities = [...new Set(day.customers.map(c=>c.city).filter(Boolean))];
+  const lastCity0 = (day.customers[day.customers.length-1]||{}).city||'';
+
+  const candidates = getCustomers()
+    .filter(c=> !inPlan.has(c.name) && (c.city||''))
+    .filter(c=> dayCities.some(dc=> getDriveMin(c.city, dc)<=60))
+    .sort((a,b)=>
+      getDriveMin(a.city||'', lastCity0) - getDriveMin(b.city||'', lastCity0) ||
+      (b.l12||0) - (a.l12||0)
+    );
+
+  const added = [];
+  for(const cand of candidates){
+    const lastV = day.customers[day.customers.length-1];
+    if(!lastV || _getDayEndEff(day) - lastV._end < 30) break;
+    day.customers.push(Object.assign({}, cand, {_autoAdded: true}));
+    recomputeDayTimes(day);
+    // recomputeDayTimes dropper kandidaten fra day.customers hvis den ikke fikk plass
+    if(day.customers.find(c=>c.name===cand.name)){
+      inPlan.add(cand.name);
+      added.push(cand.name);
+    }
+  }
+  return added;
+}
+
+// Sett ny besøksvarighet, reberegn dagen og fyll eventuelt ledig tid.
+function setPlanStopDuration(dayIdx, custIdx, newDur){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx] || !days[dayIdx].customers[custIdx]) return;
+  // Fjern _autoAdded fra alle eksisterende besøk — de er nå faste
+  days[dayIdx].customers.forEach(c=>{ delete c._autoAdded; });
+  days[dayIdx].customers[custIdx]._duration = newDur;
+  recomputeDayTimes(days[dayIdx]);
+  const added = tryAutoFill(dayIdx);
+  renderPlanFromData(days);
+  if(added.length) showToast(added.length===1 ? added[0]+' lagt til' : added.length+' kunder lagt til automatisk');
+}
+
 // Legg til flyetappe på en dag (mellom kundebesøk)
 function addFlightLegPrompt(dayIdx){
   const days = window._lastPlan;
@@ -2161,11 +2222,13 @@ function renderPlanFromData(days){
         html+='<div class="planner-drive">🚗 Kjøring · '+_ts+_ks+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||'')+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+'</div>';
       }
       const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
-      const durBadge='<span style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">'+c._duration+' min</span>';
+      const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
+      const _durOpts=[30,45,60,90,120].map(m=>'<option value="'+m+'"'+(c._duration===m?' selected':'')+'>'+m+' min</option>').join('');
+      const durBadge='<select onchange="setPlanStopDuration('+dayIdx+','+custIdx+',+this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 4px;border-radius:10px;font-weight:600;margin-left:4px;border:1px solid #D3D1C7;cursor:pointer">'+_durOpts+'</select>';
       html+='<div class="planner-stop editable-stop" draggable="true" data-day="'+dayIdx+'" data-cust="'+custIdx+'" ondragstart="plannerDragStart(event,'+dayIdx+','+custIdx+')" ondragover="plannerDragOver(event)" ondrop="plannerDrop(event,'+dayIdx+','+custIdx+')" ondragend="plannerDragEnd(event)" style="cursor:grab;position:relative'+(c.appointed===true?'':';opacity:0.62')+'">'+
         '<div class="planner-stop-time">'+f(hh)+':'+f(mm)+'</div>'+
         '<div class="planner-stop-icon" style="cursor:grab" title="Dra for å endre rekkefølge">⠿</div>'+
-        '<div class="planner-stop-body"><div class="planner-stop-name">'+escapeHtml(c.name)+' '+badge+durBadge+'</div><div class="planner-stop-meta">'+escapeHtml(c.city||'')+' · L12: '+nok(c.l12)+'</div><div class="planner-stop-meta" style="color:#888780">'+f(hh)+':'+f(mm)+' – '+f(ehh)+':'+f(emm)+'</div></div>'+
+        '<div class="planner-stop-body"><div class="planner-stop-name">'+escapeHtml(c.name)+' '+badge+newBadge+durBadge+'</div><div class="planner-stop-meta">'+escapeHtml(c.city||'')+' · L12: '+nok(c.l12)+'</div><div class="planner-stop-meta" style="color:#888780">'+f(hh)+':'+f(mm)+' – '+f(ehh)+':'+f(emm)+'</div></div>'+
         '<button onclick="toggleVisitAppointed('+dayIdx+','+custIdx+')" style="background:'+(c.appointed===true?'#1A5C3A':'#FFF6E6')+';color:'+(c.appointed===true?'#fff':'#6D4C00')+';border:1px solid '+(c.appointed===true?'#1A5C3A':'#E6D9B8')+';border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 8px;flex-shrink:0;white-space:nowrap" title="Trykk for å endre avtalestatus">'+(c.appointed===true?'✓ Avtalt':'Uanmeldt')+'</button>'+
         '<button onclick="plannerRemoveStop('+dayIdx+','+custIdx+')" style="background:none;border:none;color:#A23B27;font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0" title="Fjern besøk">×</button>'+
         '</div>';
