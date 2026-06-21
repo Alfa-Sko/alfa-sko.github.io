@@ -240,32 +240,12 @@ async function sbInitAuth(){
       var el = document.getElementById(id);
       if(el) el.style.display='none';
     });
-    // Demo-hero-banner: bytt Walk-with-us-bilde med Trondheim-kart
+    // Demo-hero-banner: bytt Walk-with-us-bilde med demo_banner.jpg
     (function(){
       var heroImg = document.querySelector('.hero-banner');
       var demoMap = document.getElementById('demo-hero-map');
-      // Lag elementet dynamisk om statisk HTML mangler (eldre nettleser-cache)
-      if(!demoMap){
-        demoMap = document.createElement('div');
-        demoMap.id = 'demo-hero-map';
-        demoMap.style.cssText = 'position:relative;height:170px;overflow:hidden;background:#1a1a2e';
-        demoMap.innerHTML =
-          '<div style="position:absolute;left:-208px;top:-182px;width:768px;height:512px">'
-          +'<img src="https://a.basemaps.cartocdn.com/dark_all/13/4331/2213.png" style="position:absolute;left:0;top:0;width:256px;height:256px" alt="" draggable="false">'
-          +'<img src="https://b.basemaps.cartocdn.com/dark_all/13/4332/2213.png" style="position:absolute;left:256px;top:0;width:256px;height:256px" alt="" draggable="false">'
-          +'<img src="https://c.basemaps.cartocdn.com/dark_all/13/4333/2213.png" style="position:absolute;left:512px;top:0;width:256px;height:256px" alt="" draggable="false">'
-          +'<img src="https://d.basemaps.cartocdn.com/dark_all/13/4331/2214.png" style="position:absolute;left:0;top:256px;width:256px;height:256px" alt="" draggable="false">'
-          +'<img src="https://a.basemaps.cartocdn.com/dark_all/13/4332/2214.png" style="position:absolute;left:256px;top:256px;width:256px;height:256px" alt="" draggable="false">'
-          +'<img src="https://b.basemaps.cartocdn.com/dark_all/13/4333/2214.png" style="position:absolute;left:512px;top:256px;width:256px;height:256px" alt="" draggable="false">'
-          +'</div>'
-          +'<div style="position:absolute;inset:0;background:rgba(0,0,0,0.35);pointer-events:none"></div>';
-        if(heroImg && heroImg.parentNode) heroImg.parentNode.insertBefore(demoMap, heroImg.nextSibling);
-        else document.body.insertBefore(demoMap, document.body.firstChild);
-        console.log('[Demo] demo-hero-map INJISERT dynamisk (manglet i DOM)');
-      }
-      demoMap.style.setProperty('display','block','important');
+      if(demoMap) demoMap.style.setProperty('display','block','important');
       if(heroImg) heroImg.style.setProperty('display','none','important');
-      console.log('[Demo] hero-banner byttet → Trondheim-kart. map=', demoMap, 'heroImg=', heroImg);
     })();
     return;
   }
