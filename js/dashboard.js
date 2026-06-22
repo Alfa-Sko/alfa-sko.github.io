@@ -114,6 +114,7 @@ async function _leaderSanitize(){
     followups = [];
     freeNotes = [];
     if(typeof custPhotos!=='undefined') custPhotos = [];
+    if(typeof constellations!=='undefined') constellations = [];
     if(typeof personalDays!=='undefined') personalDays = [];
     CUSTOMERS = [];
     userProfile = Object.assign({}, DEFAULT_USER_PROFILE);
@@ -182,6 +183,7 @@ async function managerViewUser(uid, name){
     if(byKey['alfa_user_profile']) userProfile = Object.assign({}, DEFAULT_USER_PROFILE, byKey['alfa_user_profile']);
     if(byKey['alfa_free_notes']) freeNotes = byKey['alfa_free_notes'];
     if(byKey['alfa_cust_photos'] && typeof custPhotos!=='undefined') custPhotos = byKey['alfa_cust_photos'];
+    if(byKey['alfa_cust_constellations'] && typeof constellations!=='undefined') constellations = byKey['alfa_cust_constellations'];
     if(byKey['alfa_personal_days'] && typeof personalDays!=='undefined') personalDays = byKey['alfa_personal_days'];
     window._viewOnlyMode = true;
     const cur = document.getElementById('mgr-current');

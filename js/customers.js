@@ -283,7 +283,7 @@ function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel){
   keys.forEach(function(key){
     var members=groups[key].sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','no'); });
     var l12sum=members.reduce(function(s,c){ return s+(c.l12||0); },0);
-    var groupId='cgr-'+key.replace(/[^a-zA-Z0-9]/g,'-');
+    var groupId=containerId+'-cgr-'+key.replace(/[^a-zA-Z0-9]/g,'-');
     html+='<div style="margin-bottom:8px;border:1px solid #E5E3DB;border-radius:8px;overflow:hidden">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#F8F7F3;cursor:pointer;gap:10px;user-select:none" onclick="toggleCustGroup(\''+groupId+'\')" id="'+groupId+'-hdr">';
     html+='<div style="flex:1;min-width:0"><span style="font-size:14px;font-weight:600;color:#2C2C2A">'+escapeHtml(key)+'</span></div>';
@@ -310,8 +310,36 @@ function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel){
   el.innerHTML=html;
 }
 
+// Engangs-migrering: opprett konstellasjoner fra unike chain-verdier og sett constellation_id på kunder.
+// Kjøres automatisk første gang constellations er tomt og CUSTOMERS er populert.
+function _migrateConstellations(){
+  if(constellations.length>0) return; // allerede migrert
+  var customers=getCustomers();
+  if(!customers.length) return;
+  var chainSet={};
+  customers.forEach(function(c){ if(c.chain) chainSet[c.chain]=true; });
+  var newConstellations=Object.keys(chainSet).sort().map(function(name){
+    // Deterministisk ID basert på navn (unngår duplikater ved gjentatt kjøring)
+    var idStr='cst_'+Math.abs(name.split('').reduce(function(h,c){ return (h<<5)-h+c.charCodeAt(0)|0; },0));
+    return {id:idStr, name:name};
+  });
+  newConstellations.forEach(function(cst){
+    customers.forEach(function(c){ if(c.chain===cst.name) c.constellation_id=cst.id; });
+  });
+  constellations=newConstellations;
+  saveData('alfa_cust_constellations',constellations);
+  saveData('alfa_customers',CUSTOMERS);
+}
+
 function renderKonstellasjonerView(){
-  _renderGroupedCustomersView(function(c){ return c.chain||''; },'customer-konstellasjoner-view','(Uten kjede)');
+  _migrateConstellations();
+  var nameById={};
+  constellations.forEach(function(cst){ nameById[cst.id]=cst.name; });
+  _renderGroupedCustomersView(
+    function(c){ return c.constellation_id ? (nameById[c.constellation_id]||c.constellation_id) : ''; },
+    'customer-konstellasjoner-view',
+    '(Uten konstellasjon)'
+  );
 }
 
 function renderKjederView(){

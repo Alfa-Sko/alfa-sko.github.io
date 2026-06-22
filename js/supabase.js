@@ -151,7 +151,7 @@ async function sbPullAll(){
 }
 
 // Første synk fra en enhet med eksisterende lokale data: send alt opp
-const SYNC_KEYS = ['alfa_customers','alfa_customers_version','alfa_cust_photos','alfa_events','alfa_followups','alfa_free_notes','alfa_personal_days','alfa_user_profile','alfa_visits'];
+const SYNC_KEYS = ['alfa_customers','alfa_customers_version','alfa_cust_constellations','alfa_cust_photos','alfa_events','alfa_followups','alfa_free_notes','alfa_personal_days','alfa_user_profile','alfa_visits'];
 function _sbAllSyncKeys(){
   const keys = new Set(SYNC_KEYS);
   try{ Object.keys(localStorage).forEach(k=>{ if(k.startsWith('alfa_')) keys.add(k); }); }catch(e){}
@@ -296,6 +296,7 @@ function _sbApplyPulled(){
     userProfile = Object.assign({}, DEFAULT_USER_PROFILE, loadData('alfa_user_profile', {}));
     if(typeof personalDays!=='undefined') personalDays = loadData('alfa_personal_days', personalDays);
     if(typeof custPhotos!=='undefined') custPhotos = loadData('alfa_cust_photos', custPhotos);
+    if(typeof constellations!=='undefined') constellations = loadData('alfa_cust_constellations', constellations);
     const sc = loadData('alfa_customers', null);
     if(sc) CUSTOMERS = sc;
     if(typeof syncProfileToPlanner==='function') syncProfileToPlanner();

@@ -13,6 +13,7 @@ let followups = loadData('alfa_followups', DEFAULT_FOLLOWUPS);
 let calEvents = loadData('alfa_events', DEFAULT_EVENTS);
 let freeNotes = loadData('alfa_free_notes', []);
 let custPhotos = loadData('alfa_cust_photos', []);
+let constellations = loadData('alfa_cust_constellations', []);
 let personalDays = loadData('alfa_personal_days', []); // ferie/fridager registrert av brukeren
 
 
