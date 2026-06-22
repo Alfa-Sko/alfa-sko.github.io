@@ -160,14 +160,21 @@ function deleteCustomerPhoto(id){
 async function _renderCustPhotoInPopup(el, customerName){
   var entries = custPhotos.filter(function(x){ return x.customer===customerName; });
   if(!entries.length){ el.innerHTML=''; return; }
+  var pathToEntryId = {};
+  entries.forEach(function(e){ (e.photoPaths||[]).forEach(function(path){ pathToEntryId[path]=e.id; }); });
   var allPaths = entries.reduce(function(acc,e){ return acc.concat(e.photoPaths||[]); }, []);
   if(!allPaths.length){ el.innerHTML=''; return; }
   var photos = await getStoragePhotosForVisit({photoPaths: allPaths});
   if(!photos.length){ el.innerHTML=''; return; }
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:5px;margin-top:6px">'
     + photos.map(function(p){
-        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
-          +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+        var safeUrl=p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        var safeName=p.name.replace(/'/g,"\\'");
+        var entryId=p.path?pathToEntryId[p.path]:null;
+        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
+          +'<img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+p.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
+          +(entryId&&p.path?'<button onclick="deleteSingleCustPhoto('+entryId+',\''+p.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+          +'</div>';
       }).join('')
     + '</div>';
 }
@@ -189,4 +196,53 @@ function deleteVisit(id){
     if(typeof renderCal==='function') renderCal();
   }
   showToast('Besøk slettet');
+}
+
+function clearVisitNote(id){
+  if(_roGuard()) return;
+  if(!confirm('Slett notatteksten fra dette besøket? (kan ikke angres)')) return;
+  var v=visits.find(function(x){ return x.id===id; });
+  if(!v) return;
+  v.notes='';
+  saveData('alfa_visits',visits);
+  renderNotes();
+  renderTimeline();
+  var detHdr=document.getElementById('customer-detail-name');
+  if(detHdr){ var histEl=document.getElementById('cust-history-list'); if(histEl) _renderCustHistory(detHdr.dataset.customer,'all'); }
+  showToast('Notat slettet');
+}
+
+function deleteSingleVisitPhoto(visitId, path){
+  if(_roGuard()) return;
+  if(!confirm('Slett dette bildet? (kan ikke angres)')) return;
+  var v=visits.find(function(x){ return x.id===visitId; });
+  if(!v) return;
+  v.photoPaths=(v.photoPaths||[]).filter(function(p){ return p!==path; });
+  v.photoCount=v.photoPaths.length;
+  _sbDeleteStoragePhotos([path]);
+  saveData('alfa_visits',visits);
+  renderNotes();
+  renderTimeline();
+  if(typeof _loadEvPopupPhotos==='function'){ var ph=document.getElementById('ev-popup-photos'); if(ph) _loadEvPopupPhotos(v); }
+  var detHdr=document.getElementById('customer-detail-name');
+  if(detHdr){ var histEl=document.getElementById('cust-history-list'); if(histEl) _renderCustHistory(detHdr.dataset.customer,'all'); }
+  showToast('Bilde slettet');
+}
+
+function deleteSingleCustPhoto(custPhotoId, path){
+  if(_roGuard()) return;
+  if(!confirm('Slett dette bildet? (kan ikke angres)')) return;
+  var entry=custPhotos.find(function(x){ return x.id===custPhotoId; });
+  if(!entry) return;
+  var customerName=entry.customer;
+  entry.photoPaths=(entry.photoPaths||[]).filter(function(p){ return p!==path; });
+  if(!entry.photoPaths.length) custPhotos=custPhotos.filter(function(x){ return x.id!==custPhotoId; });
+  _sbDeleteStoragePhotos([path]);
+  saveData('alfa_cust_photos',custPhotos);
+  renderTimeline();
+  var ph=document.getElementById('ev-popup-custphotos');
+  if(ph) _renderCustPhotoInPopup(ph, customerName);
+  var detHdr=document.getElementById('customer-detail-name');
+  if(detHdr&&detHdr.dataset.customer===customerName){ var histEl=document.getElementById('cust-history-list'); if(histEl) _renderCustHistory(customerName,'all'); }
+  showToast('Bilde slettet');
 }

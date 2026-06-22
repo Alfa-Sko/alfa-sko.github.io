@@ -9,7 +9,7 @@ function followItem(f){
       <div class="ftitle">${f.task} — ${f.customer}</div>
       <div class="fdue${isOverdue?' furgent':''}">Forfaller ${f.due.split('-').reverse().join('.')}${isOverdue?' · FORFALT':''}</div>
     </div>
-    ${!f.done?`<button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button>`:'<span style="font-size:11px;color:#1D9E75">✓ Ferdig</span>'}
+    ${!f.done?`<button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button>`:`<span style="font-size:11px;color:#1D9E75">✓ Ferdig</span><button onclick="deleteFollowup(${f.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0 0 0 8px" title="Slett">🗑</button>`}
   </div>`;
 }
 
@@ -40,6 +40,15 @@ function markDone(id){
   saveData('alfa_followups',followups);
   renderFollowups();
   showToast('Oppfølging markert som fullført!');
+}
+
+function deleteFollowup(id){
+  if(_roGuard()) return;
+  if(!confirm('Slett denne oppfølgingen? (kan ikke angres)')) return;
+  followups=followups.filter(function(f){ return f.id!==id; });
+  saveData('alfa_followups',followups);
+  renderFollowups();
+  showToast('Oppfølging slettet');
 }
 
 function renderFollowups(){

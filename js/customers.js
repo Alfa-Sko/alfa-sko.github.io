@@ -381,7 +381,7 @@ async function _renderCustHistory(name, filter){
     return '<div class="tl-item"><div class="tl-dot tl-dot-visit">'+t.ico+'</div><div class="tl-body">'
       +'<div class="tl-date">'+v.date.split('-').reverse().join('.')+' · '+(v.time||'')+(v.timeEnd?' – '+v.timeEnd:'')+' · '+(v.contact||'')+'</div>'
       +'<div class="tl-title">'+t.lbl+'</div>'
-      +(v.notes?'<div class="tl-text">'+v.notes+'</div>':'')
+      +(v.notes?'<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(v.notes)+'</span><button onclick="clearVisitNote('+v.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0">🗑</button></div>':'')
       +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
       +ph+'</div></div>';
   }).join('');
@@ -405,8 +405,12 @@ async function _loadChCustPhotos(p){
   if(!photos.length) return;
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
     +photos.map(function(ph){
-      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
-        +' onclick="viewPhoto(\''+ph.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+ph.name.replace(/'/g,"\\'")+'\')"><img src="'+ph.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+ph.name+'"></div>';
+      var safeUrl=ph.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var safeName=ph.name.replace(/'/g,"\\'");
+      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
+        +'<img src="'+ph.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+ph.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
+        +(ph.path?'<button onclick="deleteSingleCustPhoto('+p.id+',\''+ph.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+        +'</div>';
     }).join('')+'</div>';
 }
 
@@ -417,8 +421,12 @@ async function _loadChPhotos(v){
   if(!photos.length) return;
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
     +photos.map(function(p){
-      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
-        +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+      var safeUrl=p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var safeName=p.name.replace(/'/g,"\\'");
+      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
+        +'<img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+p.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
+        +(p.path?'<button onclick="deleteSingleVisitPhoto('+v.id+',\''+p.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+        +'</div>';
     }).join('')+'</div>';
 }
 

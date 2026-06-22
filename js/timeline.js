@@ -5,10 +5,16 @@ async function _loadTlPhotos(it){
   if(!el) return;
   var photos = await getStoragePhotosForVisit({photoPaths:it.photoPaths});
   if(!photos.length) return;
+  var isCustPhoto = it.kind==='custphoto';
+  var delFnName = isCustPhoto ? 'deleteSingleCustPhoto' : 'deleteSingleVisitPhoto';
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
     + photos.map(function(p){
-        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
-          +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+        var safeUrl=p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        var safeName=p.name.replace(/'/g,"\\'");
+        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
+          +'<img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+p.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
+          +(p.path?'<button onclick="'+delFnName+'('+it.id+',\''+p.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+          +'</div>';
       }).join('')
     + '</div>';
 }
@@ -146,7 +152,7 @@ function renderTimeline(){
       html+='</div>';
       html+='<button class="btn btn-light btn-sm" style="font-size:10px;color:#A23B27" onclick="'+delFn+'('+it.id+')">×</button>';
       html+='</div>';
-      if(it.notes){html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px">'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</div>';}
+      if(it.notes){html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span>'+(it.kind==='activity'?'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button>':'')+'</div>';}
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
       if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
       html+='</div>';
@@ -245,16 +251,16 @@ async function renderNotesWithPhotos(){
     const storagePhotos = await getStoragePhotosForVisit(v);
     const localPhotos = storagePhotos.length===0 ? await getPhotosForVisit(v.id) : [];
     const allPhotos = [
-      ...storagePhotos.map(p=>({src:p.url, name:p.name})),
-      ...localPhotos.map(p=>({src:p.data, name:p.name})),
+      ...storagePhotos.map(p=>({src:p.url, name:p.name, path:p.path||null})),
+      ...localPhotos.map(p=>({src:p.data, name:p.name, path:null})),
     ];
     const thumbsHtml = allPhotos.length>0
-      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:8px">${allPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer" onclick="viewPhoto('${p.src.replace(/'/g,"\\'")}','${p.name}')"><img src="${p.src}" style="width:100%;height:100%;object-fit:cover" alt="${p.name}"></div>`).join('')}</div>`
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:8px">${allPhotos.map(p=>`<div style="aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #D3D1C7;position:relative"><img src="${p.src}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" alt="${p.name}" onclick="viewPhoto('${p.src.replace(/'/g,"\\'")}','${p.name.replace(/'/g,"\\'")}'">${p.path?`<button onclick="deleteSingleVisitPhoto(${v.id},'${p.path}')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>`:''}</div>`).join('')}</div>`
       : '';
     const photoHtml = `<div style="margin-top:12px">${allPhotos.length>0?`<div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${allPhotos.length})</div>`:''}${thumbsHtml}<label class="btn btn-light btn-sm" style="font-size:11px;cursor:pointer;display:inline-block">+ Legg til bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoToVisit(${v.id},this)"></label></div>`;
     const t=tMap[v.type]||tMap.visit;
     const typePill=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#F1EFE8;color:#444441;font-weight:600;margin-left:6px">${t.ico} ${t.lbl}</span>`;
-    const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6">${v.notes}</div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';
+    const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>${escapeHtml(v.notes).replace(/\n/g,'<br>')}</span><button onclick="clearVisitNote(${v.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button></div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';
     return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div><div style="font-size:14px;font-weight:600;color:#2C2C2A">${v.customer}${typePill}</div><div style="font-size:11px;color:#888780">${v.date.split('-').reverse().join('.')} · ${v.time||''}${v.timeEnd?' – '+v.timeEnd:''} · ${v.contact||''}</div></div><button class="btn btn-red btn-sm" onclick="deleteVisit(${v.id})">Slett</button></div>${notesHtml}${v.followup?`<div style="margin-top:10px;font-size:12px;color:#633806;background:#FAEEDA;padding:6px 10px;border-radius:6px">▶ Oppfølging: ${v.followup}</div>`:''} ${photoHtml}</div>`;
   }));
   document.getElementById('notes-list').innerHTML=items.join('');

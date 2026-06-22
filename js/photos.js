@@ -65,7 +65,7 @@ async function getStoragePhotosForVisit(visit){
         return null;
       }
       var blob = await r.blob();
-      return {url: URL.createObjectURL(blob), name: p.split('/').pop()||'bilde'};
+      return {url: URL.createObjectURL(blob), name: p.split('/').pop()||'bilde', path: p};
     }catch(e){
       console.warn('[photos] getStoragePhotosForVisit feilet for', p, e);
       return null;

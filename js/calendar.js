@@ -619,8 +619,12 @@ async function _loadEvPopupPhotos(v){
   if(!photos.length) return;
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
     + photos.map(function(p){
-        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
-          +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" alt="'+p.name+'"></div>';
+        var safeUrl=p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        var safeName=p.name.replace(/'/g,"\\'");
+        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
+          +'<img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" alt="'+p.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
+          +(p.path?'<button onclick="deleteSingleVisitPhoto('+v.id+',\''+p.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+          +'</div>';
       }).join('')
     + '</div>';
 }
