@@ -107,6 +107,71 @@ async function addPhotoToVisit(visitId, input){
   renderNotes();
 }
 
+// ─── KUNDEKORT-BILDER (ikke knyttet til besøk) ───────────────────────────────
+
+async function addCustomerPhoto(customerName, input){
+  if(_roGuard()) return;
+  var files = Array.from(input.files);
+  input.value = '';
+  if(!files.length) return;
+  showToast('Laster opp …');
+  var groupId = Date.now();
+  var result = await sbUploadVisitPhotos(groupId, files);
+  if(!result.count){
+    showToast('Opplasting feilet – sjekk konsollen');
+    return;
+  }
+  var entry = {
+    id: groupId,
+    customer: customerName,
+    date: TODAY_STR,
+    createdAt: new Date().toISOString(),
+    photoPaths: result.paths,
+  };
+  custPhotos.push(entry);
+  saveData('alfa_cust_photos', custPhotos);
+  showToast('📷 Bilde lagret på kundekortet!');
+  // Oppdater popup-forhåndsvisning hvis den er åpen
+  var ph = document.getElementById('ev-popup-custphotos');
+  if(ph) _renderCustPhotoInPopup(ph, customerName);
+  renderTimeline();
+  // Oppdater kundekortet hvis det er åpent for denne kunden
+  var detHdr = document.getElementById('customer-detail-name');
+  if(detHdr && detHdr.dataset.customer === customerName){
+    var histEl = document.getElementById('cust-history-list');
+    if(histEl) _renderCustHistory(customerName, 'all');
+  }
+}
+
+function deleteCustomerPhoto(id){
+  if(_roGuard()) return;
+  if(!confirm('Slett dette bildet fra kundekortet?')) return;
+  var entry = custPhotos.find(function(x){ return x.id===id; });
+  if(entry && entry.photoPaths && entry.photoPaths.length){
+    _sbDeleteStoragePhotos(entry.photoPaths);
+  }
+  custPhotos = custPhotos.filter(function(x){ return x.id!==id; });
+  saveData('alfa_cust_photos', custPhotos);
+  renderTimeline();
+  showToast('Bilde slettet');
+}
+
+// Bygger thumbnails for kundekort-bilder inn i et gitt DOM-element
+async function _renderCustPhotoInPopup(el, customerName){
+  var entries = custPhotos.filter(function(x){ return x.customer===customerName; });
+  if(!entries.length){ el.innerHTML=''; return; }
+  var allPaths = entries.reduce(function(acc,e){ return acc.concat(e.photoPaths||[]); }, []);
+  if(!allPaths.length){ el.innerHTML=''; return; }
+  var photos = await getStoragePhotosForVisit({photoPaths: allPaths});
+  if(!photos.length){ el.innerHTML=''; return; }
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:5px;margin-top:6px">'
+    + photos.map(function(p){
+        return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
+          +' onclick="viewPhoto(\''+p.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+p.name.replace(/'/g,"\\'")+'\')"><img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+p.name+'"></div>';
+      }).join('')
+    + '</div>';
+}
+
 function deleteVisit(id){
   if(!confirm('Slett dette besøket og alle tilhørende bilder?')) return;
   var v = visits.find(function(x){ return x.id===id; });

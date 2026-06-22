@@ -372,8 +372,10 @@ async function _renderCustHistory(name, filter){
   var shown=filter==='bilder'?all.filter(function(v){return v.photoPaths&&v.photoPaths.length;})
            :filter==='all'?all
            :all.filter(function(v){return (v.type||'visit')===filter;});
-  if(!shown.length){el.innerHTML='<div class="empty-state" style="padding:12px">Ingen aktiviteter for dette filteret</div>';return;}
-  el.innerHTML=shown.map(function(v){
+  // Kundekort-bilder (ikke knyttet til besøk) – vises alltid i 'bilder'- og 'all'-filter
+  var shownCustPhotos=(filter==='bilder'||filter==='all')?(custPhotos||[]).filter(function(p){return p.customer===name;}).sort(function(a,b){return b.date.localeCompare(a.date);}) : [];
+  if(!shown.length && !shownCustPhotos.length){el.innerHTML='<div class="empty-state" style="padding:12px">Ingen aktiviteter for dette filteret</div>';return;}
+  var visitHtml=shown.map(function(v){
     var t=tMap[v.type]||tMap.visit;
     var ph=(v.photoPaths&&v.photoPaths.length)?'<div id="ch-photos-'+v.id+'" style="margin-top:8px"></div>':'';
     return '<div class="tl-item"><div class="tl-dot tl-dot-visit">'+t.ico+'</div><div class="tl-body">'
@@ -383,7 +385,29 @@ async function _renderCustHistory(name, filter){
       +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
       +ph+'</div></div>';
   }).join('');
+  var custPhotoHtml=shownCustPhotos.map(function(p){
+    return '<div class="tl-item" style="border-left:3px solid #185FA5"><div class="tl-dot" style="background:#185FA5;color:#fff;font-size:12px">📷</div><div class="tl-body">'
+      +'<div class="tl-date">'+p.date.split('-').reverse().join('.')+'</div>'
+      +'<div class="tl-title" style="color:#185FA5">Kundekort-bilde</div>'
+      +'<div id="ch-custphotos-'+p.id+'" style="margin-top:8px"></div>'
+      +'<button onclick="deleteCustomerPhoto('+p.id+')" style="margin-top:6px;background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0">🗑 Slett</button>'
+      +'</div></div>';
+  }).join('');
+  el.innerHTML=visitHtml+custPhotoHtml;
   shown.forEach(function(v){if(v.photoPaths&&v.photoPaths.length)_loadChPhotos(v);});
+  shownCustPhotos.forEach(function(p){_loadChCustPhotos(p);});
+}
+
+async function _loadChCustPhotos(p){
+  var el=document.getElementById('ch-custphotos-'+p.id);
+  if(!el) return;
+  var photos=await getStoragePhotosForVisit({photoPaths:p.photoPaths||[]});
+  if(!photos.length) return;
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px">'
+    +photos.map(function(ph){
+      return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;cursor:pointer"'
+        +' onclick="viewPhoto(\''+ph.url.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+ph.name.replace(/'/g,"\\'")+'\')"><img src="'+ph.url+'" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="'+ph.name+'"></div>';
+    }).join('')+'</div>';
 }
 
 async function _loadChPhotos(v){
@@ -415,13 +439,14 @@ function openCustomer(name){
   const _hat=[...new Set(custVisits.map(v=>v.type||'visit'))];
   let histFilterBtns='<button class="btn btn-dark btn-sm" id="chf-all" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\'all\')">Alle</button>';
   _hat.forEach(t=>{histFilterBtns+='<button class="btn btn-light btn-sm" id="chf-'+t+'" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\''+t+'\')">'+(_htl[t]||t)+'</button>';});
-  if(custVisits.some(v=>v.photoPaths&&v.photoPaths.length>0)) histFilterBtns+='<button class="btn btn-light btn-sm" id="chf-bilder" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\'bilder\')">📷 Bilder</button>';
+  const _hasCustPhotos=(custPhotos||[]).some(p=>p.customer===name);
+  if(custVisits.some(v=>v.photoPaths&&v.photoPaths.length>0)||_hasCustPhotos) histFilterBtns+='<button class="btn btn-light btn-sm" id="chf-bilder" style="font-size:11px" onclick="_renderCustHistory(\''+safeName+'\',\'bilder\')">📷 Bilder</button>';
 
   document.getElementById('customer-detail-content').innerHTML=`
     <div class="card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
         <div style="flex:1">
-          <div style="font-size:20px;font-weight:700;color:#2C2C2A">${c.name}</div>
+          <div id="customer-detail-name" data-customer="${c.name}" style="font-size:20px;font-weight:700;color:#2C2C2A">${c.name}</div>
           <div style="font-size:13px;color:#888780;margin-top:3px">${c.city||''}${c.chain?' · '+c.chain:''}</div>
           ${(c.gate||c.address)?`<div style="font-size:12px;color:#888780;margin-top:2px">📍 ${c.gate?`${c.gate}, ${c.postnr} ${c.poststed}`:c.address}</div>`:''}
         </div>

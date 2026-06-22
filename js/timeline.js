@@ -78,6 +78,23 @@ function renderTimeline(){
       sortKey:n.date+'T'+(noteTime||'23:59')
     });
   });
+  (custPhotos||[]).forEach(p=>{
+    let pTime='';
+    if(p.createdAt){
+      const cd=new Date(p.createdAt);
+      if(!isNaN(cd)) pTime=String(cd.getHours()).padStart(2,'0')+':'+String(cd.getMinutes()).padStart(2,'0');
+    }
+    items.push({
+      kind:'custphoto',
+      type:'photo',
+      date:p.date,
+      time:pTime,
+      title:p.customer,
+      id:p.id,
+      photoPaths:p.photoPaths||[],
+      sortKey:p.date+'T'+(pTime||'23:59')
+    });
+  });
   // Sortér nyeste først
   items.sort((a,b)=>b.sortKey.localeCompare(a.sortKey));
   // Filtrér
@@ -103,7 +120,7 @@ function renderTimeline(){
   });
   const groupKeys=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
   const monthNames=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
-  const typeMap={visit:{ico:'🏪',lbl:'Kundebesøk',color:'#888780'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen',color:'#5F5E5A'},phone:{ico:'📞',lbl:'Telefonsamtale',color:'#0C447C'},clinic:{ico:'🎓',lbl:'Clinic',color:'#6D4C00'},teams:{ico:'👥',lbl:'Teamsmøte',color:'#0C447C'},training:{ico:'🏃',lbl:'Trening',color:'#1A7A4E'},lunch:{ico:'🥪',lbl:'Lunsj med kunde',color:'#7A3B0E'},dinner:{ico:'🍽️',lbl:'Middag med kunde',color:'#7A3B0E'},other:{ico:'📌',lbl:'Annet',color:'#5F5E5A'},free:{ico:'💭',lbl:'Fritt notat',color:'#1A7A4E'}};
+  const typeMap={visit:{ico:'🏪',lbl:'Kundebesøk',color:'#888780'},nydalen:{ico:'🏢',lbl:'Besøk Nydalen',color:'#5F5E5A'},phone:{ico:'📞',lbl:'Telefonsamtale',color:'#0C447C'},clinic:{ico:'🎓',lbl:'Clinic',color:'#6D4C00'},teams:{ico:'👥',lbl:'Teamsmøte',color:'#0C447C'},training:{ico:'🏃',lbl:'Trening',color:'#1A7A4E'},lunch:{ico:'🥪',lbl:'Lunsj med kunde',color:'#7A3B0E'},dinner:{ico:'🍽️',lbl:'Middag med kunde',color:'#7A3B0E'},other:{ico:'📌',lbl:'Annet',color:'#5F5E5A'},free:{ico:'💭',lbl:'Fritt notat',color:'#1A7A4E'},photo:{ico:'📷',lbl:'Kundebilde',color:'#185FA5'}};
   let html='';
   groupKeys.forEach(gk=>{
     const [y,m]=gk.split('-');
@@ -114,9 +131,10 @@ function renderTimeline(){
       const dateLabel=it.date.split('-').reverse().join('.');
       const timeLabel=it.time?(' · '+it.time+(it.timeEnd?'–'+it.timeEnd:'')):'';
       const isFree=it.kind==='free';
-      const accent=isFree?'#1A7A4E':t.color;
-      const bg=isFree?'#E8F4ED':'#fff';
-      const delFn=isFree?'deleteFreeNote':'deleteVisit';
+      const isCustPhoto=it.kind==='custphoto';
+      const accent=isFree?'#1A7A4E':isCustPhoto?'#185FA5':t.color;
+      const bg=isFree?'#E8F4ED':isCustPhoto?'#EEF4FB':'#fff';
+      const delFn=isFree?'deleteFreeNote':isCustPhoto?'deleteCustomerPhoto':'deleteVisit';
       html+='<div class="card" style="margin-bottom:10px;padding:14px;border-left:3px solid '+accent+';background:'+bg+'">';
       html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">';
       html+='<div style="flex:1;min-width:0">';
@@ -130,12 +148,12 @@ function renderTimeline(){
       html+='</div>';
       if(it.notes){html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px">'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</div>';}
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
-      if(it.kind==='activity' && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
+      if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
       html+='</div>';
     });
   });
   list.innerHTML=html;
-  filtered.forEach(function(it){ if(it.kind==='activity' && it.photoPaths && it.photoPaths.length) _loadTlPhotos(it); });
+  filtered.forEach(function(it){ if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length) _loadTlPhotos(it); });
 }
 // ─── FELLES TEAM-TIDSLINJE (ledervisning) ──────────────────────────────────
 
