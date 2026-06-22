@@ -2039,12 +2039,10 @@ function plannerRemoveStop(dayIdx, custIdx){
 function plannerAddStopPrompt(dayIdx){
   const days = window._lastPlan;
   if(!days || !days[dayIdx]) return;
-  // Bygg en liste over kunder som ikke allerede er i planen
   const inPlan = new Set();
   days.forEach(d=>d.customers.forEach(c=>inPlan.add(c.name)));
   const available = getCustomers().filter(c=>!inPlan.has(c.name)).sort((a,b)=>(b.l12||0)-(a.l12||0));
-  if(available.length===0){ showToast('Alle kunder er allerede i planen'); return; }
-  // Vis søkbar modal
+  window._lastAddStopAvail = available;
   showAddStopModal(dayIdx, available);
 }
 
@@ -2065,6 +2063,10 @@ function showAddStopModal(dayIdx, available){
   modal.innerHTML = '<div style="background:#fff;border-radius:14px;width:520px;max-width:100%;max-height:80vh;display:flex;flex-direction:column">'+
     '<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:center"><div style="font-size:15px;font-weight:700">Legg til kunde</div><button onclick="document.getElementById(\'add-stop-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button></div>'+
     '<div style="padding:10px 16px;border-bottom:1px solid #F1EFE8"><input type="text" id="add-stop-search" placeholder="Søk på navn, by, kjede ..." oninput="filterAddStop()" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px"></div>'+
+    '<div onclick="showAdHocForm('+dayIdx+')" style="padding:11px 16px;border-bottom:1px solid #D3D1C7;background:#F8F9FC;cursor:pointer;display:flex;align-items:center;gap:10px;flex-shrink:0">'+
+    '<span style="font-size:18px">📍</span>'+
+    '<div><div style="font-size:13px;font-weight:700;color:#2C2C2A">Legg til uregistrert kunde</div>'+
+    '<div style="font-size:11px;color:#888780">Ad hoc-stopp · geokodes via adresse</div></div></div>'+
     '<div id="add-stop-list" style="overflow-y:auto;flex:1">'+rows+'</div></div>';
   document.body.appendChild(modal);
   setTimeout(()=>{ const s=document.getElementById('add-stop-search'); if(s) s.focus(); },50);
@@ -2077,6 +2079,92 @@ function filterAddStop(){
     const text = row.textContent.toLowerCase();
     row.style.display = (text.includes(q)) ? 'flex' : 'none';
   });
+}
+
+// ── Ad hoc-stopp: Nominatim-geokoding ────────────────────────────────────────
+async function _geocodeAdHoc(address, city){
+  const UA = 'AlfaKompass/1.0 (intern CRM)';
+  const BASE = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=no&q=';
+  // Forsøk 1: full adresse
+  if(address){
+    const r = await fetch(BASE + encodeURIComponent(address + ', ' + city + ', Norge'), {headers:{'User-Agent':UA}});
+    if(!r.ok) throw new Error('Nominatim svarte ' + r.status);
+    const j = await r.json();
+    if(j.length > 0) return {lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon), precision: 'adresse'};
+  }
+  // Forsøk 2: by-nivå via Nominatim
+  const r2 = await fetch(BASE + encodeURIComponent(city + ', Norge'), {headers:{'User-Agent':UA}});
+  if(!r2.ok) throw new Error('Nominatim svarte ' + r2.status);
+  const j2 = await r2.json();
+  if(j2.length > 0) return {lat: parseFloat(j2[0].lat), lng: parseFloat(j2[0].lon), precision: 'by'};
+  // Forsøk 3: CITY_COORDS lokal fallback
+  const local = _coordFor(city);
+  if(local) return {lat: local[0], lng: local[1], precision: 'by'};
+  throw new Error('Fant ikke "' + city + '" — sjekk at poststedet er riktig skrevet');
+}
+
+function showAdHocForm(dayIdx){
+  const modal = document.getElementById('add-stop-modal');
+  if(!modal) return;
+  const box = modal.querySelector('div');
+  box.innerHTML =
+    '<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:center">'+
+    '<div style="font-size:15px;font-weight:700">📍 Uregistrert stopp</div>'+
+    '<button onclick="document.getElementById(\'add-stop-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button></div>'+
+    '<div style="padding:16px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Navn på stopp *</label>'+
+    '<input type="text" id="adhoc-name" placeholder="f.eks. Legevakt Tromsø" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:12px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Adresse (gate og nr)</label>'+
+    '<input type="text" id="adhoc-address" placeholder="f.eks. Storgata 12" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:12px">'+
+    '<label style="display:block;font-size:12px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Poststed/by *</label>'+
+    '<input type="text" id="adhoc-city" placeholder="f.eks. Tromsø" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px">'+
+    '<div id="adhoc-status" style="min-height:18px;font-size:12px;color:#888780;margin-bottom:10px"></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="showAddStopModal('+dayIdx+',window._lastAddStopAvail||[])" style="flex:1;padding:10px;background:#F1EFE8;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;cursor:pointer;color:#5F5E5A">Tilbake</button>'+
+    '<button id="adhoc-confirm-btn" onclick="confirmAdHocStop('+dayIdx+')" style="flex:2;padding:10px;background:#2C2C2A;border:none;border-radius:8px;font-size:13px;cursor:pointer;color:#fff;font-weight:600">Geokod og legg til</button>'+
+    '</div></div>';
+  setTimeout(()=>{ const n=document.getElementById('adhoc-name'); if(n) n.focus(); }, 50);
+}
+
+async function confirmAdHocStop(dayIdx){
+  const nameEl = document.getElementById('adhoc-name');
+  const addrEl = document.getElementById('adhoc-address');
+  const cityEl = document.getElementById('adhoc-city');
+  const statusEl = document.getElementById('adhoc-status');
+  const btn = document.getElementById('adhoc-confirm-btn');
+  const name = (nameEl && nameEl.value || '').trim();
+  const address = (addrEl && addrEl.value || '').trim();
+  const city = (cityEl && cityEl.value || '').trim();
+  if(!name){ if(nameEl){ nameEl.style.borderColor='#C62828'; nameEl.focus(); } return; }
+  if(!city){ if(cityEl){ cityEl.style.borderColor='#C62828'; cityEl.focus(); } return; }
+  if(statusEl) statusEl.innerHTML = '🔍 Geokoder …';
+  if(btn) btn.disabled = true;
+  try {
+    const {lat, lng, precision} = await _geocodeAdHoc(address, city);
+    const adhocObj = {
+      name: name,
+      city: city,
+      lat: lat,
+      lng: lng,
+      _adhoc: true,
+      _adhocAddress: address ? (address + ', ' + city) : city,
+      _adhocPrecision: precision,
+      _duration: 60
+    };
+    const modal = document.getElementById('add-stop-modal');
+    if(modal) modal.remove();
+    const days = window._lastPlan;
+    if(!days || !days[dayIdx]) return;
+    plannerInsertStop(dayIdx, days[dayIdx].customers.length, adhocObj);
+    if(precision === 'by'){
+      showToast(name + ' lagt til (koordinat på by-nivå — adressen ble ikke funnet)');
+    } else {
+      showToast(name + ' lagt til med presis adresse');
+    }
+  } catch(err) {
+    if(statusEl){ statusEl.innerHTML = '⚠ ' + escapeHtml(err.message||'Geokoding feilet'); statusEl.style.color='#C62828'; }
+    if(btn) btn.disabled = false;
+  }
 }
 
 function plannerConfirmAddStop(dayIdx, name){
@@ -2225,13 +2313,20 @@ function renderPlanFromData(days){
       }
       const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
       const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
+      const adhocBadge=c._adhoc?'<span style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">📍 Ad hoc</span>':'';
       const _durOpts=[30,45,60,90,120].map(m=>'<option value="'+m+'"'+(c._duration===m?' selected':'')+'>'+m+' min</option>').join('');
       const durBadge='<select onchange="setPlanStopDuration('+dayIdx+','+custIdx+',+this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="background:#F1EFE8;color:#5F5E5A;font-size:10px;padding:1px 4px;border-radius:10px;font-weight:600;margin-left:4px;border:1px solid #D3D1C7;cursor:pointer">'+_durOpts+'</select>';
-      html+='<div class="planner-stop editable-stop" draggable="true" data-day="'+dayIdx+'" data-cust="'+custIdx+'" ondragstart="plannerDragStart(event,'+dayIdx+','+custIdx+')" ondragover="plannerDragOver(event)" ondrop="plannerDrop(event,'+dayIdx+','+custIdx+')" ondragend="plannerDragEnd(event)" style="cursor:grab;position:relative'+(c.appointed===true?'':';opacity:0.62')+'">'+
+      const _stopOpacity = (c._adhoc || c.appointed===true) ? '' : ';opacity:0.62';
+      const _metaLine = c._adhoc
+        ? '<div class="planner-stop-meta">'+escapeHtml(c._adhocAddress||c.city||'')+(c._adhocPrecision==='by'?' · <em style="color:#B8860B">by-nivå koordinat</em>':'')+'</div>'
+        : '<div class="planner-stop-meta">'+escapeHtml(c.city||'')+' · L12: '+nok(c.l12)+'</div>';
+      const _appointedBtn = c._adhoc ? ''
+        : '<button onclick="toggleVisitAppointed('+dayIdx+','+custIdx+')" style="background:'+(c.appointed===true?'#1A5C3A':'#FFF6E6')+';color:'+(c.appointed===true?'#fff':'#6D4C00')+';border:1px solid '+(c.appointed===true?'#1A5C3A':'#E6D9B8')+';border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 8px;flex-shrink:0;white-space:nowrap" title="Trykk for å endre avtalestatus">'+(c.appointed===true?'✓ Avtalt':'Uanmeldt')+'</button>';
+      html+='<div class="planner-stop editable-stop" draggable="true" data-day="'+dayIdx+'" data-cust="'+custIdx+'" ondragstart="plannerDragStart(event,'+dayIdx+','+custIdx+')" ondragover="plannerDragOver(event)" ondrop="plannerDrop(event,'+dayIdx+','+custIdx+')" ondragend="plannerDragEnd(event)" style="cursor:grab;position:relative'+_stopOpacity+'">'+
         '<div class="planner-stop-time">'+f(hh)+':'+f(mm)+'</div>'+
         '<div class="planner-stop-icon" style="cursor:grab" title="Dra for å endre rekkefølge">⠿</div>'+
-        '<div class="planner-stop-body"><div class="planner-stop-name">'+escapeHtml(c.name)+' '+badge+newBadge+durBadge+'</div><div class="planner-stop-meta">'+escapeHtml(c.city||'')+' · L12: '+nok(c.l12)+'</div><div class="planner-stop-meta" style="color:#888780">'+f(hh)+':'+f(mm)+' – '+f(ehh)+':'+f(emm)+'</div></div>'+
-        '<button onclick="toggleVisitAppointed('+dayIdx+','+custIdx+')" style="background:'+(c.appointed===true?'#1A5C3A':'#FFF6E6')+';color:'+(c.appointed===true?'#fff':'#6D4C00')+';border:1px solid '+(c.appointed===true?'#1A5C3A':'#E6D9B8')+';border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 8px;flex-shrink:0;white-space:nowrap" title="Trykk for å endre avtalestatus">'+(c.appointed===true?'✓ Avtalt':'Uanmeldt')+'</button>'+
+        '<div class="planner-stop-body"><div class="planner-stop-name">'+escapeHtml(c.name)+' '+badge+newBadge+adhocBadge+durBadge+'</div>'+_metaLine+'<div class="planner-stop-meta" style="color:#888780">'+f(hh)+':'+f(mm)+' – '+f(ehh)+':'+f(emm)+'</div></div>'+
+        _appointedBtn+
         '<button onclick="plannerRemoveStop('+dayIdx+','+custIdx+')" style="background:none;border:none;color:#A23B27;font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0" title="Fjern besøk">×</button>'+
         '</div>';
       prevCity = c.city || prevCity;
