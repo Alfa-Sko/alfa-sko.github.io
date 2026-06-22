@@ -125,6 +125,11 @@
 
     <!-- KUNDER -->
     <div id="sec-kunder" class="section" style="display:none">
+      <div id="ct-tabs" style="display:flex;gap:4px;margin-bottom:12px">
+        <button id="ct-tab-list" class="btn btn-dark btn-sm" onclick="switchCustomerTab('list')">Kundeliste</button>
+        <button id="ct-tab-konstellasjoner" class="btn btn-light btn-sm" onclick="switchCustomerTab('konstellasjoner')">Konstellasjoner</button>
+        <button id="ct-tab-kjeder" class="btn btn-light btn-sm" onclick="switchCustomerTab('kjeder')">Kjeder</button>
+      </div>
       <div id="customer-list-view">
         <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
           <button class="btn btn-light btn-sm" onclick="importCustomersExcel()" title="Last inn kundeliste fra Excel-malen">📥 Importer kundeliste (Excel)</button>
@@ -169,6 +174,8 @@
         </div>
         <div class="ct-count" id="ct-count"></div>
       </div>
+      <div id="customer-konstellasjoner-view" style="display:none"></div>
+      <div id="customer-kjeder-view" style="display:none"></div>
       <div id="customer-detail" style="display:none">
         <button class="btn btn-light btn-sm" onclick="closeCustomerDetail()" style="margin-bottom:16px">&#8592; Tilbake til kundeliste</button>
         <div id="customer-detail-content"></div>

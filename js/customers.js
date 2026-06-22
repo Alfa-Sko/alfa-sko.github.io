@@ -218,10 +218,104 @@ document.getElementById('quick-customer-modal').addEventListener('click',functio
 // ─── CUSTOMERS ──────────────────────────────────────────────────────────────
 
 function renderCustomers(){
-  document.getElementById('customer-list-view').style.display='block';
+  _setCtTabsVisible(true);
+  _switchCtTabDisplay('list');
   document.getElementById('customer-detail').style.display='none';
   populateChainFilter();
   filterCustomers();
+}
+
+function _setCtTabsVisible(visible){
+  var el=document.getElementById('ct-tabs');
+  if(el) el.style.display=visible?'flex':'none';
+}
+
+function _switchCtTabDisplay(tab){
+  ['list','konstellasjoner','kjeder'].forEach(function(t){
+    var btn=document.getElementById('ct-tab-'+t);
+    if(btn) btn.className=(t===tab)?'btn btn-dark btn-sm':'btn btn-light btn-sm';
+  });
+  document.getElementById('customer-list-view').style.display=(tab==='list')?'block':'none';
+  var kEl=document.getElementById('customer-konstellasjoner-view');
+  if(kEl) kEl.style.display=(tab==='konstellasjoner')?'block':'none';
+  var kjEl=document.getElementById('customer-kjeder-view');
+  if(kjEl) kjEl.style.display=(tab==='kjeder')?'block':'none';
+}
+
+function switchCustomerTab(tab){
+  _setCtTabsVisible(true);
+  _switchCtTabDisplay(tab);
+  if(tab==='konstellasjoner') renderKonstellasjonerView();
+  else if(tab==='kjeder') renderKjederView();
+}
+
+function _chainPrefix(chain){
+  if(!chain) return '';
+  var dot=chain.indexOf(' · ');
+  return dot>=0?chain.slice(0,dot):chain;
+}
+
+function toggleCustGroup(groupId){
+  var el=document.getElementById(groupId);
+  var arrow=document.getElementById(groupId+'-arrow');
+  if(!el) return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  if(arrow) arrow.style.transform=isOpen?'':'rotate(90deg)';
+}
+
+function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel){
+  var el=document.getElementById(containerId);
+  if(!el) return;
+  var groups={};
+  getCustomers().forEach(function(c){
+    var key=getKeyFn(c)||emptyLabel;
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(c);
+  });
+  var keys=Object.keys(groups).sort(function(a,b){
+    if(a===emptyLabel) return 1;
+    if(b===emptyLabel) return -1;
+    return a.localeCompare(b,'no');
+  });
+  if(!keys.length){ el.innerHTML='<div class="empty-state">Ingen kunder</div>'; return; }
+  var html='';
+  keys.forEach(function(key){
+    var members=groups[key].sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','no'); });
+    var l12sum=members.reduce(function(s,c){ return s+(c.l12||0); },0);
+    var groupId='cgr-'+key.replace(/[^a-zA-Z0-9]/g,'-');
+    html+='<div style="margin-bottom:8px;border:1px solid #E5E3DB;border-radius:8px;overflow:hidden">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#F8F7F3;cursor:pointer;gap:10px;user-select:none" onclick="toggleCustGroup(\''+groupId+'\')" id="'+groupId+'-hdr">';
+    html+='<div style="flex:1;min-width:0"><span style="font-size:14px;font-weight:600;color:#2C2C2A">'+escapeHtml(key)+'</span></div>';
+    html+='<div style="display:flex;align-items:center;gap:12px;flex-shrink:0">';
+    html+='<span style="font-size:11px;color:#888780">'+members.length+' butikk'+(members.length!==1?'er':'')+'</span>';
+    if(l12sum>0) html+='<span style="font-size:11px;color:#5F5E5A;font-weight:600">'+Math.round(l12sum/1000)+' k</span>';
+    html+='<span id="'+groupId+'-arrow" style="font-size:11px;color:#B4B2A9;display:inline-block;transition:transform 0.15s">▶</span>';
+    html+='</div></div>';
+    html+='<div id="'+groupId+'" style="display:none">';
+    members.forEach(function(c){
+      var safeName=c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var bCls=c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
+      var bLbl=c.class==='A'?'A':c.class==='B'?'B':c.class==='C'?'C':'Ny';
+      html+='<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid #F1EFE8;cursor:pointer;background:#fff" onclick="openCustomer(\''+safeName+'\')" onmouseover="this.style.background=\'#FAF9F5\'" onmouseout="this.style.background=\'#fff\'">';
+      html+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</div>';
+      if(c.city) html+='<div style="font-size:11px;color:#888780">'+escapeHtml(c.city)+'</div>';
+      html+='</div>';
+      if(c.class) html+='<span class="ct-badge '+bCls+'" style="flex-shrink:0">'+bLbl+'</span>';
+      if(c.l12>0) html+='<span style="font-size:11px;color:#888780;flex-shrink:0">'+Math.round(c.l12/1000)+' k</span>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+function renderKonstellasjonerView(){
+  _renderGroupedCustomersView(function(c){ return c.chain||''; },'customer-konstellasjoner-view','(Uten kjede)');
+}
+
+function renderKjederView(){
+  _renderGroupedCustomersView(function(c){ return _chainPrefix(c.chain); },'customer-kjeder-view','(Uten kjede)');
 }
 
 function populateChainFilter(){
@@ -433,7 +527,10 @@ async function _loadChPhotos(v){
 function openCustomer(name){
   const c=getCustomers().find(c=>c.name===name);
   if(!c) return;
+  _setCtTabsVisible(false);
   document.getElementById('customer-list-view').style.display='none';
+  var kEl=document.getElementById('customer-konstellasjoner-view'); if(kEl) kEl.style.display='none';
+  var kjEl=document.getElementById('customer-kjeder-view'); if(kjEl) kjEl.style.display='none';
   document.getElementById('customer-detail').style.display='block';
   const custVisits=visits.filter(v=>v.customer===name).sort((a,b)=>b.date.localeCompare(a.date));
   const custFollows=followups.filter(f=>f.customer===name&&!f.done);
