@@ -264,7 +264,7 @@ function toggleCustGroup(groupId){
   if(arrow) arrow.style.transform=isOpen?'':'rotate(90deg)';
 }
 
-function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel){
+function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel, getGroupActionsFn){
   var el=document.getElementById(containerId);
   if(!el) return;
   var groups={};
@@ -284,12 +284,14 @@ function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel){
     var members=groups[key].sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','no'); });
     var l12sum=members.reduce(function(s,c){ return s+(c.l12||0); },0);
     var groupId=containerId+'-cgr-'+key.replace(/[^a-zA-Z0-9]/g,'-');
+    var actions=getGroupActionsFn?getGroupActionsFn(key):'';
     html+='<div style="margin-bottom:8px;border:1px solid #E5E3DB;border-radius:8px;overflow:hidden">';
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#F8F7F3;cursor:pointer;gap:10px;user-select:none" onclick="toggleCustGroup(\''+groupId+'\')" id="'+groupId+'-hdr">';
     html+='<div style="flex:1;min-width:0"><span style="font-size:14px;font-weight:600;color:#2C2C2A">'+escapeHtml(key)+'</span></div>';
-    html+='<div style="display:flex;align-items:center;gap:12px;flex-shrink:0">';
+    html+='<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">';
     html+='<span style="font-size:11px;color:#888780">'+members.length+' butikk'+(members.length!==1?'er':'')+'</span>';
     if(l12sum>0) html+='<span style="font-size:11px;color:#5F5E5A;font-weight:600">'+Math.round(l12sum/1000)+' k</span>';
+    if(actions) html+='<div style="display:flex;gap:4px" onclick="event.stopPropagation()">'+actions+'</div>';
     html+='<span id="'+groupId+'-arrow" style="font-size:11px;color:#B4B2A9;display:inline-block;transition:transform 0.15s">▶</span>';
     html+='</div></div>';
     html+='<div id="'+groupId+'" style="display:none">';
@@ -333,17 +335,143 @@ function _migrateConstellations(){
 
 function renderKonstellasjonerView(){
   _migrateConstellations();
+  var el=document.getElementById('customer-konstellasjoner-view');
+  if(!el) return;
   var nameById={};
-  constellations.forEach(function(cst){ nameById[cst.id]=cst.name; });
+  var idByName={};
+  constellations.forEach(function(cst){ nameById[cst.id]=cst.name; idByName[cst.name]=cst.id; });
+  var topBar='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<button class="btn btn-sm" onclick="createConstellation()">+ Ny konstellasjon</button>';
+  if(constellations.length>=2) topBar+='<button class="btn btn-sm" onclick="_openMergeConstellations()">Slå sammen …</button>';
+  topBar+='</div><div id="kst-groups"></div>';
+  el.innerHTML=topBar;
   _renderGroupedCustomersView(
     function(c){ return c.constellation_id ? (nameById[c.constellation_id]||c.constellation_id) : ''; },
-    'customer-konstellasjoner-view',
-    '(Uten konstellasjon)'
+    'kst-groups',
+    '(Uten konstellasjon)',
+    function(key){
+      var id=idByName[key];
+      if(!id) return '';
+      var safeId=id.replace(/'/g,"\\'");
+      return '<button onclick="renameConstellation(\''+safeId+'\')" title="Gi nytt navn" style="background:none;border:1px solid #D3D1C7;border-radius:5px;font-size:11px;color:#5F5E5A;cursor:pointer;padding:2px 7px;line-height:1.4">✏</button>'
+           +'<button onclick="deleteConstellation(\''+safeId+'\')" title="Slett konstellasjon" style="background:none;border:1px solid #D3D1C7;border-radius:5px;font-size:11px;color:#A23B27;cursor:pointer;padding:2px 7px;line-height:1.4">🗑</button>';
+    }
   );
 }
 
 function renderKjederView(){
   _renderGroupedCustomersView(function(c){ return _chainPrefix(c.chain); },'customer-kjeder-view','(Uten kjede)');
+}
+
+// ─── KONSTELLASJONS-ADMINISTRASJON ──────────────────────────────────────────
+
+function createConstellation(){
+  if(_roGuard()) return;
+  var name=prompt('Navn på ny konstellasjon:','');
+  if(!name||!name.trim()) return;
+  name=name.trim();
+  if(constellations.some(function(c){ return c.name===name; })){
+    showToast('En konstellasjon med det navnet finnes allerede'); return;
+  }
+  var id='cst_'+Date.now();
+  constellations.push({id:id,name:name});
+  saveData('alfa_cust_constellations',constellations);
+  renderKonstellasjonerView();
+  showToast('Konstellasjon "'+name+'" opprettet');
+}
+
+function renameConstellation(id){
+  if(_roGuard()) return;
+  var cst=constellations.find(function(c){ return c.id===id; });
+  if(!cst) return;
+  var newName=prompt('Nytt navn for "'+cst.name+'":',cst.name);
+  if(!newName||!newName.trim()) return;
+  newName=newName.trim();
+  if(constellations.some(function(c){ return c.name===newName&&c.id!==id; })){
+    showToast('En konstellasjon med det navnet finnes allerede'); return;
+  }
+  cst.name=newName;
+  saveData('alfa_cust_constellations',constellations);
+  renderKonstellasjonerView();
+  showToast('Omdøpt til "'+newName+'"');
+}
+
+function deleteConstellation(id){
+  if(_roGuard()) return;
+  var cst=constellations.find(function(c){ return c.id===id; });
+  if(!cst) return;
+  var members=getCustomers().filter(function(c){ return c.constellation_id===id; });
+  if(!confirm('Slett konstellasjon "'+cst.name+'"?\n'+members.length+' kunde(r) mister konstellasjon (slettes ikke).')) return;
+  members.forEach(function(c){ c.constellation_id=null; });
+  constellations=constellations.filter(function(c){ return c.id!==id; });
+  saveData('alfa_cust_constellations',constellations);
+  if(members.length) saveData('alfa_customers',CUSTOMERS);
+  renderKonstellasjonerView();
+  showToast('Konstellasjon slettet');
+}
+
+function setCustomerConstellation(customerName, constellationId){
+  if(_roGuard()) return;
+  var c=getCustomers().find(function(x){ return x.name===customerName; });
+  if(!c) return;
+  c.constellation_id=constellationId||null;
+  saveData('alfa_customers',CUSTOMERS);
+  showToast('Konstellasjon oppdatert');
+}
+
+function mergeConstellations(keepId, mergeIds){
+  if(_roGuard()) return;
+  var customers=getCustomers();
+  mergeIds.forEach(function(mId){
+    customers.forEach(function(c){ if(c.constellation_id===mId) c.constellation_id=keepId; });
+  });
+  constellations=constellations.filter(function(c){ return c.id===keepId||mergeIds.indexOf(c.id)===-1; });
+  saveData('alfa_cust_constellations',constellations);
+  saveData('alfa_customers',CUSTOMERS);
+  renderKonstellasjonerView();
+  showToast('Konstellasjoner slått sammen');
+}
+
+function _openMergeConstellations(){
+  var existing=document.getElementById('kst-merge-panel');
+  if(existing){ existing.remove(); return; }
+  var panel=document.createElement('div');
+  panel.id='kst-merge-panel';
+  panel.style.cssText='background:#F8F7F3;border:1px solid #D3D1C7;border-radius:8px;padding:14px;margin-bottom:12px';
+  var html='<div style="font-size:13px;font-weight:600;margin-bottom:8px">Slå sammen konstellasjoner</div>';
+  html+='<div style="font-size:12px;color:#5F5E5A;margin-bottom:8px">Huk av de som skal slås inn, velg hvilken som beholdes:</div>';
+  html+='<div id="kst-merge-checks" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">';
+  constellations.forEach(function(cst){
+    html+='<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">'
+      +'<input type="checkbox" value="'+cst.id+'"> '+escapeHtml(cst.name)+'</label>';
+  });
+  html+='</div>';
+  html+='<div style="font-size:12px;color:#5F5E5A;margin-bottom:4px">Behold denne (alle kunder samles her):</div>';
+  html+='<select id="kst-merge-keep" style="width:100%;margin-bottom:10px;padding:6px;font-size:13px;border:1px solid #D3D1C7;border-radius:6px">';
+  html+='<option value="">Velg …</option>';
+  constellations.forEach(function(cst){
+    html+='<option value="'+cst.id+'">'+escapeHtml(cst.name)+'</option>';
+  });
+  html+='</select>';
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button class="btn btn-dark btn-sm" onclick="_doMergeConstellations()">Slå sammen</button>';
+  html+='<button class="btn btn-sm" onclick="document.getElementById(\'kst-merge-panel\').remove()">Avbryt</button>';
+  html+='</div>';
+  panel.innerHTML=html;
+  var groupsEl=document.getElementById('kst-groups');
+  if(groupsEl) groupsEl.parentNode.insertBefore(panel,groupsEl);
+}
+
+function _doMergeConstellations(){
+  var keepId=(document.getElementById('kst-merge-keep')||{}).value||'';
+  if(!keepId){ showToast('Velg konstellasjon å beholde'); return; }
+  var checked=Array.from(document.querySelectorAll('#kst-merge-checks input:checked')).map(function(i){ return i.value; });
+  var mergeIds=checked.filter(function(id){ return id!==keepId; });
+  if(!mergeIds.length){ showToast('Velg minst én konstellasjon å slå inn'); return; }
+  var keepCst=constellations.find(function(c){ return c.id===keepId; });
+  var mergeNames=mergeIds.map(function(id){ var c=constellations.find(function(x){ return x.id===id; }); return c?'"'+c.name+'"':id; });
+  if(!confirm('Slå inn '+mergeNames.join(', ')+' i "'+keepCst.name+'"?\nDe andre konstellasjonene slettes.')) return;
+  mergeConstellations(keepId,mergeIds);
 }
 
 function populateChainFilter(){
@@ -629,7 +757,12 @@ function openCustomer(name){
             <option value="Pop-up"${(c.storetype||'')==='Pop-up'?' selected':''}>Pop-up</option>
           </select>
         </div>
-        <div></div>
+        <div class="form-group" style="margin-bottom:8px"><label>Konstellasjon</label>
+          <select id="edit-constellation">
+            <option value="">Ingen konstellasjon</option>
+            ${constellations.map(cst=>`<option value="${cst.id}"${c.constellation_id===cst.id?' selected':''}>${escapeHtml(cst.name)}</option>`).join('')}
+          </select>
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:10px"><label>Notat</label><textarea id="edit-note" style="min-height:60px">${c.note||''}</textarea></div>
       <button class="btn btn-dark btn-sm" onclick="saveCustomerEdits('${safeName}')">Lagre endringer</button>
@@ -669,6 +802,8 @@ function saveCustomerEdits(name){
   c.discount=document.getElementById('edit-discount').value.trim();
   c.storetype=document.getElementById('edit-storetype').value;
   c.note=document.getElementById('edit-note').value.trim();
+  const cstSel=document.getElementById('edit-constellation');
+  if(cstSel) c.constellation_id=cstSel.value||null;
   saveData('alfa_customers',CUSTOMERS);
   _sbPatchCustomerField(c.id,{phone:c.phone,email:c.email});
   openCustomer(name);
