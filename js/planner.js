@@ -1673,73 +1673,101 @@ function recomputeDayTimes(day){
   let prevCity = day.startCity || '';
   const _startHotelCoord = (day.startHotel && day.startHotel.lat!=null && day.startHotel.lon!=null) ? [day.startHotel.lat, day.startHotel.lon] : null;
   let prevCoord = _startHotelCoord || _coordFor(day.startCity||'');
-  // Faste hindringer: flyetapper (med byskifte) og tidsblokker (adm/lunsj/møter osv.).
-  // Besøk som kolliderer skyves til etter hindringen.
+  // Faste hindringer: flyetapper + tidsblokker + låste besøk som faste ankere.
+  // Låste besøk hindrer andre besøk fra å lande i det låste tidsvinduet.
   const legs = (day.flightLegs||[]).slice().sort((a,b)=>a.depMins-b.depMins);
   const blocks = (day.timeBlocks||[]).slice().sort((a,b)=>a.startMins-b.startMins);
   const obstacles = [];
-  legs.forEach(L=>obstacles.push({s:L.depMins-30, e:L.arrMins+20, arrCity:L.arrCity}));
-  blocks.forEach(b=>obstacles.push({s:b.startMins, e:b.endMins}));
+  legs.forEach(L=>obstacles.push({s:L.depMins-30, e:L.arrMins+20, arrCity:L.arrCity, kind:'flight'}));
+  blocks.forEach(b=>obstacles.push({s:b.startMins, e:b.endMins, kind:'block'}));
+  day.customers.forEach(c=>{
+    if(c._timeLocked && c._lockedStart!=null){
+      const dur2=(c._duration!=null)?c._duration:_gVisitDuration(c);
+      obstacles.push({s:c._lockedStart, e:c._lockedStart+dur2, arrCity:c.city, kind:'locked', custRef:c});
+    }
+  });
   obstacles.sort((a,b)=>a.s-b.s);
   let oIdx = 0;
   const placed = [];
   day.customers.forEach((c)=>{
-    // Bevar opprinnelig _duration (satt av rpBuildRoute/runPlanner ved bygging).
-    // Fall tilbake til _gVisitDuration berre for nyleg-lagt-til kundar utan preset.
     const dur = (c._duration != null) ? c._duration : _gVisitDuration(c);
-    // Effektiv cutoff per kandidat: flyfrist – oppmøtetid – kjøretid til flyplass.
-    let effectiveCutoff = dayEndMin;
-    if(_frItem && _frItem.retMins){
-      const _driveToAP = getDriveMin(c.city||'', _frItem.to||'');
-      effectiveCutoff = Math.min(dayEndMin, roundTo30(_frItem.retMins - FLIGHT_BUFFER_MIN - _driveToAP));
-    }
-    let placedOk = false;
-    let guard = 0;
-    while(!placedOk && guard<40){
-      guard++;
-      // Konsumér hindringer vi allerede har passert (fly bytter by)
-      while(oIdx<obstacles.length && obstacles[oIdx].e<=cursor){
-        if(obstacles[oIdx].arrCity){
-          prevCity = obstacles[oIdx].arrCity;
-          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
+    if(c._timeLocked && c._lockedStart!=null){
+      // ── Låst anker: plasser på eksakt _lockedStart ────────────────────────
+      // Konsumér hindringer som slutter FØR det låste tidspunktet
+      while(oIdx<obstacles.length && obstacles[oIdx].e<=c._lockedStart){
+        const ob=obstacles[oIdx];
+        if(ob.kind!=='locked'||ob.custRef!==c){
+          if(ob.arrCity){prevCity=ob.arrCity;prevCoord=_coordFor(ob.arrCity)||prevCoord;}
         }
         oIdx++;
       }
-      const toCoord = (c.lat!=null&&c.lng!=null) ? [c.lat,c.lng] : _coordFor(c.city||'');
-      const drive = prevCity ? getDriveMin(prevCity, c.city||'', prevCoord, toCoord) : 0;
-      const openMin = _gOpeningTimeMin(c, weekday);
-      let t = Math.ceil(Math.max(cursor + drive, openMin)/30)*30;
-      // Kolliderer besøket med neste hindring?
-      if(oIdx<obstacles.length && t+dur > obstacles[oIdx].s && t < obstacles[oIdx].e){
-        cursor = obstacles[oIdx].e;
-        if(obstacles[oIdx].arrCity){
-          prevCity = obstacles[oIdx].arrCity;
-          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
-        }
-        oIdx++;
-        continue;
+      // Hopp over dette besøkets egen obstacle-oppføring
+      if(oIdx<obstacles.length && obstacles[oIdx].kind==='locked' && obstacles[oIdx].custRef===c) oIdx++;
+      // Konflikt-sjekk: er cursor allerede forbi det låste tidspunktet?
+      c._conflict = false;
+      if(cursor > c._lockedStart){
+        c._conflict = true;
+      } else {
+        // Overlapper en annen hindring det låste vinduet?
+        const over=obstacles.slice(oIdx).find(ob=>ob.custRef!==c && ob.s<c._lockedStart+dur && ob.e>c._lockedStart);
+        if(over) c._conflict=true;
       }
-      // Hoppet helt forbi en hindring (sen åpningstid e.l.)? Konsumér den og prøv igjen.
-      if(oIdx<obstacles.length && t >= obstacles[oIdx].e){
-        if(obstacles[oIdx].arrCity){
-          prevCity = obstacles[oIdx].arrCity;
-          prevCoord = _coordFor(obstacles[oIdx].arrCity) || prevCoord;
-        }
-        oIdx++;
-        continue;
-      }
-      // Cutoff-sjekk: besøket får ikkje plass før grensa → utsett (same prinsipp som rpBuildRoute).
-      if(t + dur > effectiveCutoff) break;
-      c._drive = drive;
-      c._duration = dur;
-      c._start = t;
-      c._end = t + dur;
-      c.isPrio = c.l12>=150000;
-      cursor = t + dur;
-      prevCity = c.city || prevCity;
-      prevCoord = toCoord || prevCoord;
-      placedOk = true;
+      const toCoord=(c.lat!=null&&c.lng!=null)?[c.lat,c.lng]:_coordFor(c.city||'');
+      const drive=prevCity?getDriveMin(prevCity,c.city||'',prevCoord,toCoord):0;
+      c._drive=drive;
+      c._duration=dur;
+      c._start=c._lockedStart;
+      c._end=c._lockedStart+dur;
+      c.isPrio=c.l12>=150000;
+      cursor=c._end;
+      prevCity=c.city||prevCity;
+      prevCoord=toCoord||prevCoord;
       placed.push(c);
+    } else {
+      // ── Ulåst besøk: standard sekvensiell plassering ──────────────────────
+      let effectiveCutoff = dayEndMin;
+      if(_frItem && _frItem.retMins){
+        const _driveToAP = getDriveMin(c.city||'', _frItem.to||'');
+        effectiveCutoff = Math.min(dayEndMin, roundTo30(_frItem.retMins - FLIGHT_BUFFER_MIN - _driveToAP));
+      }
+      let placedOk = false;
+      let guard = 0;
+      while(!placedOk && guard<40){
+        guard++;
+        while(oIdx<obstacles.length && obstacles[oIdx].e<=cursor){
+          if(obstacles[oIdx].arrCity){
+            prevCity=obstacles[oIdx].arrCity;
+            prevCoord=_coordFor(obstacles[oIdx].arrCity)||prevCoord;
+          }
+          oIdx++;
+        }
+        const toCoord=(c.lat!=null&&c.lng!=null)?[c.lat,c.lng]:_coordFor(c.city||'');
+        const drive=prevCity?getDriveMin(prevCity,c.city||'',prevCoord,toCoord):0;
+        const openMin=_gOpeningTimeMin(c,weekday);
+        let t=Math.ceil(Math.max(cursor+drive,openMin)/30)*30;
+        if(oIdx<obstacles.length && t+dur>obstacles[oIdx].s && t<obstacles[oIdx].e){
+          cursor=obstacles[oIdx].e;
+          if(obstacles[oIdx].arrCity){prevCity=obstacles[oIdx].arrCity;prevCoord=_coordFor(obstacles[oIdx].arrCity)||prevCoord;}
+          oIdx++;
+          continue;
+        }
+        if(oIdx<obstacles.length && t>=obstacles[oIdx].e){
+          if(obstacles[oIdx].arrCity){prevCity=obstacles[oIdx].arrCity;prevCoord=_coordFor(obstacles[oIdx].arrCity)||prevCoord;}
+          oIdx++;
+          continue;
+        }
+        if(t+dur>effectiveCutoff) break;
+        c._drive=drive;
+        c._duration=dur;
+        c._start=t;
+        c._end=t+dur;
+        c.isPrio=c.l12>=150000;
+        cursor=t+dur;
+        prevCity=c.city||prevCity;
+        prevCoord=toCoord||prevCoord;
+        placedOk=true;
+        placed.push(c);
+      }
     }
   });
   day.customers = placed;
@@ -2036,6 +2064,72 @@ function plannerRemoveStop(dayIdx, custIdx){
   renderPlanFromData(days);
 }
 
+function editStopTime(dayIdx, custIdx){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const c = days[dayIdx].customers[custIdx];
+  if(!c) return;
+  const existing = document.getElementById('lock-time-modal');
+  if(existing) existing.remove();
+  const pad = n => String(n).padStart(2,'0');
+  const curVal = c._timeLocked && c._lockedStart!=null
+    ? pad(Math.floor(c._lockedStart/60))+':'+pad(c._lockedStart%60)
+    : (c._start!=null ? pad(Math.floor(c._start/60))+':'+pad(c._start%60) : '09:00');
+  const unlockBtn = c._timeLocked
+    ? '<button onclick="clearStopLock('+dayIdx+','+custIdx+')" style="flex:1;padding:10px;background:#FFF6E6;border:1px solid #E6D9B8;border-radius:8px;font-size:13px;cursor:pointer;color:#6D4C00;font-weight:600">Fjern lås 🔓</button>'
+    : '';
+  const modal = document.createElement('div');
+  modal.id = 'lock-time-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:320px;max-width:100%;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">'
+    +'<div style="font-size:15px;font-weight:700;color:#2C2C2A;margin-bottom:4px">🔒 Lås tidspunkt</div>'
+    +'<div style="font-size:12px;color:#888780;margin-bottom:14px">'+escapeHtml(c.name)+'</div>'
+    +'<div style="font-size:12px;font-weight:600;color:#5F5E5A;margin-bottom:6px">Start-tidspunkt</div>'
+    +'<input type="time" id="lock-time-input" value="'+escapeHtml(curVal)+'" style="width:100%;padding:10px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:18px;box-sizing:border-box;margin-bottom:14px">'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="document.getElementById(\'lock-time-modal\').remove()" style="flex:1;padding:10px;background:#F1EFE8;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;cursor:pointer;color:#5F5E5A">Avbryt</button>'
+    +unlockBtn
+    +'<button onclick="setStopLockedTime('+dayIdx+','+custIdx+',document.getElementById(\'lock-time-input\').value)" style="flex:2;padding:10px;background:#2C2C2A;border:none;border-radius:8px;font-size:13px;cursor:pointer;color:#fff;font-weight:600">Lås 🔒</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  setTimeout(()=>{ const inp=document.getElementById('lock-time-input'); if(inp) inp.focus(); },50);
+}
+
+function setStopLockedTime(dayIdx, custIdx, timeStr){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const c = days[dayIdx].customers[custIdx];
+  if(!c) return;
+  const m = (timeStr||'').match(/^(\d{1,2}):(\d{2})$/);
+  if(!m){ showToast('Ugyldig tid — bruk HH:MM'); return; }
+  const mins = parseInt(m[1])*60+parseInt(m[2]);
+  c._timeLocked = true;
+  c._lockedStart = mins;
+  c._conflict = false;
+  const modal = document.getElementById('lock-time-modal');
+  if(modal) modal.remove();
+  recomputeDayTimes(days[dayIdx]);
+  renderPlanFromData(days);
+  showToast('🔒 Tidspunkt låst til '+timeStr);
+}
+
+function clearStopLock(dayIdx, custIdx){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const c = days[dayIdx].customers[custIdx];
+  if(!c) return;
+  delete c._timeLocked;
+  delete c._lockedStart;
+  delete c._conflict;
+  const modal = document.getElementById('lock-time-modal');
+  if(modal) modal.remove();
+  recomputeDayTimes(days[dayIdx]);
+  renderPlanFromData(days);
+  showToast('🔓 Tidslås fjernet');
+}
+
 function plannerAddStopPrompt(dayIdx){
   const days = window._lastPlan;
   if(!days || !days[dayIdx]) return;
@@ -2322,8 +2416,13 @@ function renderPlanFromData(days){
         : '<div class="planner-stop-meta">'+escapeHtml(c.city||'')+' · L12: '+nok(c.l12)+'</div>';
       const _appointedBtn = c._adhoc ? ''
         : '<button onclick="toggleVisitAppointed('+dayIdx+','+custIdx+')" style="background:'+(c.appointed===true?'#1A5C3A':'#FFF6E6')+';color:'+(c.appointed===true?'#fff':'#6D4C00')+';border:1px solid '+(c.appointed===true?'#1A5C3A':'#E6D9B8')+';border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 8px;flex-shrink:0;white-space:nowrap" title="Trykk for å endre avtalestatus">'+(c.appointed===true?'✓ Avtalt':'Uanmeldt')+'</button>';
+      const _lockExtra = c._timeLocked
+        ? ' <span onclick="event.stopPropagation();clearStopLock('+dayIdx+','+custIdx+')" title="Fjern tidslås" style="cursor:pointer;font-size:10px">🔒</span>'
+          +(c._conflict?' <span title="Konflikt: tidspunktet lar seg ikke holde — juster rekkefølge eller låst tid" style="cursor:help;font-size:10px">⚠️</span>':'')
+        : '';
+      const _timeColor = c._conflict?';color:#C62828':c._timeLocked?';color:#0C447C':'';
       html+='<div class="planner-stop editable-stop" draggable="true" data-day="'+dayIdx+'" data-cust="'+custIdx+'" ondragstart="plannerDragStart(event,'+dayIdx+','+custIdx+')" ondragover="plannerDragOver(event)" ondrop="plannerDrop(event,'+dayIdx+','+custIdx+')" ondragend="plannerDragEnd(event)" style="cursor:grab;position:relative'+_stopOpacity+'">'+
-        '<div class="planner-stop-time">'+f(hh)+':'+f(mm)+'</div>'+
+        '<div class="planner-stop-time" onclick="event.stopPropagation();editStopTime('+dayIdx+','+custIdx+')" style="cursor:pointer'+_timeColor+'" title="'+(c._timeLocked?'Låst – klikk for å endre eller fjerne':'Klikk for å låse tidspunktet')+'">'+f(hh)+':'+f(mm)+_lockExtra+'</div>'+
         '<div class="planner-stop-icon" style="cursor:grab" title="Dra for å endre rekkefølge">⠿</div>'+
         '<div class="planner-stop-body"><div class="planner-stop-name">'+escapeHtml(c.name)+' '+badge+newBadge+adhocBadge+durBadge+'</div>'+_metaLine+'<div class="planner-stop-meta" style="color:#888780">'+f(hh)+':'+f(mm)+' – '+f(ehh)+':'+f(emm)+'</div></div>'+
         _appointedBtn+
