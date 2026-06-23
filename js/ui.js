@@ -301,10 +301,13 @@ function showCustomerListModal(title, customers){
   document.body.appendChild(modal);
 }
 
-function showToast(msg){
+function showToast(msg, type){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),3000);
+  t.textContent=msg;
+  t.style.background=(type==='warning')?'#92400E':'';
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>{ t.classList.remove('show'); t.style.background=''; },(type==='warning')?5000:3000);
 }
 
 function viewPhoto(src, name){

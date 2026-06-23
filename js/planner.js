@@ -883,10 +883,11 @@ function runPlanner(){
   // Custom rute: hold styr på hvilke kunder som er plassert (på tvers av dager)
   const _placedGlobal = new Set();
   let _groupIdx = 0; // teller for dagsgrupper — øker kun på arbeidsdager
+  let _workDays = 0; // arbeidsdager plassert (ekskl. hellig-/fridager) — styrer hard dagsgrense
   // Hvor starter dag 2+ fra? Default = hjem hvis dag 1 endte hjemme, ellers siste besøk by.
   let lastDayEndCity = homeBase;
   let prevDayEndedAtHome = true;
-  for(let d=0; (customRouteActive ? (_groupIdx<customDayGroups.length && d<customDayGroups.length+14) : d<effDays); d++){
+  for(let d=0; (customRouteActive ? (_groupIdx<customDayGroups.length && d<customDayGroups.length+14) : (_workDays<effDays && d<effDays+28)); d++){
     const dayDate=new Date(startDate);
     dayDate.setDate(startDate.getDate()+d);
     const dayKey=dayDate.getFullYear()+'-'+String(dayDate.getMonth()+1).padStart(2,'0')+'-'+String(dayDate.getDate()).padStart(2,'0');
@@ -1150,6 +1151,7 @@ function runPlanner(){
     timeline.sort((a,b)=>a.startMins-b.startMins);
     // Hvilke soner dekker denne dagen?
     const zones=[...new Set(dayCustomers.map(c=>customerZone.get(c.name)).filter(Boolean))];
+    if(!customRouteActive) _workDays++;
     days.push({label:dayLabel,date:dayDate,customers:dayCustomers,timeline:timeline,startMin:dayStartMin,fixedCount:fixedAppts.length,zones:zones,startCity:dayStartCity});
     // Oppdater "forrige dags sluttsted" for neste iterasjon
     if(dayCustomers.length>0){
@@ -1197,6 +1199,10 @@ function runPlanner(){
   days.forEach(day=>day.customers.forEach(c=>planNames.add(c.name)));
   const callPool=getCustomers().filter(c=>!planNames.has(c.name)&&(c.phone||(c.contacts||[]).some(p=>p.phone)));
   callPool.sort((a,b)=>(b.l12||0)-(a.l12||0));
+  // Alle pool-kunder som ikke fikk plass (uavhengig av telefon)
+  const unplacedPool=pool.filter(c=>!planNames.has(c.name));
+  unplacedPool.sort((a,b)=>(b.l12||0)-(a.l12||0));
+  window._lastUnplacedPool=unplacedPool;
   let html='<div class="planner-result">';
   // Pool-fordeling per sone (debug-informasjon for å vise hvor kundene kommer fra)
   const zoneBreakdown={};
@@ -1241,7 +1247,9 @@ function runPlanner(){
     }
     const fixedInfo=day.fixedCount>0?' · <span style="color:#0C447C">'+day.fixedCount+' fast(e) avtale(r)</span>':'';
     const zoneInfo=day.zones&&day.zones.length>0?' · <span style="color:#0A4A7A;font-weight:600">📍 '+day.zones.join(' → ')+'</span>':'';
-    html+='<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span></div>';
+    const _mxOpts=['','30','45','60','90'].map(v=>'<option value="'+v+'"'+((v&&day._maxVisitDuration===+v)?' selected':(!v&&!day._maxVisitDuration?' selected':''))+'>'+(v?v+' min':'Fri tid')+'</option>').join('');
+    const _mxSel='<select onchange="setDayMaxVisit('+dayIdx+',this.value)" onclick="event.stopPropagation()" style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:7px;font-size:10px;color:#5F5E5A;padding:2px 5px;cursor:pointer;margin-left:8px;font-weight:600" title="Maks besøkstid per kunde (låste og manuelt justerte besøk røres ikke)">'+_mxOpts+'</select>';
+    html+='<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span>'+_mxSel+'</div>';
     // Vis fridag-/helligdag-banner og hopp over resten av dagen
     if(day.skippedReason){
       const icon = day.isHoliday ? '🎉' : '🌴';
@@ -1353,15 +1361,16 @@ function runPlanner(){
         // som en drive-home-blokk, skal vi ikke vise den igjen.
         const driveHomeAlreadyShown = day.timeline.some(x=>x.kind==='drive-home');
         const isFirstVisitOfDay = day.timeline.filter(x=>x.kind==='visit')[0] === item;
-        const showFullDrive = driveMin>=15 && !(isFirstVisitOfDay && driveHomeAlreadyShown);
-        if(showFullDrive){
+        const showDriveBlock = driveMin>0 && !(isFirstVisitOfDay && driveHomeAlreadyShown);
+        if(showDriveBlock){
           const routeInfo=getRouteInfo(prevCity, c.city||area);
           const ferry=routeInfo?routeInfo.ferry:null;
           let ferryHtml='';
           if(ferry){
             ferryHtml='<div style="margin-top:6px;padding:6px 8px;background:#E6F1FB;border:1px solid #B8D4E8;border-radius:5px;font-size:11px;color:#0C447C;display:flex;align-items:center;gap:6px"><span style="font-size:14px">⛴</span><div style="flex:1"><strong>Ferje: '+escapeHtml(ferry.name)+'</strong> <span style="color:#5F5E5A">— '+escapeHtml(ferry.op)+'</span></div><a href="'+escapeHtml(ferry.url)+'" target="_blank" style="color:#0C447C;text-decoration:underline;font-weight:600">Tider ↗</a></div>';
           }
-          const calls=callsByCustomer[c.name]||[];
+          // Ringeforslag vises kun ved kjøring ≥15 min
+          const calls=driveMin>=15?(callsByCustomer[c.name]||[]):[];
           let callsHtml='';
           if(calls.length>0){
             callsHtml='<div style="margin-top:6px;padding-top:6px;border-top:1px solid #E6D9B8"><div style="font-size:10px;font-weight:700;color:#6D4C00;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">📞 Ringeforslag ('+calls.length+' kunder · '+driveMin+' min)</div>';
@@ -1373,16 +1382,11 @@ function runPlanner(){
             });
             callsHtml+='</div>';
           }
-          // Formatér tid + distanse fra routeInfo (samme strekning som driveMin er beregnet fra)
           const _dh=Math.floor(driveMin/60), _dm=driveMin%60;
           const timeStr=_dh>0?(_dh+'t'+(_dm>0?' '+_dm+'min':'')):(_dm+' min');
           const kmStr=routeInfo&&routeInfo.km?(routeInfo.estimated?'≈':'')+routeInfo.km+' km':'';
           const distLabel=timeStr+(kmStr?' · '+kmStr:'');
           html+='<div class="planner-drive">🚗 Kjøring · '+distLabel+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||area)+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+callsHtml+'</div>';
-        } else if(driveMin>0){
-          const _ri=getRouteInfo(prevCity, c.city||area);
-          const _kmS=_ri&&_ri.km?' · '+(_ri.estimated?'≈':'')+_ri.km+' km':'';
-          html+='<div class="planner-drive" style="background:#F8F7F3;color:#888780">🚗 '+driveMin+' min'+_kmS+'</div>';
         }
         const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
         const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
@@ -1413,6 +1417,19 @@ function runPlanner(){
   window._lastPlan=days;
   window._lastTripMeta=tripMeta;
   window._lastHomeBase=homeBase;
+  if(unplacedPool.length>0){
+    html+='<div style="margin-top:14px;padding:12px 14px;background:#FFF6E6;border:1px solid #E6D9B8;border-radius:10px">';
+    html+='<div style="font-size:13px;font-weight:700;color:#6D4C00;margin-bottom:4px">Fikk ikke plass – '+unplacedPool.length+' kunder</div>';
+    html+='<div style="font-size:11px;color:#888780;margin-bottom:8px">Disse kundene i valgt distrikt fikk ikke plass innenfor antall dager. Legg til dager, eller sett dem inn manuelt.</div>';
+    unplacedPool.forEach(c=>{
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F1EFE8">'
+        +'<span style="flex:1;font-size:12px;font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</span>'
+        +'<span style="font-size:11px;color:#888780;flex-shrink:0">'+escapeHtml(c.city||'')+'</span>'
+        +'<span style="font-size:11px;color:#5F5E5A;flex-shrink:0">'+nok(c.l12||0)+'</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
   html+='<div style="font-size:11px;color:#888780;margin:8px 0;text-align:center;font-style:italic">💡 Dra i ⠿ for å endre rekkefølge · × for å fjerne · knappen for å legge til</div>';
   html+='<button class="btn btn-dark planner-add-btn" onclick="plannerAddToCalendar(window._lastPlan)" style="width:100%;margin-top:8px">📅 Legg inn i kalender</button>';
   html+='</div>';
@@ -1717,7 +1734,11 @@ function recomputeDayTimes(day){
   let oIdx = 0;
   const placed = [];
   day.customers.forEach((c)=>{
-    const dur = (c._duration != null) ? c._duration : _gVisitDuration(c);
+    const _baseDur = (c._duration != null) ? c._duration : _gVisitDuration(c);
+    // _maxVisitDuration kapper lange besøk — men IKKE låste (_timeLocked) eller manuelt justerte (_durationPinned)
+    const dur = (!c._timeLocked && !c._durationPinned && day._maxVisitDuration)
+      ? Math.min(_baseDur, day._maxVisitDuration)
+      : _baseDur;
     if(c._timeLocked && c._lockedStart!=null){
       // ── Låst anker: plasser på eksakt _lockedStart ────────────────────────
       // Konsumér hindringer som slutter FØR det låste tidspunktet
@@ -1752,7 +1773,8 @@ function recomputeDayTimes(day){
       placed.push(c);
     } else {
       // ── Ulåst besøk: standard sekvensiell plassering ──────────────────────
-      let effectiveCutoff = dayEndMin;
+      // Manuelt tillagte besøk kan gå forbi arbeidstid (med varsel til bruker)
+      let effectiveCutoff = c._manuallyAdded ? 23*60 : dayEndMin;
       if(_frItem && _frItem.retMins){
         const _driveToAP = getDriveMin(c.city||'', _frItem.to||'');
         effectiveCutoff = Math.min(dayEndMin, roundTo30(_frItem.retMins - FLIGHT_BUFFER_MIN - _driveToAP));
@@ -1798,6 +1820,16 @@ function recomputeDayTimes(day){
     }
   });
   day.customers = placed;
+  // Sjekk om manuelt tillagte besøk overskred normal arbeidstid
+  day._manualOverflow = false;
+  day._manualOverflowEnd = 0;
+  if(placed.length > 0){
+    const _lastP = placed[placed.length-1];
+    if(_lastP._end > dayEndMin && placed.some(c=>c._manuallyAdded)){
+      day._manualOverflow = true;
+      day._manualOverflowEnd = _lastP._end;
+    }
+  }
   // Oppdater flight-return sin startMins etter reberegning (brukar FLIGHT_BUFFER_MIN, ikkje hardkoda 45).
   if(_frItem && _frItem.retMins){
     const _lastV = placed.length>0 ? placed[placed.length-1] : null;
@@ -1895,10 +1927,20 @@ function setPlanStopDuration(dayIdx, custIdx, newDur){
   // Fjern _autoAdded fra alle eksisterende besøk — de er nå faste
   days[dayIdx].customers.forEach(c=>{ delete c._autoAdded; });
   days[dayIdx].customers[custIdx]._duration = newDur;
+  days[dayIdx].customers[custIdx]._durationPinned = true;
   recomputeDayTimes(days[dayIdx]);
   const added = tryAutoFill(dayIdx);
   renderPlanFromData(days);
   if(added.length) showToast(added.length===1 ? added[0]+' lagt til' : added.length+' kunder lagt til automatisk');
+}
+
+// Sett maks besøkstid per kunde for en dag — kapper lange besøk, respekterer låste og manuelt justerte.
+function setDayMaxVisit(dayIdx, val){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  days[dayIdx]._maxVisitDuration = val ? +val : null;
+  recomputeDayTimes(days[dayIdx]);
+  renderPlanFromData(days);
 }
 
 // Legg til flyetappe på en dag (mellom kundebesøk)
@@ -2293,12 +2335,19 @@ function plannerConfirmAddStop(dayIdx, name){
   if(!days || !days[dayIdx]) return;
   const cust = getCustomers().find(c=>c.name===name);
   if(!cust) return;
-  days[dayIdx].customers.push(Object.assign({}, cust));
-  recomputeDayTimes(days[dayIdx]);
+  const day = days[dayIdx];
+  day.customers.push(Object.assign({}, cust, {_manuallyAdded: true}));
+  recomputeDayTimes(day);
   const modal = document.getElementById('add-stop-modal');
   if(modal) modal.remove();
   renderPlanFromData(days);
-  showToast(name + ' lagt til');
+  if(day._manualOverflow){
+    const hh=String(Math.floor(day._manualOverflowEnd/60)).padStart(2,'0');
+    const mm=String(day._manualOverflowEnd%60).padStart(2,'0');
+    showToast('⚠ '+name+' lagt til – dagen strekker seg til '+hh+':'+mm+' (over arbeidstid)', 'warning');
+  } else {
+    showToast(name + ' lagt til');
+  }
 }
 
 // Sett inn en kunde på en bestemt plass i dagen (bruker splice-mønsteret fra drag-drop).
@@ -2307,12 +2356,18 @@ function plannerInsertStop(dayIdx, insertAt, cust){
   const days = window._lastPlan;
   if(!days || !days[dayIdx]) return;
   const day = days[dayIdx];
-  day.customers.splice(insertAt, 0, Object.assign({}, cust));
+  day.customers.splice(insertAt, 0, Object.assign({}, cust, {_manuallyAdded: true}));
   recomputeDayTimes(day);
   const modal = document.getElementById('insert-pos-modal');
   if(modal) modal.remove();
   renderPlanFromData(days);
-  showToast(cust.name + ' lagt til som stopp ' + (insertAt + 1));
+  if(day._manualOverflow){
+    const hh=String(Math.floor(day._manualOverflowEnd/60)).padStart(2,'0');
+    const mm=String(day._manualOverflowEnd%60).padStart(2,'0');
+    showToast('⚠ '+cust.name+' lagt til – dagen strekker seg til '+hh+':'+mm+' (over arbeidstid)', 'warning');
+  } else {
+    showToast(cust.name + ' lagt til som stopp ' + (insertAt + 1));
+  }
 }
 
 // Vis posisjonvelger: bruker velger plass i rekkefølgen, som kaller plannerInsertStop.
@@ -2380,7 +2435,9 @@ function renderPlanFromData(days){
   days.forEach((day, dayIdx)=>{
     const fixedInfo = day.fixedCount>0 ? ' · '+day.fixedCount+' fast(e) avtale(r)' : '';
     const zoneInfo = day.zones&&day.zones.length>0 ? ' · 📍 '+day.zones.join(' → ') : '';
-    html += '<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span></div>';
+    const _mxOpts2=['','30','45','60','90'].map(v=>'<option value="'+v+'"'+((v&&day._maxVisitDuration===+v)?' selected':(!v&&!day._maxVisitDuration?' selected':''))+'>'+(v?v+' min':'Fri tid')+'</option>').join('');
+    const _mxSel2='<select onchange="setDayMaxVisit('+dayIdx+',this.value)" onclick="event.stopPropagation()" style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:7px;font-size:10px;color:#5F5E5A;padding:2px 5px;cursor:pointer;margin-left:8px;font-weight:600" title="Maks besøkstid per kunde (låste og manuelt justerte besøk røres ikke)">'+_mxOpts2+'</select>';
+    html += '<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span>'+_mxSel2+'</div>';
     if(day.skippedReason){
       const icon = day.isHoliday ? '🎉' : '🌴';
       html += '<div style="background:#FBE9E7;border:1px solid #C62828;color:#C62828;padding:12px 14px;margin:8px 0;border-radius:8px;font-size:13px;font-weight:600">'+icon+' '+escapeHtml(day.skippedReason)+' — ingen besøk planlagt</div></div>';
@@ -2491,6 +2548,22 @@ function renderPlanFromData(days){
     }
     html+='</div>';
   });
+  const _rfdPlanNames=new Set();
+  days.forEach(d=>d.customers.forEach(c=>_rfdPlanNames.add(c.name)));
+  const _rfdUnplaced=(window._lastUnplacedPool||[]).filter(c=>!_rfdPlanNames.has(c.name));
+  if(_rfdUnplaced.length>0){
+    html+='<div style="margin-top:14px;padding:12px 14px;background:#FFF6E6;border:1px solid #E6D9B8;border-radius:10px">';
+    html+='<div style="font-size:13px;font-weight:700;color:#6D4C00;margin-bottom:4px">Fikk ikke plass – '+_rfdUnplaced.length+' kunder</div>';
+    html+='<div style="font-size:11px;color:#888780;margin-bottom:8px">Disse kundene fikk ikke plass i planen. Legg til manuelt, eller endre antall dager.</div>';
+    _rfdUnplaced.forEach(c=>{
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F1EFE8">'
+        +'<span style="flex:1;font-size:12px;font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</span>'
+        +'<span style="font-size:11px;color:#888780;flex-shrink:0">'+escapeHtml(c.city||'')+'</span>'
+        +'<span style="font-size:11px;color:#5F5E5A;flex-shrink:0">'+nok(c.l12||0)+'</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
   html += '<div style="font-size:11px;color:#888780;margin:8px 0;text-align:center;font-style:italic">💡 Dra i ⠿ for å endre rekkefølge · × for å fjerne · knappen for å legge til</div>';
   html += '<button class="btn btn-dark planner-add-btn" onclick="plannerAddToCalendar(window._lastPlan)" style="width:100%;margin-top:8px">📅 Legg inn i kalender</button>';
   html += '</div>';
