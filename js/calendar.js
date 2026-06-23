@@ -811,8 +811,8 @@ function deleteCalEventGeneric(dateKey, startMins, type, label){
 function openApptFor(name, dateKey){
   openAppt(dateKey, null);
   setTimeout(()=>{
-    const sel=document.getElementById('appt-customer');
-    for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===name){sel.selectedIndex=i;break;}}
+    if(typeof window._csp_appt_setSelected==='function') window._csp_appt_setSelected(name);
+    else document.getElementById('appt-customer').value=name;
     apptCustomerChange();
     apptTab('notat', document.querySelectorAll('.appt-tab')[1]);
   }, 80);
@@ -834,25 +834,16 @@ function openAppt(dateKey, evt, presetHour){
   const hE = String(Math.min(h+1,23)).padStart(2,'0');
   document.getElementById('appt-start').value = hS+':00';
   document.getElementById('appt-end').value = hE+':00';
-  const sel = document.getElementById('appt-customer');
-  sel.value = '';
+  document.getElementById('appt-customer').value = '';
   document.getElementById('appt-cinfo').style.display = 'none';
-  function _apptPopulateSel(filtered){
-    const prev=sel.value;
-    sel.innerHTML='<option value="">Velg kunde...</option>'
-      +'<option value="__new__">+ Legg til ny kunde</option>'
-      +'<optgroup label="──────────────────"></optgroup>'
-      +filtered.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
-    if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
-    if(!filtered.length){
-      const opt=document.createElement('option'); opt.value=''; opt.textContent='Ingen kunder funnet'; opt.disabled=true; sel.appendChild(opt);
-    }
-  }
   var apptCsBar=document.getElementById('appt-cs-bar');
-  if(apptCsBar && typeof _csMountSearch==='function'){
-    _csMountSearch(apptCsBar, getCustomers(), _apptPopulateSel, 'appt');
-  } else {
-    _apptPopulateSel(getCustomers());
+  if(apptCsBar && typeof _csMountPicker==='function'){
+    _csMountPicker(apptCsBar, getCustomers(), {
+      prefix:'appt',
+      topRows:[{value:'__new__',label:'+ Legg til ny kunde'}],
+      onPick:function(name){ document.getElementById('appt-customer').value=name; apptCustomerChange(); },
+      onTopRow:function(){ document.getElementById('appt-customer').value=''; openQuickCustomerModal(); }
+    });
   }
   document.getElementById('appt-agenda').value = '';
   document.getElementById('appt-contact').value = '';
@@ -863,7 +854,7 @@ function openAppt(dateKey, evt, presetHour){
   document.getElementById('appt-open-follows').innerHTML = '';
   apptTab('avtale', document.querySelector('.appt-tab'));
   document.getElementById('appt-overlay').classList.add('open');
-  setTimeout(()=>sel.focus(), 100);
+  setTimeout(()=>{ const q=document.getElementById('appt-q'); if(q) q.focus(); }, 100);
 }
 
 function closeAppt(){ document.getElementById('appt-overlay').classList.remove('open'); }

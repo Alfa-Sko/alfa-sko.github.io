@@ -45,6 +45,146 @@ function showSection(id, el){
   if(id==='kart') mapInitOverview();
 }
 
+// ─── KUNDEVELGER MED LIVE-LISTE ───────────────────────────────────────────────
+// Monterer søkefelt + filtre + klikkbar resultatliste i `barEl`.
+// opts: { prefix, topRows:[{value,label}], onPick(name), onTopRow(value), maxRows }
+// Eksponerer window['_csp_'+prefix+'_setSelected'](name) for ekstern pre-valg.
+function _csMountPicker(barEl, customers, opts){
+  if(!barEl) return;
+  opts = opts||{};
+  var prefix = opts.prefix||'cspk';
+  var maxRows = opts.maxRows||25;
+  var topRows = opts.topRows||[];
+  var onPick = opts.onPick||function(){};
+  var onTopRow = opts.onTopRow||function(){};
+  var qId=prefix+'-q', chainId=prefix+'-chain', cityId=prefix+'-city', cstId=prefix+'-cst';
+  var listId=prefix+'-list', badgeId=prefix+'-badge', badgeTxtId=prefix+'-badgetxt';
+
+  var nameById={};
+  if(typeof constellations!=='undefined') constellations.forEach(function(c){ nameById[c.id]=c.name; });
+  var chainSet={},citySet={},cstSet={};
+  customers.forEach(function(c){
+    if(c.chain) chainSet[c.chain]=true;
+    if(c.city) citySet[c.city]=true;
+    if(c.constellation_id) cstSet[c.constellation_id]=true;
+  });
+  var chains=Object.keys(chainSet).sort(function(a,b){ return a.localeCompare(b,'no'); });
+  var cities=Object.keys(citySet).sort(function(a,b){ return a.localeCompare(b,'no'); });
+  var csts=Object.keys(cstSet).map(function(id){ return {id:id,name:nameById[id]||id}; }).sort(function(a,b){ return a.name.localeCompare(b.name,'no'); });
+  var hasFilters=chains.length>1||cities.length>1||csts.length>1;
+
+  var html='';
+  // Valgt-badge (skjult til noe er valgt)
+  html+='<div id="'+badgeId+'" style="display:none;padding:7px 10px;background:#E8F4ED;border:1px solid #B8D4C2;border-radius:8px;margin-bottom:6px;align-items:center;gap:8px">';
+  html+='<span style="color:#1A5C3A;font-size:13px;flex-shrink:0">✓</span>';
+  html+='<span id="'+badgeTxtId+'" style="flex:1;font-size:13px;font-weight:500;color:#1A5C3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>';
+  html+='<button id="'+prefix+'-clearbtn" style="background:none;border:none;font-size:16px;cursor:pointer;color:#888780;padding:0;flex-shrink:0;line-height:1" title="Fjern valg">×</button>';
+  html+='</div>';
+  // Søkefelt
+  html+='<input type="text" id="'+qId+'" placeholder="Søk navn, by, kjede …" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:5px">';
+  // Filtre
+  if(hasFilters){
+    html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px">';
+    if(chains.length>1){
+      html+='<select id="'+chainId+'" style="flex:1;min-width:80px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff"><option value="">Alle kjeder</option>';
+      chains.forEach(function(ch){ html+='<option value="'+escapeHtml(ch)+'">'+escapeHtml(ch)+'</option>'; });
+      html+='</select>';
+    }
+    if(cities.length>1){
+      html+='<select id="'+cityId+'" style="flex:1;min-width:80px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff"><option value="">Alle byer</option>';
+      cities.forEach(function(ci){ html+='<option value="'+escapeHtml(ci)+'">'+escapeHtml(ci)+'</option>'; });
+      html+='</select>';
+    }
+    if(csts.length>1){
+      html+='<select id="'+cstId+'" style="flex:1;min-width:80px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff"><option value="">Alle konst.</option>';
+      csts.forEach(function(c){ html+='<option value="'+c.id+'">'+escapeHtml(c.name)+'</option>'; });
+      html+='</select>';
+    }
+    html+='</div>';
+  }
+  // Resultatliste
+  html+='<div id="'+listId+'" style="border:1px solid #D3D1C7;border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto;background:#fff"></div>';
+  barEl.innerHTML=html;
+
+  var _sel='';
+
+  function _getF(){ return {q:(document.getElementById(qId)||{value:''}).value||'',chain:(document.getElementById(chainId)||{value:''}).value||'',city:(document.getElementById(cityId)||{value:''}).value||'',cst:(document.getElementById(cstId)||{value:''}).value||''}; }
+
+  function _filter(f){
+    var nb={}; if(typeof constellations!=='undefined') constellations.forEach(function(c){ nb[c.id]=c.name; });
+    return customers.filter(function(c){
+      if(f.chain&&(c.chain||'')!==f.chain) return false;
+      if(f.city&&(c.city||'')!==f.city) return false;
+      if(f.cst&&(c.constellation_id||'')!==f.cst) return false;
+      if(f.q){ var cstN=c.constellation_id?(nb[c.constellation_id]||''):''; var hay=[c.name,c.city,c.chain,cstN].filter(Boolean).join(' ').toLowerCase(); var words=f.q.toLowerCase().split(/\s+/).filter(Boolean); if(!words.every(function(w){ return hay.includes(w); })) return false; }
+      return true;
+    });
+  }
+
+  function _renderList(){
+    var filtered=_filter(_getF());
+    var list=document.getElementById(listId);
+    if(!list) return;
+    var h='';
+    topRows.forEach(function(r){
+      var sv=r.value.replace(/'/g,"\\'");
+      h+='<div onclick="'+prefix+'_tr(\''+sv+'\')" style="padding:10px 12px;border-bottom:1px solid #D3D1C7;cursor:pointer;background:#F8F9FC;font-size:13px;font-weight:600;color:#2C2C2A" onmouseover="this.style.background=\'#EEF3FC\'" onmouseout="this.style.background=\'#F8F9FC\'">'+escapeHtml(r.label)+'</div>';
+    });
+    if(!filtered.length){
+      h+='<div style="padding:14px;color:#888780;font-size:13px;text-align:center">Ingen kunder funnet</div>';
+    } else {
+      filtered.slice(0,maxRows).forEach(function(c){
+        var sn=c.name.replace(/'/g,"\\'");
+        var isSel=c.name===_sel;
+        var bg=isSel?'#E8F4ED':'#fff', bgH=isSel?'#D0ECD8':'#F8F7F3';
+        var clrC=c.class==='A'?'#1A7A4E':c.class==='B'?'#BA7517':'#888780';
+        h+='<div onclick="'+prefix+'_pk(\''+sn+'\')" style="padding:9px 12px;border-bottom:1px solid #F1EFE8;cursor:pointer;display:flex;align-items:center;gap:8px;background:'+bg+'" onmouseover="this.style.background=\''+bgH+'\'" onmouseout="this.style.background=\''+bg+'\'">';
+        if(isSel) h+='<span style="color:#1A5C3A;font-size:12px;flex-shrink:0">✓</span>';
+        h+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:'+(isSel?'600':'500')+';color:'+(isSel?'#1A5C3A':'#2C2C2A')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</div>';
+        if(c.city||c.chain) h+='<div style="font-size:11px;color:#888780">'+escapeHtml(c.city||'')+(c.chain?' · '+escapeHtml(c.chain):'')+'</div>';
+        h+='</div>';
+        if(c.class) h+='<span style="flex-shrink:0;font-size:10px;font-weight:700;color:'+clrC+'">'+c.class+'</span>';
+        if(c.l12>0) h+='<span style="flex-shrink:0;font-size:11px;color:#888780">'+Math.round(c.l12/1000)+'k</span>';
+        h+='</div>';
+      });
+      if(filtered.length>maxRows) h+='<div style="padding:6px 12px;color:#888780;font-size:11px;text-align:center;background:#F8F7F3;border-top:1px solid #F1EFE8">'+filtered.length+' treff – skriv mer for å snevre inn</div>';
+    }
+    list.innerHTML=h;
+  }
+
+  function _doSelect(name){
+    _sel=name;
+    var c=customers.find(function(x){ return x.name===name; });
+    var badge=document.getElementById(badgeId), txt=document.getElementById(badgeTxtId);
+    if(badge){ badge.style.display='flex'; }
+    if(txt&&c) txt.textContent=c.name+(c.city?' — '+c.city:'');
+    var qEl=document.getElementById(qId); if(qEl) qEl.value='';
+    _renderList();
+    onPick(name);
+  }
+
+  function _doClear(){
+    _sel='';
+    var badge=document.getElementById(badgeId); if(badge) badge.style.display='none';
+    var qEl=document.getElementById(qId); if(qEl){ qEl.value=''; qEl.focus(); }
+    _renderList();
+    onPick('');
+  }
+
+  window[prefix+'_pk']=_doSelect;
+  window[prefix+'_tr']=function(v){ onTopRow(v); };
+  var cb=document.getElementById(prefix+'-clearbtn');
+  if(cb) cb.addEventListener('click',function(e){ e.stopPropagation(); _doClear(); });
+  var qEl=document.getElementById(qId);
+  if(qEl) qEl.addEventListener('input',function(){ if(_sel){ _sel=''; var b=document.getElementById(badgeId); if(b) b.style.display='none'; onPick(''); } _renderList(); });
+  [chainId,cityId,cstId].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('change',_renderList); });
+  _renderList();
+
+  var api={setSelected:function(name){ if(!name){ _doClear(); } else { var c=customers.find(function(x){ return x.name===name; }); if(c) _doSelect(name); } }};
+  window['_csp_'+prefix+'_setSelected']=api.setSelected;
+  return api;
+}
+
 // ─── SØKBAR KUNDEVELGER — felles komponent ────────────────────────────────────
 // Monterer søkefelt + filtre (kjede/by/konstellasjon) i `barEl`.
 // `onFilter(filteredList)` kalles umiddelbart og ved hvert tastetrykk/endre.

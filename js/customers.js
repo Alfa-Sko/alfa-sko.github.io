@@ -207,8 +207,8 @@ function saveQuickCustomer(){
   saveData('alfa_customers', CUSTOMERS);
   closeQuickCustomerModal();
   populateVisitCustomers();
-  const sel=document.getElementById('visit-customer');
-  sel.value=name;
+  if(typeof window._csp_visit_setSelected==='function') window._csp_visit_setSelected(name);
+  else document.getElementById('visit-customer').value=name;
   showToast('Kunde "'+name+'" opprettet og valgt!');
 }
 
@@ -814,7 +814,10 @@ function closeCustomerDetail(){ renderCustomers(); window.scrollTo(0,0); }
 
 function startNewVisit(name){
   showSection('nytt-besok', document.querySelectorAll('.nav-item')[3]);
-  setTimeout(()=>{const sel=document.getElementById('visit-customer');populateVisitCustomers();sel.value=name;},100);
+  setTimeout(()=>{
+    populateVisitCustomers();
+    setTimeout(()=>{ if(typeof window._csp_visit_setSelected==='function') window._csp_visit_setSelected(name); else document.getElementById('visit-customer').value=name; },50);
+  },100);
 }
 
 // ─── KONTAKTPERSONER ────────────────────────────────────────────────────────

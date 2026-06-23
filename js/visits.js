@@ -1,29 +1,10 @@
 // ─── VISIT FORM ─────────────────────────────────────────────────────────────
 
 
-function _populateVisitSel(filtered){
-  const sel=document.getElementById('visit-customer');
-  if(!sel) return;
-  const prev=sel.value;
-  sel.innerHTML='<option value="">Velg kunde...</option>'
-    +'<option value="__new__">+ Ny kunde (skriv inn nå)</option>'
-    +'<optgroup label="─────────────────"></optgroup>'
-    +filtered.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
-  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
-  if(!filtered.length){
-    const opt=document.createElement('option');
-    opt.value=''; opt.textContent='Ingen kunder funnet'; opt.disabled=true;
-    sel.appendChild(opt);
-  }
-}
-
 function populateVisitCustomers(){
-  const sel=document.getElementById('visit-customer');
-  if(sel) sel.onchange=function(){if(this.value==='__new__'){openQuickCustomerModal();this.value='';}};
   document.getElementById('visit-date').value=TODAY_STR;
   fillHalfHourSlots(document.getElementById('visit-time'), '09:00');
   fillHalfHourSlots(document.getElementById('visit-time-end'), '10:00');
-  // Auto-juster slutt når start endres (sett slutt = start + 1t hvis slutt er <= start)
   const startEl=document.getElementById('visit-time');
   const endEl=document.getElementById('visit-time-end');
   startEl.onchange=function(){
@@ -37,10 +18,13 @@ function populateVisitCustomers(){
     }
   };
   var visitCsBar=document.getElementById('visit-cs-bar');
-  if(visitCsBar && typeof _csMountSearch==='function'){
-    _csMountSearch(visitCsBar, getCustomers(), _populateVisitSel, 'visit');
-  } else {
-    _populateVisitSel(getCustomers());
+  if(visitCsBar && typeof _csMountPicker==='function'){
+    _csMountPicker(visitCsBar, getCustomers(), {
+      prefix:'visit',
+      topRows:[{value:'__new__',label:'+ Ny kunde (skriv inn nå)'}],
+      onPick:function(name){ document.getElementById('visit-customer').value=name; },
+      onTopRow:function(){ openQuickCustomerModal(); }
+    });
   }
 }
 function populateFollowCustomers(){
@@ -49,7 +33,8 @@ function populateFollowCustomers(){
 }
 
 function clearVisitForm(){
-  document.getElementById('visit-customer').value='';
+  if(typeof window._csp_visit_setSelected==='function') window._csp_visit_setSelected('');
+  else document.getElementById('visit-customer').value='';
   document.getElementById('visit-type').value='visit';
   const ow=document.getElementById('visit-other-wrap'); if(ow) ow.style.display='none';
   const ol=document.getElementById('visit-other-label'); if(ol) ol.value='';
