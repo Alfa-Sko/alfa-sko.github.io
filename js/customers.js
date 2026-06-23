@@ -631,7 +631,7 @@ async function _renderCustHistory(name, filter){
     return '<div class="tl-item"><div class="tl-dot tl-dot-visit">'+t.ico+'</div><div class="tl-body">'
       +'<div class="tl-date">'+v.date.split('-').reverse().join('.')+' · '+(v.time||'')+(v.timeEnd?' – '+v.timeEnd:'')+' · '+(v.contact||'')+'</div>'
       +'<div class="tl-title">'+t.lbl+'</div>'
-      +(v.notes?'<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(v.notes)+'</span><div style="display:flex;gap:2px;flex-shrink:0"><button onclick="editVisitNote('+v.id+')" style="background:none;border:none;color:#5F5E5A;font-size:11px;cursor:pointer;padding:0" title="Rediger notat">✏</button><button onclick="clearVisitNote('+v.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0">🗑</button></div></div>':'')
+      +(v.notes?'<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(v.notes)+'</span><div style="display:flex;gap:0;flex-shrink:0"><button onclick="editVisitNote('+v.id+')" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1" title="Rediger notat">✏</button><button onclick="clearVisitNote('+v.id+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">🗑</button></div></div>':'')
       +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
       +ph+'</div></div>';
   }).join('');

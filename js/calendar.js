@@ -135,7 +135,8 @@ function renderMonth(body){
     const evHtml=evs.map(e=>{
       const cc=calEvClass(e.type);
       const safeLabel=(e.label||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      return `<div class="cal-ev ${cc}" style="${calEvDim(e)}" onclick="event.stopPropagation();monthEvClick('${key}')">${calBookedMark(e)}${safeLabel}</div>`;
+      const si=_calStatusIcons(e,key);
+      return `<div class="cal-ev ${cc}" style="${calEvDim(e)}" onclick="event.stopPropagation();monthEvClick('${key}')">${calBookedMark(e)}${safeLabel}${si?'<span style="font-size:9px;margin-left:2px;opacity:0.9">'+si+'</span>':''}</div>`;
     }).join('');
     h+=`<div class="cal-day${wk}${td}${hasEv}${isHol}${isVac}" onclick="jumpToDayFromMonth(${y},${m},${d})"><div class="cal-dnum">${d}</div>${topLabel}${evHtml}${more}</div>`;
   }
@@ -188,6 +189,17 @@ function calEvClass(type){
 function calEvEmoji(type){
   const m={visit:'🏪',phone:'📞',nydalen:'🏢',teams:'👥',clinic:'🎓',external:'📈',dinner:'🍽️',drive:'🚗','drive-auto':'🚗',hotel:'🏨','hotel-start':'🏨',flight:'✈',adm:'💻',lunch:'🍽️',training:'🏃',leisure:'🌿',rental:'🚙',other:'📌'};
   return m[type]||'📅';
+}
+function _calStatusIcons(e, key){
+  if(e.type !== 'visit') return '';
+  const v = e.visitId
+    ? visits.find(x => x.id === e.visitId)
+    : visits.find(x => x.date === key && x.customer === e.label);
+  const hasPhoto = (v && v.photoPaths && v.photoPaths.length > 0)
+    || (custPhotos || []).some(p => p.customer === e.label && p.date === key);
+  const hasNote = !!(v && v.notes && v.notes.trim());
+  const hasFollowup = (window.followups || []).some(f => f.customer === e.label && !f.done);
+  return (hasPhoto ? '📷' : '') + (hasNote ? '📝' : '') + (hasFollowup ? '🔔' : '');
 }
 function calFmt(m){
   const h=Math.floor(m/60),mm=m%60;
@@ -344,6 +356,8 @@ function renderWeek(body){
       html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
       if(showTime) html+='<span style="font-size:9px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
       if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<span onclick="event.stopPropagation();window.open(\'https://www.google.com/maps/dir/'+mf+'/'+mt+'\',\'_blank\')" style="font-size:9px;text-decoration:underline;cursor:pointer;display:block">Maps ↗</span>';}
+      const _siW=_calStatusIcons(e,key);
+      if(_siW) html+='<span style="font-size:9px;display:block;opacity:0.85;line-height:1.2">'+_siW+'</span>';
       html+='<div onmousedown="calResizeStart(event,\''+key+'\',\''+eEnc+'\')" style="position:absolute;bottom:0;left:0;right:0;height:5px;cursor:s-resize;background:rgba(0,0,0,0.12);border-radius:0 0 3px 3px"></div>';
       html+='</div>';
     });
@@ -398,6 +412,8 @@ function renderDay(body){
     html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;padding:4px 8px;font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
     if(showTime) html+='<span style="font-size:10px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
     if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="font-size:11px;color:#1565C0;text-decoration:underline;display:block;margin-top:2px">🗺 Åpne i Google Maps ↗</a>';}
+    const _siD=_calStatusIcons(e,key);
+    if(_siD) html+='<span style="font-size:11px;display:block;margin-top:2px;line-height:1;opacity:0.85">'+_siD+'</span>';
     html+='<div onmousedown="calResizeStart(event,\''+key+'\',\''+eEnc+'\')" style="position:absolute;bottom:0;left:0;right:0;height:6px;cursor:s-resize;background:rgba(0,0,0,0.12);border-radius:0 0 4px 4px"></div>';
     html+='</div>';
   });

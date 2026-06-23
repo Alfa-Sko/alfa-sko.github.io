@@ -178,10 +178,10 @@ function renderTimeline(){
       html+='</div>';
       if(it.notes){
         const _noteEditBtn=it.kind==='activity'
-          ?'<button onclick="editVisitNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Rediger notat">✏</button>'
-          +'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button>'
+          ?'<button onclick="editVisitNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Rediger notat">✏</button>'
+          +'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Slett notat">🗑</button>'
           :it.kind==='free'
-          ?'<button onclick="editFreeNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Rediger notat">✏</button>'
+          ?'<button onclick="editFreeNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Rediger notat">✏</button>'
           :'';
         html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span><div style="display:flex;gap:2px;flex-shrink:0">'+_noteEditBtn+'</div></div>';
       }
