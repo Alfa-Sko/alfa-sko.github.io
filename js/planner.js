@@ -263,17 +263,25 @@ function rpInitRegionSelect(){
   const sel = document.getElementById('rp-region');
   if(!sel) return;
   const sd=document.getElementById('rp-startdate'); if(sd && !sd.value) sd.value=(typeof TODAY_STR!=='undefined'?TODAY_STR:new Date().toISOString().slice(0,10));
-  const present = rpAllRegionsPresent();
-  // Sorter regioner etter antall kunder (flest først), men løft mitt territorium øverst
-  const territory = ['Trøndelag','Nordland','Troms','Finnmark','Svalbard'];
-  const regions = Object.keys(present).sort((a,b)=>{
-    const ta=territory.indexOf(a), tb=territory.indexOf(b);
-    if(ta!==-1 && tb!==-1) return ta-tb;
-    if(ta!==-1) return -1;
-    if(tb!==-1) return 1;
-    return present[b]-present[a];
-  });
-  sel.innerHTML = regions.map(r=>'<option value="'+escapeHtml(r)+'">'+escapeHtml(r)+' ('+present[r]+')</option>').join('');
+  const present = rpAllRegionsPresent(); // {region: antall kunder}
+
+  // Ledere ser alle regioner (ingen filter)
+  const isLeader = !!(window._leaderHome || window._bootLeader ||
+    (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
+  const myDistrict = !isLeader && window._myProfile && window._myProfile.district;
+  const allowedRegions = myDistrict ? DISTRICT_TO_REGIONS[myDistrict] : null;
+
+  let regions;
+  if(allowedRegions){
+    // Vis alle regioner i brukerens distrikt (inkl. 0 kunder) – sortert flest kunder øverst
+    regions = allowedRegions.slice().sort((a,b)=>(present[b]||0)-(present[a]||0));
+    sel.innerHTML = regions.map(r=>'<option value="'+escapeHtml(r)+'">'+escapeHtml(r)+' ('+( present[r]||0)+')</option>').join('');
+  } else {
+    // Leder eller ukjent distrikt: vis alle regioner som finnes blant kundene
+    regions = Object.keys(present).sort((a,b)=>(present[b]||0)-(present[a]||0));
+    sel.innerHTML = regions.map(r=>'<option value="'+escapeHtml(r)+'">'+escapeHtml(r)+' ('+present[r]+')</option>').join('');
+  }
+
   // Startby fra profil
   const startEl = document.getElementById('rp-start');
   if(startEl && !startEl.value) startEl.value = (userProfile&&userProfile.homeCity)||'';

@@ -194,6 +194,12 @@ const CITY_COORDS = {
   'Ulsteinvik':[62.3453,5.8458],'Ørsta':[62.2011,6.1333],'Volda':[62.1487,6.0747],'Brattvåg':[62.5917,6.5417],
 };
 const BIG_CITIES = ['Tromsø','Trondheim','Bodø','Alta','Harstad','Oslo','Bergen','Stavanger','Kristiansand','Drammen','Fredrikstad/Sarpsborg'];
+// Mapping: profiles.district → tillatte regioner i regionplanleggeren.
+// Ledere (sjef/ceo) og ukjente distrikter filtreres ikke (ser alt).
+const DISTRICT_TO_REGIONS = {
+  'Midt/Nord-Norge + Svalbard': ['Trøndelag','Nordland','Troms','Finnmark','Svalbard'],
+  'Vest/Sør-Norge': ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
+};
 // Naboregioner — styrer hvilke bolker som vises under den valgte regionen.
 const REGION_NEIGHBORS = {
   'Trøndelag':['Nordland','Møre og Romsdal','Innlandet'],
