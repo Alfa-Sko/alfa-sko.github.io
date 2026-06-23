@@ -270,7 +270,6 @@ function rpInitRegionSelect(){
     (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
   const myDistrict = !isLeader && window._myProfile && window._myProfile.district;
   const allowedRegions = myDistrict ? DISTRICT_TO_REGIONS[myDistrict] : null;
-  _rpAllowedRegions = allowedRegions || null; // brukes av _rpBaseCustomers()
 
   let regions;
   if(allowedRegions){
@@ -310,12 +309,19 @@ function rpBuildBlocks(selectedRegion, customers){
 }
 
 let _rpLastFiltered = null; // siste filtrerte kundeliste fra søkfeltet
-let _rpAllowedRegions = null; // satt av rpInitRegionSelect; null = ingen filter (ledere)
 
 function _rpBaseCustomers(){
   const all = getCustomers();
-  if(!_rpAllowedRegions) return all;
-  return all.filter(c => _rpAllowedRegions.includes(rpRegionOfCustomer(c)));
+  // Les _myProfile direkte ved kjøretidspunktet — profilen lastes async og kan
+  // ankomme etter at rpInitRegionSelect allerede har kjørt med null profil.
+  const isLeader = !!(window._leaderHome || window._bootLeader ||
+    (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
+  if(isLeader) return all;
+  const district = window._myProfile && window._myProfile.district;
+  if(!district || typeof DISTRICT_TO_REGIONS === 'undefined') return all;
+  const allowed = DISTRICT_TO_REGIONS[district];
+  if(!allowed || !allowed.length) return all;
+  return all.filter(c => allowed.includes(rpRegionOfCustomer(c)));
 }
 
 function rpRenderCustomerList(){
