@@ -176,6 +176,22 @@ const CITY_COORDS = {
   'Oslo':[59.9139,10.7522],'Bergen':[60.3913,5.3221],'Stavanger':[58.9700,5.7331],
   'Kristiansand':[58.1599,8.0182],'Ålesund':[62.4722,6.1495],'Molde':[62.7375,7.1591],
   'Kristiansund':[63.1115,7.7282],
+  // Sør-/Øst-Norge (Håvards og andre selskapers distrikter)
+  'Drammen':[59.7439,10.2045],'Kongsberg':[59.6719,9.6456],'Mjøndalen':[59.7419,10.0197],
+  'Tønsberg':[59.2683,10.4086],'Sandefjord':[59.1306,10.2194],'Larvik':[59.0567,10.0275],'Horten':[59.4183,10.4831],
+  'Skien':[59.2083,9.6044],'Porsgrunn':[59.1428,9.6556],'Porsgrunn/Skien':[59.1728,9.6300],'Notodden':[59.5592,9.2614],'Seljord':[59.4889,8.6436],
+  'Hamar':[60.7945,11.0678],'Lillehammer':[61.1153,10.4661],'Gjøvik':[60.7961,10.6917],'Elverum':[60.8833,11.5667],'Kongsvinger':[60.1902,11.9992],'Brumunddal':[60.8850,10.9650],
+  'Moss':[59.4333,10.6667],'Fredrikstad/Sarpsborg':[59.2181,10.9298],'Halden':[59.1253,11.3875],'Askim':[59.5850,11.1650],'Mysen':[59.5500,11.3333],
+  'Sandvika':[59.8900,10.5267],'Asker':[59.8330,10.4400],'Lørenskog':[59.9233,10.9567],'Kolbotn':[59.8047,10.7958],'Ski':[59.7217,10.8369],'Ås':[59.6656,10.7889],'Drøbak':[59.6650,10.6350],'Lillestrøm':[59.9567,11.0500],'Jessheim':[60.1431,11.1736],
+  'Arendal':[58.4617,8.7722],'Grimstad':[58.3406,8.5886],'Lillesand':[58.2500,8.3800],'Mandal':[58.0281,7.4614],'Farsund':[58.0953,6.8014],'Søgne':[58.0956,7.7917],'Evje':[58.5869,7.9150],
+  // Rogaland
+  'Sandnes':[58.8522,5.7322],'Stavanger/Sandnes':[58.9700,5.7331],'Bryne':[58.7333,5.6500],'Egersund':[58.4500,6.0017],'Haugesund':[59.4133,5.2683],'Kopervik':[59.2839,5.3047],
+  // Vestland
+  'Voss':[60.6281,6.4162],'Os':[60.1889,5.4736],'Askøy':[60.3994,5.1450],'Knarrevik/Straume':[60.3636,5.1847],'Norheimsund':[60.3753,6.1450],'Leirvik':[59.7775,5.5028],
+  'Florø':[61.5993,5.0322],'Førde':[61.4519,5.8597],'Sunnfjord':[61.4519,5.8597],'Sogndal':[61.2308,7.0994],
+  'Sandane':[61.7700,6.2200],'Nordfjordeid':[61.9100,5.9900],
+  // Møre og Romsdal
+  'Ulsteinvik':[62.3453,5.8458],'Ørsta':[62.2011,6.1333],'Volda':[62.1487,6.0747],'Brattvåg':[62.5917,6.5417],
 };
 const BIG_CITIES = ['Tromsø','Trondheim','Bodø','Alta','Harstad','Oslo','Bergen','Stavanger','Kristiansand','Drammen','Fredrikstad/Sarpsborg'];
 // Naboregioner — styrer hvilke bolker som vises under den valgte regionen.
@@ -243,7 +259,7 @@ const CITY_TO_REGION = {
   'Hamar':'Innlandet','Gjøvik':'Innlandet','Lillehammer':'Innlandet','Elverum':'Innlandet','Kongsvinger':'Innlandet','Brumunddal':'Innlandet',
   'Kristiansand':'Agder','Arendal':'Agder','Grimstad':'Agder','Mandal':'Agder','Lillesand':'Agder','Søgne':'Agder','Farsund':'Agder','Evje':'Agder',
   'Stavanger/Sandnes':'Rogaland','Haugesund':'Rogaland','Bryne':'Rogaland','Egersund':'Rogaland','Kopervik':'Rogaland','Stavanger':'Rogaland','Sandnes':'Rogaland',
-  'Bergen':'Vestland','Askøy':'Vestland','Knarrevik/Straume':'Vestland','Førde':'Vestland','Florø':'Vestland','Voss':'Vestland','Os':'Vestland','Leirvik':'Vestland','Sogndal':'Vestland','Sunnfjord':'Vestland','Nordfjordeid':'Vestland','Norheimsund':'Vestland',
+  'Bergen':'Vestland','Askøy':'Vestland','Knarrevik/Straume':'Vestland','Førde':'Vestland','Florø':'Vestland','Voss':'Vestland','Os':'Vestland','Leirvik':'Vestland','Sogndal':'Vestland','Sunnfjord':'Vestland','Nordfjordeid':'Vestland','Norheimsund':'Vestland','Sandane':'Vestland',
   'Ålesund':'Møre og Romsdal','Molde':'Møre og Romsdal','Kristiansund':'Møre og Romsdal','Ulsteinvik':'Møre og Romsdal','Ørsta':'Møre og Romsdal','Volda':'Møre og Romsdal','Brattvåg':'Møre og Romsdal'
 };
 
