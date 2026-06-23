@@ -129,12 +129,14 @@ function mapInitOverview() {
                     : c.geo === 'manuell'  ? '📍 manuelt koordinat'
                     : '○ by-nivå (omtrentlig)';
 
+      const safeName = c.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       marker.bindPopup(
         `<div style="min-width:190px;font-family:inherit">` +
         `<div style="font-weight:700;font-size:14px;margin-bottom:3px">${c.name}</div>` +
         `<div style="font-size:12px;color:#555;margin-bottom:7px">${c.city || ''}${c.chain ? ' · ' + c.chain : ''}</div>` +
         `<div style="font-size:12px;margin-bottom:4px">${clsBadge}<span style="color:#666">L12: ${l12str}</span></div>` +
         `<div style="font-size:10px;color:#999;margin-top:4px;border-top:1px solid #eee;padding-top:4px">${precTxt}</div>` +
+        `<button onclick="goToCustomer('${safeName}')" style="margin-top:8px;width:100%;padding:6px 8px;background:#2C2C2A;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">🏪 Åpne kundekort</button>` +
         `</div>`,
         { maxWidth: 260 }
       );
