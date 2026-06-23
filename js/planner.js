@@ -270,6 +270,7 @@ function rpInitRegionSelect(){
     (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
   const myDistrict = !isLeader && window._myProfile && window._myProfile.district;
   const allowedRegions = myDistrict ? DISTRICT_TO_REGIONS[myDistrict] : null;
+  _rpAllowedRegions = allowedRegions || null; // brukes av _rpBaseCustomers()
 
   let regions;
   if(allowedRegions){
@@ -309,26 +310,34 @@ function rpBuildBlocks(selectedRegion, customers){
 }
 
 let _rpLastFiltered = null; // siste filtrerte kundeliste fra søkfeltet
+let _rpAllowedRegions = null; // satt av rpInitRegionSelect; null = ingen filter (ledere)
+
+function _rpBaseCustomers(){
+  const all = getCustomers();
+  if(!_rpAllowedRegions) return all;
+  return all.filter(c => _rpAllowedRegions.includes(rpRegionOfCustomer(c)));
+}
 
 function rpRenderCustomerList(){
   const selEl = document.getElementById('rp-region');
   if(!selEl) return;
   const region = selEl.value;
+  const base = _rpBaseCustomers();
   const csBar = document.getElementById('rp-cs-bar');
   if(csBar && typeof _csMountSearch === 'function'){
     if(csBar.dataset.region !== region){
       csBar.dataset.region = region;
       _rpLastFiltered = null;
-      _csMountSearch(csBar, getCustomers(), function(filtered){
+      _csMountSearch(csBar, base, function(filtered){
         _rpLastFiltered = filtered;
         _rpDoRenderList(region, filtered);
       }, 'rp');
       return;
     }
-    _rpDoRenderList(region, _rpLastFiltered || getCustomers());
+    _rpDoRenderList(region, _rpLastFiltered || base);
     return;
   }
-  _rpDoRenderList(region, getCustomers());
+  _rpDoRenderList(region, base);
 }
 
 function _rpDoRenderList(region, customers){
@@ -377,7 +386,7 @@ function rpToggle(id, on){
 
 function rpClearSelection(){
   _rpSelected = {};
-  _rpDoRenderList((document.getElementById('rp-region')||{}).value||'', _rpLastFiltered||getCustomers());
+  _rpDoRenderList((document.getElementById('rp-region')||{}).value||'', _rpLastFiltered||_rpBaseCustomers());
 }
 
 function rpUpdateSelectionBar(){
