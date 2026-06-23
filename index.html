@@ -188,6 +188,7 @@
         <div class="card-title">Registrer ny aktivitet</div>
         <div class="form-group">
           <label>Kunde</label>
+          <div id="visit-cs-bar"></div>
           <select id="visit-customer"><option value="">Velg kunde...</option></select>
         </div>
         <div class="form-group">
@@ -601,6 +602,7 @@
         <div style="font-size:11px;color:#A8A6A0;margin-top:10px">Møtelengde: A-kunde 60 min · B 45 min · C 30 min. Dagstart følger arbeidstiden i profilen din. Flere kunder enn det er plass til? De med lavest omsetning utsettes.</div>
       </div>
 
+      <div id="rp-cs-bar"></div>
       <div id="rp-customer-list"></div>
 
       <div style="position:sticky;bottom:0;background:#F1EFE8;padding:12px 0;margin-top:8px;border-top:1px solid #D3D1C7">
@@ -985,6 +987,7 @@
       <div class="appt-panel active" id="appt-panel-avtale">
         <div class="appt-slbl">Kunde</div>
         <div class="form-group" style="margin-bottom:10px">
+          <div id="appt-cs-bar"></div>
           <select id="appt-customer" onchange="apptCustomerChange()"><option value="">Velg kunde...</option></select>
         </div>
         <div id="appt-cinfo" class="appt-cinfo" style="display:none">

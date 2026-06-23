@@ -280,9 +280,10 @@ function rpInitRegionSelect(){
 }
 
 // Bygg bolker: valgt region øverst, så naboregioner i egne bolker.
-function rpBuildBlocks(selectedRegion){
+function rpBuildBlocks(selectedRegion, customers){
+  customers = customers || getCustomers();
   const byRegion = {};
-  getCustomers().forEach(c=>{
+  customers.forEach(c=>{
     const r = rpRegionOfCustomer(c);
     (byRegion[r]=byRegion[r]||[]).push(c);
   });
@@ -299,12 +300,38 @@ function rpBuildBlocks(selectedRegion){
   });
 }
 
+let _rpLastFiltered = null; // siste filtrerte kundeliste fra søkfeltet
+
 function rpRenderCustomerList(){
+  const selEl = document.getElementById('rp-region');
+  if(!selEl) return;
+  const region = selEl.value;
+  const csBar = document.getElementById('rp-cs-bar');
+  if(csBar && typeof _csMountSearch === 'function'){
+    if(csBar.dataset.region !== region){
+      csBar.dataset.region = region;
+      _rpLastFiltered = null;
+      _csMountSearch(csBar, getCustomers(), function(filtered){
+        _rpLastFiltered = filtered;
+        _rpDoRenderList(region, filtered);
+      }, 'rp');
+      return;
+    }
+    _rpDoRenderList(region, _rpLastFiltered || getCustomers());
+    return;
+  }
+  _rpDoRenderList(region, getCustomers());
+}
+
+function _rpDoRenderList(region, customers){
   const host = document.getElementById('rp-customer-list');
-  const sel = document.getElementById('rp-region');
-  if(!host||!sel) return;
-  const region = sel.value;
-  const blocks = rpBuildBlocks(region);
+  if(!host) return;
+  const blocks = rpBuildBlocks(region, customers);
+  if(!blocks.length){
+    host.innerHTML='<div style="padding:24px;text-align:center;color:#888780;font-size:13px">Ingen kunder funnet for dette søket</div>';
+    rpUpdateSelectionBar();
+    return;
+  }
   let html='';
   blocks.forEach(b=>{
     const sumL12 = b.customers.reduce((s,c)=>s+(c.l12||0),0);
@@ -342,7 +369,7 @@ function rpToggle(id, on){
 
 function rpClearSelection(){
   _rpSelected = {};
-  rpRenderCustomerList();
+  _rpDoRenderList((document.getElementById('rp-region')||{}).value||'', _rpLastFiltered||getCustomers());
 }
 
 function rpUpdateSelectionBar(){

@@ -45,6 +45,97 @@ function showSection(id, el){
   if(id==='kart') mapInitOverview();
 }
 
+// ─── SØKBAR KUNDEVELGER — felles komponent ────────────────────────────────────
+// Monterer søkefelt + filtre (kjede/by/konstellasjon) i `barEl`.
+// `onFilter(filteredList)` kalles umiddelbart og ved hvert tastetrykk/endre.
+// `prefix` brukes som ID-prefiks for søkefeltene så flere instanser kan eksistere.
+function _csMountSearch(barEl, customers, onFilter, prefix){
+  if(!barEl) return;
+  prefix = prefix || 'cs';
+  var qId = prefix+'-cs-q';
+  var chainId = prefix+'-cs-chain';
+  var cityId = prefix+'-cs-city';
+  var cstId = prefix+'-cs-cst';
+
+  var nameById = {};
+  if(typeof constellations !== 'undefined') constellations.forEach(function(c){ nameById[c.id]=c.name; });
+
+  var chains = [];
+  var cities = [];
+  var csts = [];
+  (function(){
+    var chainSet={}, citySet={}, cstSet={};
+    customers.forEach(function(c){
+      if(c.chain) chainSet[c.chain]=true;
+      if(c.city) citySet[c.city]=true;
+      if(c.constellation_id) cstSet[c.constellation_id]=true;
+    });
+    chains = Object.keys(chainSet).sort(function(a,b){ return a.localeCompare(b,'no'); });
+    cities = Object.keys(citySet).sort(function(a,b){ return a.localeCompare(b,'no'); });
+    csts = Object.keys(cstSet).map(function(id){ return {id:id,name:nameById[id]||id}; }).sort(function(a,b){ return a.name.localeCompare(b.name,'no'); });
+  })();
+
+  var html = '<div style="margin-bottom:6px">';
+  html += '<input type="text" id="'+qId+'" placeholder="Søk navn, by, kjede …" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box';
+  if(chains.length>1||cities.length>1||csts.length>1) html += ';margin-bottom:5px';
+  html += '">';
+  if(chains.length>1||cities.length>1||csts.length>1){
+    html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    if(chains.length>1){
+      html += '<select id="'+chainId+'" style="flex:1;min-width:88px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff">';
+      html += '<option value="">Alle kjeder</option>';
+      chains.forEach(function(ch){ html += '<option value="'+escapeHtml(ch)+'">'+escapeHtml(ch)+'</option>'; });
+      html += '</select>';
+    }
+    if(cities.length>1){
+      html += '<select id="'+cityId+'" style="flex:1;min-width:88px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff">';
+      html += '<option value="">Alle byer</option>';
+      cities.forEach(function(ci){ html += '<option value="'+escapeHtml(ci)+'">'+escapeHtml(ci)+'</option>'; });
+      html += '</select>';
+    }
+    if(csts.length>1){
+      html += '<select id="'+cstId+'" style="flex:1;min-width:88px;padding:4px 6px;border:1px solid #D3D1C7;border-radius:7px;font-size:11px;color:#5F5E5A;background:#fff">';
+      html += '<option value="">Alle konst.</option>';
+      csts.forEach(function(c){ html += '<option value="'+c.id+'">'+escapeHtml(c.name)+'</option>'; });
+      html += '</select>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  barEl.innerHTML = html;
+
+  function runFilter(){
+    var q = (document.getElementById(qId)||{value:''}).value||'';
+    var chain = (document.getElementById(chainId)||{value:''}).value||'';
+    var city = (document.getElementById(cityId)||{value:''}).value||'';
+    var cst = (document.getElementById(cstId)||{value:''}).value||'';
+    var nb = {};
+    if(typeof constellations !== 'undefined') constellations.forEach(function(c){ nb[c.id]=c.name; });
+    var filtered = customers.filter(function(c){
+      if(chain && (c.chain||'')!==chain) return false;
+      if(city && (c.city||'')!==city) return false;
+      if(cst && (c.constellation_id||'')!==cst) return false;
+      if(q){
+        var cstN = c.constellation_id ? (nb[c.constellation_id]||'') : '';
+        var hay = [c.name,c.city,c.chain,cstN].filter(Boolean).join(' ').toLowerCase();
+        var words = q.toLowerCase().split(/\s+/).filter(Boolean);
+        if(!words.every(function(w){ return hay.includes(w); })) return false;
+      }
+      return true;
+    });
+    onFilter(filtered);
+  }
+
+  [qId, chainId, cityId, cstId].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){
+      el.addEventListener('input', runFilter);
+      el.addEventListener('change', runFilter);
+    }
+  });
+  runFilter();
+}
+
 function showCustomerListModal(title, customers){
   if(!customers || customers.length===0){
     showToast('Listen er tom');

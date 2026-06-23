@@ -835,9 +835,25 @@ function openAppt(dateKey, evt, presetHour){
   document.getElementById('appt-start').value = hS+':00';
   document.getElementById('appt-end').value = hE+':00';
   const sel = document.getElementById('appt-customer');
-  sel.innerHTML = '<option value="">Velg kunde...</option>'+'<option value="__new__">+ Legg til ny kunde</option>'+'<optgroup label="──────────────────"></optgroup>'+getCustomers().map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
   sel.value = '';
   document.getElementById('appt-cinfo').style.display = 'none';
+  function _apptPopulateSel(filtered){
+    const prev=sel.value;
+    sel.innerHTML='<option value="">Velg kunde...</option>'
+      +'<option value="__new__">+ Legg til ny kunde</option>'
+      +'<optgroup label="──────────────────"></optgroup>'
+      +filtered.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
+    if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+    if(!filtered.length){
+      const opt=document.createElement('option'); opt.value=''; opt.textContent='Ingen kunder funnet'; opt.disabled=true; sel.appendChild(opt);
+    }
+  }
+  var apptCsBar=document.getElementById('appt-cs-bar');
+  if(apptCsBar && typeof _csMountSearch==='function'){
+    _csMountSearch(apptCsBar, getCustomers(), _apptPopulateSel, 'appt');
+  } else {
+    _apptPopulateSel(getCustomers());
+  }
   document.getElementById('appt-agenda').value = '';
   document.getElementById('appt-contact').value = '';
   document.getElementById('appt-notes').value = '';

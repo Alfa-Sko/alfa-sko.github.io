@@ -1,10 +1,25 @@
 // ─── VISIT FORM ─────────────────────────────────────────────────────────────
 
 
+function _populateVisitSel(filtered){
+  const sel=document.getElementById('visit-customer');
+  if(!sel) return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">Velg kunde...</option>'
+    +'<option value="__new__">+ Ny kunde (skriv inn nå)</option>'
+    +'<optgroup label="─────────────────"></optgroup>'
+    +filtered.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name} — ${c.city}</option>`).join('');
+  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  if(!filtered.length){
+    const opt=document.createElement('option');
+    opt.value=''; opt.textContent='Ingen kunder funnet'; opt.disabled=true;
+    sel.appendChild(opt);
+  }
+}
+
 function populateVisitCustomers(){
   const sel=document.getElementById('visit-customer');
-  sel.innerHTML='<option value="">Velg kunde...</option>'+'<option value="__new__">+ Ny kunde (skriv inn nå)</option>'+'<optgroup label="─────────────────"></optgroup>'+getCustomers().map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
-  sel.onchange=function(){if(this.value==='__new__'){openQuickCustomerModal();this.value='';}};
+  if(sel) sel.onchange=function(){if(this.value==='__new__'){openQuickCustomerModal();this.value='';}};
   document.getElementById('visit-date').value=TODAY_STR;
   fillHalfHourSlots(document.getElementById('visit-time'), '09:00');
   fillHalfHourSlots(document.getElementById('visit-time-end'), '10:00');
@@ -21,6 +36,12 @@ function populateVisitCustomers(){
       if([...endEl.options].some(o=>o.value===hh+':'+mm)) endEl.value=hh+':'+mm;
     }
   };
+  var visitCsBar=document.getElementById('visit-cs-bar');
+  if(visitCsBar && typeof _csMountSearch==='function'){
+    _csMountSearch(visitCsBar, getCustomers(), _populateVisitSel, 'visit');
+  } else {
+    _populateVisitSel(getCustomers());
+  }
 }
 function populateFollowCustomers(){
   const sel=document.getElementById('follow-customer');
