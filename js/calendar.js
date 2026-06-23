@@ -198,7 +198,7 @@ function _calStatusIcons(e, key){
   const hasPhoto = (v && v.photoPaths && v.photoPaths.length > 0)
     || (custPhotos || []).some(p => p.customer === e.label && p.date === key);
   const hasNote = !!(v && v.notes && v.notes.trim());
-  const hasFollowup = (window.followups || []).some(f => f.customer === e.label && !f.done);
+  const hasFollowup = (typeof followups !== 'undefined' ? followups : []).some(f => f.customer === e.label && !f.done);
   return (hasPhoto ? '📷' : '') + (hasNote ? '📝' : '') + (hasFollowup ? '🔔' : '');
 }
 function calFmt(m){
