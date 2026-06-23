@@ -261,7 +261,7 @@ function rpAllRegionsPresent(){
 
 function rpInitRegionSelect(){
   const sel = document.getElementById('rp-region');
-  if(!sel) return;
+  if(!sel){ console.log('[RP] rpInitRegionSelect: rp-region DOM-element FINNES IKKE → tidlig retur'); return; }
   const sd=document.getElementById('rp-startdate'); if(sd && !sd.value) sd.value=(typeof TODAY_STR!=='undefined'?TODAY_STR:new Date().toISOString().slice(0,10));
   const present = rpAllRegionsPresent(); // {region: antall kunder}
 
@@ -270,6 +270,7 @@ function rpInitRegionSelect(){
     (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
   const myDistrict = !isLeader && window._myProfile && window._myProfile.district;
   const allowedRegions = myDistrict ? DISTRICT_TO_REGIONS[myDistrict] : null;
+  console.log('[RP] rpInitRegionSelect:', {isLeader, myDistrict, allowedRegions, _myProfile: window._myProfile ? {role:window._myProfile.role, district:window._myProfile.district} : null});
 
   let regions;
   if(allowedRegions){
@@ -289,7 +290,9 @@ function rpInitRegionSelect(){
 
 // Bygg bolker: valgt region øverst, så naboregioner i egne bolker.
 function rpBuildBlocks(selectedRegion, customers){
+  const _usedFallback = !customers;
   customers = customers || getCustomers();
+  console.log('[RP] rpBuildBlocks: region=', selectedRegion, '| kunder inn=', customers.length, '| fallback til getCustomers()=', _usedFallback);
   const byRegion = {};
   customers.forEach(c=>{
     const r = rpRegionOfCustomer(c);
@@ -312,16 +315,22 @@ let _rpLastFiltered = null; // siste filtrerte kundeliste fra søkfeltet
 
 function _rpBaseCustomers(){
   const all = getCustomers();
-  // Les _myProfile direkte ved kjøretidspunktet — profilen lastes async og kan
-  // ankomme etter at rpInitRegionSelect allerede har kjørt med null profil.
   const isLeader = !!(window._leaderHome || window._bootLeader ||
     (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
-  if(isLeader) return all;
+  if(isLeader){ console.log('[RP] _rpBaseCustomers: leder → returnerer alle', all.length, 'kunder'); return all; }
   const district = window._myProfile && window._myProfile.district;
-  if(!district || typeof DISTRICT_TO_REGIONS === 'undefined') return all;
+  if(!district || typeof DISTRICT_TO_REGIONS === 'undefined'){
+    console.log('[RP] _rpBaseCustomers: ingen district/DISTRICT_TO_REGIONS → returnerer alle', all.length, 'kunder. district=', district, 'DISTRICT_TO_REGIONS defined=', typeof DISTRICT_TO_REGIONS !== 'undefined');
+    return all;
+  }
   const allowed = DISTRICT_TO_REGIONS[district];
-  if(!allowed || !allowed.length) return all;
-  return all.filter(c => allowed.includes(rpRegionOfCustomer(c)));
+  if(!allowed || !allowed.length){
+    console.log('[RP] _rpBaseCustomers: district=', district, '→ ingen allowed-liste i DISTRICT_TO_REGIONS → returnerer alle', all.length);
+    return all;
+  }
+  const filtered = all.filter(c => allowed.includes(rpRegionOfCustomer(c)));
+  console.log('[RP] _rpBaseCustomers: district=', district, '→ allowed=', allowed, '→ inn:', all.length, '→ ut:', filtered.length);
+  return filtered;
 }
 
 function rpRenderCustomerList(){
@@ -329,12 +338,14 @@ function rpRenderCustomerList(){
   if(!selEl) return;
   const region = selEl.value;
   const base = _rpBaseCustomers();
+  console.log('[RP] rpRenderCustomerList: region=', region, '| base.length=', base.length);
   const csBar = document.getElementById('rp-cs-bar');
   if(csBar && typeof _csMountSearch === 'function'){
     if(csBar.dataset.region !== region){
       csBar.dataset.region = region;
       _rpLastFiltered = null;
       _csMountSearch(csBar, base, function(filtered){
+        console.log('[RP] _csMountSearch callback: filtered.length=', filtered.length);
         _rpLastFiltered = filtered;
         _rpDoRenderList(region, filtered);
       }, 'rp');
@@ -347,6 +358,7 @@ function rpRenderCustomerList(){
 }
 
 function _rpDoRenderList(region, customers){
+  console.log('[RP] _rpDoRenderList: region=', region, '| customers.length=', customers ? customers.length : 'undefined/null');
   const host = document.getElementById('rp-customer-list');
   if(!host) return;
   const blocks = rpBuildBlocks(region, customers);

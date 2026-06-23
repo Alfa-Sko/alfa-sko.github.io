@@ -34,7 +34,7 @@ function showSection(id, el){
   if(id==='lookbooks'){ setTimeout(lbRender,0); setTimeout(sbRenderCatalogs,0); }
   if(id==='kalender') renderCal();
   if(id==='kunder') renderCustomers();
-  if(id==='regionplan'){ rpInitRegionSelect(); rpRenderCustomerList(); }
+  if(id==='regionplan'){ console.log('[RP] showSection regionplan — _myProfile:', window._myProfile ? {role:window._myProfile.role, district:window._myProfile.district} : null); rpInitRegionSelect(); rpRenderCustomerList(); }
   if(id==='notater') renderNotes();
   if(id==='oversikt') renderOverview();
   if(id==='oppfolging'){ populateFollowCustomers(); renderFollowups(); }
@@ -336,6 +336,7 @@ function modeSelectRegion(){
   document.querySelectorAll('.section').forEach(s=>s.style.display='none');
   document.getElementById('sec-regionplan').style.display='block';
   if(_modeNavEl){document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));_modeNavEl.classList.add('active');}
+  console.log('[RP] modeSelectRegion — _myProfile:', window._myProfile ? {role:window._myProfile.role, district:window._myProfile.district} : null);
   rpInitRegionSelect(); rpRenderCustomerList();
 }
 function modeSelectAI(){
