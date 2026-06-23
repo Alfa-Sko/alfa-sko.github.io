@@ -43,6 +43,30 @@ function deleteFreeNote(id){
   showToast('Notat slettet');
 }
 
+function editFreeNote(id){
+  if(_roGuard()) return;
+  var n=freeNotes.find(function(x){ return x.id===id; });
+  if(!n) return;
+  _openNoteEditModal({
+    text: n.text||'',
+    subtitle: (n.tag||'Fritt notat')+' · '+n.date.split('-').reverse().join('.'),
+    onSave: function(newText){
+      if(!newText){
+        // Tomt fritt notat → slett
+        freeNotes=freeNotes.filter(function(x){ return x.id!==id; });
+        saveData('alfa_free_notes', freeNotes);
+        renderTimeline();
+        showToast('Tomt notat slettet');
+      } else {
+        n.text=newText;
+        saveData('alfa_free_notes', freeNotes);
+        renderTimeline();
+        showToast('Notat oppdatert');
+      }
+    }
+  });
+}
+
 function renderTimeline(){
   if(window._leaderHome && !window._mgrBackup){ renderTeamTimeline(); return; }
   const list=document.getElementById('timeline-list');
@@ -152,7 +176,15 @@ function renderTimeline(){
       html+='</div>';
       html+='<button class="btn btn-light btn-sm" style="font-size:10px;color:#A23B27" onclick="'+delFn+'('+it.id+')">×</button>';
       html+='</div>';
-      if(it.notes){html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span>'+(it.kind==='activity'?'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button>':'')+'</div>';}
+      if(it.notes){
+        const _noteEditBtn=it.kind==='activity'
+          ?'<button onclick="editVisitNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Rediger notat">✏</button>'
+          +'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button>'
+          :it.kind==='free'
+          ?'<button onclick="editFreeNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Rediger notat">✏</button>'
+          :'';
+        html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span><div style="display:flex;gap:2px;flex-shrink:0">'+_noteEditBtn+'</div></div>';
+      }
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
       if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
       html+='</div>';
