@@ -312,12 +312,26 @@ function _renderGroupedCustomersView(getKeyFn, containerId, emptyLabel, getGroup
   el.innerHTML=html;
 }
 
-// Engangs-migrering: opprett konstellasjoner fra unike chain-verdier og sett constellation_id på kunder.
-// Kjøres automatisk første gang constellations er tomt og CUSTOMERS er populert.
+// Migrering/re-kobling: opprett konstellasjoner fra unike chain-verdier og sett constellation_id på kunder.
+// Kjøres også når constellations finnes men kunder mangler constellation_id (f.eks. etter Supabase-reload).
 function _migrateConstellations(){
-  if(constellations.length>0) return; // allerede migrert
   var customers=getCustomers();
   if(!customers.length) return;
+
+  if(constellations.length>0){
+    // Re-koble kunder som har mistet constellation_id (skjer etter fetchCustomersFromSupabase)
+    var needsRelink=customers.some(function(c){ return c.chain && !c.constellation_id; });
+    if(!needsRelink) return;
+    var idByName={};
+    constellations.forEach(function(cst){ idByName[cst.name]=cst.id; });
+    customers.forEach(function(c){
+      if(c.chain && idByName[c.chain]) c.constellation_id=idByName[c.chain];
+    });
+    saveData('alfa_customers',CUSTOMERS);
+    return;
+  }
+
+  // Første gang: opprett konstellasjoner fra unike chain-verdier
   var chainSet={};
   customers.forEach(function(c){ if(c.chain) chainSet[c.chain]=true; });
   var newConstellations=Object.keys(chainSet).sort().map(function(name){
