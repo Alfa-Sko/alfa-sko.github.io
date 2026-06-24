@@ -58,8 +58,29 @@ async function fetchCustomersFromSupabase() {
   const data = await res.json();
   if (!Array.isArray(data) || data.length === 0) return; // migrasjon ikke kjørt ennå → behold fallback
 
+  // Les lokallagret snapshot FØR vi overskriv — contacts kan ligge der men mangle i Supabase
+  // (skjer når PATCH-kall brukte legacy-ID, ikke Supabase UUID, og trefte ingen rad)
+  const localSnapshot = loadData('alfa_customers', null);
+  const localByName = {};
+  if (Array.isArray(localSnapshot)) {
+    localSnapshot.forEach(function(c){ if(c.name && c.contacts && c.contacts.length) localByName[c.name] = c.contacts; });
+  }
+
   CUSTOMERS.length = 0;
   CUSTOMERS.push(...data);
+
+  // Merge contacts frå lokallagring der Supabase har tom liste
+  // — re-patcher til Supabase med korrekt UUID så neste fetch òg har data
+  let anyMerged = false;
+  CUSTOMERS.forEach(function(sbC){
+    const localContacts = localByName[sbC.name];
+    if(localContacts && localContacts.length && (!sbC.contacts || !sbC.contacts.length)){
+      sbC.contacts = localContacts;
+      anyMerged = true;
+      _sbPatchCustomerField(sbC.id, {contacts: sbC.contacts});
+    }
+  });
+  if(anyMerged) saveData('alfa_customers', CUSTOMERS);
 }
 
 // PATCH éin eller fleire felt direkte på customers-tabellen (delt).
