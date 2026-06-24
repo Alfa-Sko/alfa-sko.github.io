@@ -102,6 +102,16 @@ function _plannerFilterArea(){
     const hasCustomers = !populatedSet || grpRegions.some(r => populatedSet.has(r));
     g.style.display = (inDistrict && hasCustomers) ? '' : 'none';
   });
+  // Auto-velg første synlige option — aldri en by i en skjult/filtrert optgruppe.
+  const firstVisibleVal = (() => {
+    for(const g of sel.querySelectorAll('optgroup')){
+      if(g.style.display === 'none') continue;
+      const opt = g.querySelector('option');
+      if(opt) return opt.value;
+    }
+    return null;
+  })();
+  if(firstVisibleVal !== null) sel.value = firstVisibleVal;
 }
 
 function populateCustomRouteDropdown(){
@@ -796,6 +806,10 @@ function getFixedAppointmentsForDate(dt){
 function runPlanner(){
   window._planOutputTarget = null; // Auto-planlegger skriver alltid til #planner-output
   const area=document.getElementById('planner-area').value;
+  if(!area){
+    document.getElementById('planner-output').innerHTML='<div class="planner-result" style="color:#888780;text-align:center;padding:24px">Velg et område / en by først.</div>';
+    return;
+  }
   const dateStr=document.getElementById('planner-date').value||TODAY_STR;
   const startT=document.getElementById('planner-start').value||'08:00';
   const endT=document.getElementById('planner-end').value||'17:00';
