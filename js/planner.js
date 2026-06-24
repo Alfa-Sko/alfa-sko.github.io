@@ -1981,7 +1981,57 @@ function setDayMaxVisit(dayIdx, val){
   if(!days || !days[dayIdx]) return;
   days[dayIdx]._maxVisitDuration = val ? +val : null;
   recomputeDayTimes(days[dayIdx]);
+  _fillUnplacedIntoDay(days[dayIdx]);
   renderPlanFromData(days);
+}
+
+function _fillUnplacedIntoDay(day){
+  var pool = window._lastUnplacedPool;
+  if(!pool || !pool.length) return;
+  if(!day.customers || !day.customers.length) return;
+  var _endEl = document.getElementById('planner-end');
+  var _wEnd = (_endEl && _endEl.value) || (userProfile && userProfile.workEnd) || '17:00';
+  var _wParts = _wEnd.split(':').map(Number);
+  var dayEndMin = roundTo30(_wParts[0]*60 + _wParts[1]);
+  var planNames = new Set(day.customers.map(function(c){return c.name;}));
+  var remaining = pool.filter(function(c){return !planNames.has(c.name);});
+  if(!remaining.length) return;
+  var weekday = day.date ? day.date.getDay() : 1;
+  var lastCust = day.customers[day.customers.length-1];
+  var cursor = lastCust._end || 0;
+  if(cursor >= dayEndMin) return;
+  var changed = false;
+  while(cursor < dayEndMin && remaining.length > 0){
+    var lastCity = lastCust.city || day.startCity || '';
+    var lastCoord = (lastCust.lat!=null&&lastCust.lng!=null)?[lastCust.lat,lastCust.lng]:_coordFor(lastCity);
+    var best=null, bestDrive=Infinity, bestT=0, bestDur=0;
+    for(var i=0;i<remaining.length;i++){
+      var c=remaining[i];
+      var toCoord=(c.lat!=null&&c.lng!=null)?[c.lat,c.lng]:_coordFor(c.city||'');
+      var drive=getDriveMin(lastCity,c.city||'',lastCoord,toCoord);
+      var baseDur=_gVisitDuration(c);
+      var dur=day._maxVisitDuration?Math.min(baseDur,day._maxVisitDuration):baseDur;
+      var openMin=_gOpeningTimeMin(c,weekday);
+      var t=Math.ceil(Math.max(cursor+drive,openMin)/30)*30;
+      if(t+dur>dayEndMin) continue;
+      if(drive<bestDrive||(drive===bestDrive&&(c.l12||0)>((best&&best.l12)||0))){
+        best=c; bestDrive=drive; bestT=t; bestDur=dur;
+      }
+    }
+    if(!best) break;
+    best._drive=bestDrive;
+    best._duration=bestDur;
+    best._start=bestT;
+    best._end=bestT+bestDur;
+    best._autoAdded=true;
+    day.customers.push(best);
+    cursor=best._end;
+    lastCust=best;
+    var bestName=best.name;
+    remaining=remaining.filter(function(c){return c.name!==bestName;});
+    changed=true;
+  }
+  if(changed) recomputeDayTimes(day);
 }
 
 // Legg til flyetappe på en dag (mellom kundebesøk)
