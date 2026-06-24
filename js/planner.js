@@ -1265,11 +1265,8 @@ function runPlanner(){
       }
     }
   }
-  // Telefonpool: ringbare kandidater som ikke er på planen, sortert etter L12
   const planNames=new Set();
   days.forEach(day=>day.customers.forEach(c=>planNames.add(c.name)));
-  const callPool=getCustomers().filter(c=>!planNames.has(c.name)&&(c.phone||(c.contacts||[]).some(p=>p.phone)));
-  callPool.sort((a,b)=>(b.l12||0)-(a.l12||0));
   // Alle pool-kunder som ikke fikk plass (uavhengig av telefon)
   const unplacedPool=pool.filter(c=>!planNames.has(c.name));
   unplacedPool.sort((a,b)=>(b.l12||0)-(a.l12||0));
@@ -1302,20 +1299,6 @@ function runPlanner(){
   html+=tripInfoHtml;
   html+='<div style="font-size:11px;color:#888780;margin-bottom:14px">Områder i poolen: '+zoneList+'</div>';
   days.forEach((day,dayIdx)=>{
-    // Forhåndsberegn kjøreturer >15 min for denne dagen (for ringeforslag)
-    const driveSegments=[];
-    day.customers.forEach((c,i)=>{if(c._drive>=15) driveSegments.push(c.name);});
-    const dayCalls=callPool.slice(dayIdx*10,(dayIdx+1)*10);
-    const totalDriveMin=day.customers.filter(c=>c._drive>=15).reduce((s,c)=>s+c._drive,0);
-    const callsByCustomer={};
-    if(driveSegments.length>0&&totalDriveMin>0){
-      let assigned=0;
-      day.customers.filter(c=>c._drive>=15).forEach((c,j,arr)=>{
-        const share=j===arr.length-1?dayCalls.length-assigned:Math.round((c._drive/totalDriveMin)*dayCalls.length);
-        callsByCustomer[c.name]=dayCalls.slice(assigned,assigned+share);
-        assigned+=share;
-      });
-    }
     const fixedInfo=day.fixedCount>0?' · <span style="color:#0C447C">'+day.fixedCount+' fast(e) avtale(r)</span>':'';
     const zoneInfo=day.zones&&day.zones.length>0?' · <span style="color:#0A4A7A;font-weight:600">📍 '+day.zones.join(' → ')+'</span>':'';
     const _mxOpts=['','30','45','60','90'].map(v=>'<option value="'+v+'"'+((v&&day._maxVisitDuration===+v)?' selected':(!v&&!day._maxVisitDuration?' selected':''))+'>'+(v?v+' min':'Fri tid')+'</option>').join('');
@@ -1440,24 +1423,11 @@ function runPlanner(){
           if(ferry){
             ferryHtml='<div style="margin-top:6px;padding:6px 8px;background:#E6F1FB;border:1px solid #B8D4E8;border-radius:5px;font-size:11px;color:#0C447C;display:flex;align-items:center;gap:6px"><span style="font-size:14px">⛴</span><div style="flex:1"><strong>Ferje: '+escapeHtml(ferry.name)+'</strong> <span style="color:#5F5E5A">— '+escapeHtml(ferry.op)+'</span></div><a href="'+escapeHtml(ferry.url)+'" target="_blank" style="color:#0C447C;text-decoration:underline;font-weight:600">Tider ↗</a></div>';
           }
-          // Ringeforslag vises kun ved kjøring ≥15 min
-          const calls=driveMin>=15?(callsByCustomer[c.name]||[]):[];
-          let callsHtml='';
-          if(calls.length>0){
-            callsHtml='<div style="margin-top:6px;padding-top:6px;border-top:1px solid #E6D9B8"><div style="font-size:10px;font-weight:700;color:#6D4C00;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">📞 Ringeforslag ('+calls.length+' kunder · '+driveMin+' min)</div>';
-            calls.forEach(cc=>{
-              const contact=(cc.contacts&&cc.contacts[0])?cc.contacts[0]:null;
-              const phone=cc.phone||(contact?contact.phone:'')||'';
-              const contactName=contact?contact.name:(cc.phone?'Direkte':'');
-              callsHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;color:#2C2C2A;gap:6px"><span style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cc.name+'</span><span style="color:#888780;font-size:10px;flex-shrink:0">'+contactName+'</span>'+(phone?'<a href="tel:'+phone+'" style="color:#0C447C;font-weight:600;text-decoration:none;flex-shrink:0">'+phone+'</a>':'')+'</div>';
-            });
-            callsHtml+='</div>';
-          }
           const _dh=Math.floor(driveMin/60), _dm=driveMin%60;
           const timeStr=_dh>0?(_dh+'t'+(_dm>0?' '+_dm+'min':'')):(_dm+' min');
           const kmStr=routeInfo&&routeInfo.km?(routeInfo.estimated?'≈':'')+routeInfo.km+' km':'';
           const distLabel=timeStr+(kmStr?' · '+kmStr:'');
-          html+='<div class="planner-drive">🚗 Kjøring · '+distLabel+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||area)+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+callsHtml+'</div>';
+          html+='<div class="planner-drive">🚗 Kjøring · '+distLabel+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||area)+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+_renderDriveCalls(dayIdx, day.customers.indexOf(c), c._driveCalls||[])+'</div>';
         }
         const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
         const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
@@ -2098,6 +2068,179 @@ function removeTimeBlock(dayIdx, blockId){
   renderPlanFromData(days);
 }
 
+// ─── MANUELL RINGELISTE PÅ KJØREETAPPER ────────────────────────────────────
+
+function _renderDriveCalls(dayIdx, custIdx, calls){
+  var h = '';
+  if(calls.length > 0){
+    h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #E6D9B8">';
+    h += '<div style="font-size:10px;font-weight:700;color:#6D4C00;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">📞 Anrop under kjøring</div>';
+    calls.forEach(function(call, callIdx){
+      if(call.type==='followup'){
+        h += '<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid #F1EFE8;font-size:11px">';
+        h += '<div style="flex:1;min-width:0"><div style="font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(call.customer||'')+'</div><div style="color:#5F5E5A">'+escapeHtml(call.task||'')+'</div>'+(call.due?'<div style="color:#888780;font-size:10px">Frist: '+escapeHtml(call.due)+'</div>':'')+'</div>';
+        h += '<button onclick="plannerMarkCallDone('+dayIdx+','+custIdx+','+callIdx+','+call.id+')" style="background:#1A5C3A;color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 7px;flex-shrink:0;white-space:nowrap">✓ Gjort</button>';
+        h += '<button onclick="plannerRemoveCall('+dayIdx+','+custIdx+','+callIdx+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Fjern">×</button>';
+        h += '</div>';
+      } else {
+        h += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #F1EFE8;font-size:11px">';
+        h += '<div style="flex:1;min-width:0"><div style="font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(call.customerName||'')+'</div><div style="color:#5F5E5A">'+escapeHtml(call.contactName||'')+(call.role?' · '+escapeHtml(call.role):'')+'</div></div>';
+        if(call.phone) h += '<a href="tel:'+escapeHtml(call.phone)+'" style="color:#0C447C;font-weight:600;text-decoration:none;font-size:11px;flex-shrink:0">'+escapeHtml(call.phone)+'</a>';
+        h += '<button onclick="plannerRemoveCall('+dayIdx+','+custIdx+','+callIdx+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Fjern">×</button>';
+        h += '</div>';
+      }
+    });
+    h += '</div>';
+  }
+  h += '<button onclick="plannerAddCallPrompt('+dayIdx+','+custIdx+')" style="display:block;width:100%;margin-top:'+(calls.length?'4':'6')+'px;padding:5px 8px;background:#FFF6E6;border:1px dashed #E6D9B8;border-radius:6px;color:#6D4C00;font-size:11px;font-weight:600;cursor:pointer;text-align:left">+ Legg til anrop</button>';
+  return h;
+}
+
+function plannerAddCallPrompt(dayIdx, custIdx){
+  var existing = document.getElementById('drive-call-modal');
+  if(existing) existing.remove();
+  window._dcmCtx = {dayIdx:dayIdx, custIdx:custIdx};
+  window._dcmFollowups = (typeof followups !== 'undefined' ? followups : []).filter(function(f){ return !f.done; });
+  var fuRows = '';
+  if(window._dcmFollowups.length === 0){
+    fuRows = '<div style="color:#888780;font-size:12px;text-align:center;padding:16px">Ingen åpne oppfølginger</div>';
+  } else {
+    window._dcmFollowups.forEach(function(f, i){
+      fuRows += '<div class="dcm-fu-row" data-idx="'+i+'" onclick="_dcmPickFollowup('+i+')" style="padding:8px 10px;border-bottom:1px solid #F1EFE8;cursor:pointer" onmouseover="this.style.background=\'#F8F7F3\'" onmouseout="this.style.background=\'\'">';
+      fuRows += '<div style="font-size:12px;font-weight:600;color:#2C2C2A">'+escapeHtml(f.customer||'')+'</div>';
+      fuRows += '<div style="font-size:11px;color:#5F5E5A">'+escapeHtml(f.task||'')+'</div>';
+      if(f.due) fuRows += '<div style="font-size:10px;color:#888780">Frist: '+escapeHtml(f.due)+'</div>';
+      fuRows += '</div>';
+    });
+  }
+  var modal = document.createElement('div');
+  modal.id = 'drive-call-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:480px;max-width:100%;padding:16px;max-height:90vh;display:flex;flex-direction:column">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+        '<div style="font-size:15px;font-weight:700">📞 Legg til anrop</div>'+
+        '<button onclick="document.getElementById(\'drive-call-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:12px">'+
+        '<button id="dcm-tab-fu" onclick="_dcmShowTab(\'fu\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid #D3D1C7;font-size:12px;font-weight:600;cursor:pointer;background:#2C2C2A;color:#fff">📋 Oppfølging</button>'+
+        '<button id="dcm-tab-ct" onclick="_dcmShowTab(\'ct\')" style="flex:1;padding:7px;border-radius:8px;border:1px solid #D3D1C7;font-size:12px;font-weight:600;cursor:pointer;background:#F1EFE8;color:#5F5E5A">👤 Kontaktperson</button>'+
+      '</div>'+
+      '<div id="dcm-body-fu" style="overflow-y:auto;flex:1">'+
+        '<input oninput="_dcmFilterFu(this.value)" placeholder="Filtrer oppfølginger …" style="width:100%;padding:7px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:12px;box-sizing:border-box;margin-bottom:8px">'+
+        '<div id="dcm-fu-list" style="border:1px solid #D3D1C7;border-radius:8px;overflow:hidden;max-height:260px;overflow-y:auto">'+fuRows+'</div>'+
+      '</div>'+
+      '<div id="dcm-body-ct" style="overflow-y:auto;flex:1;display:none">'+
+        '<div id="dcm-cs-picker"></div>'+
+        '<div id="dcm-contacts-list" style="margin-top:8px"></div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  setTimeout(function(){
+    var pickerEl = document.getElementById('dcm-cs-picker');
+    if(!pickerEl || typeof _csMountPicker === 'undefined') return;
+    _csMountPicker(pickerEl, getCustomers(), {
+      prefix: 'dcm-cs',
+      maxRows: 20,
+      onPick: function(c){ _dcmShowContacts(c); }
+    });
+  }, 0);
+}
+
+function _dcmShowTab(tab){
+  var fu = document.getElementById('dcm-body-fu');
+  var ct = document.getElementById('dcm-body-ct');
+  var tabFu = document.getElementById('dcm-tab-fu');
+  var tabCt = document.getElementById('dcm-tab-ct');
+  if(!fu || !ct) return;
+  var isFu = tab === 'fu';
+  fu.style.display = isFu ? '' : 'none';
+  ct.style.display = isFu ? 'none' : '';
+  if(tabFu){ tabFu.style.background = isFu ? '#2C2C2A' : '#F1EFE8'; tabFu.style.color = isFu ? '#fff' : '#5F5E5A'; }
+  if(tabCt){ tabCt.style.background = isFu ? '#F1EFE8' : '#2C2C2A'; tabCt.style.color = isFu ? '#5F5E5A' : '#fff'; }
+}
+
+function _dcmFilterFu(q){
+  q = (q||'').toLowerCase();
+  var rows = document.querySelectorAll('.dcm-fu-row');
+  rows.forEach(function(row){
+    var idx = +row.dataset.idx;
+    var f = (window._dcmFollowups||[])[idx];
+    if(!f){ row.style.display = 'none'; return; }
+    var match = !q || (f.customer||'').toLowerCase().indexOf(q)>=0 || (f.task||'').toLowerCase().indexOf(q)>=0;
+    row.style.display = match ? '' : 'none';
+  });
+}
+
+function _dcmPickFollowup(idx){
+  var ctx = window._dcmCtx;
+  if(!ctx) return;
+  var f = (window._dcmFollowups||[])[idx];
+  if(!f) return;
+  var call = {type:'followup', id:f.id, customer:f.customer||'', task:f.task||'', due:f.due||''};
+  var modal = document.getElementById('drive-call-modal');
+  if(modal) modal.remove();
+  _plannerConfirmCall(ctx.dayIdx, ctx.custIdx, call);
+}
+
+function _dcmShowContacts(cust){
+  var listEl = document.getElementById('dcm-contacts-list');
+  if(!listEl) return;
+  window._dcmCurrentCust = cust;
+  window._dcmCurrentContacts = (cust.contacts||[]).filter(function(p){ return p.phone || p.email; });
+  var contacts = window._dcmCurrentContacts;
+  if(contacts.length === 0){
+    listEl.innerHTML = '<div style="color:#888780;font-size:12px;text-align:center;padding:12px">Ingen registrerte kontakter med telefon eller e-post</div>';
+    return;
+  }
+  var html = '<div style="border:1px solid #D3D1C7;border-radius:8px;overflow:hidden">';
+  contacts.forEach(function(p, pi){
+    html += '<div onclick="_dcmPickContact('+pi+')" style="padding:8px 10px;border-bottom:1px solid #F1EFE8;cursor:pointer" onmouseover="this.style.background=\'#F8F7F3\'" onmouseout="this.style.background=\'\'">';
+    html += '<div style="font-size:12px;font-weight:600;color:#2C2C2A">'+escapeHtml(p.name||'')+'</div>';
+    if(p.role) html += '<div style="font-size:11px;color:#5F5E5A">'+escapeHtml(p.role)+'</div>';
+    if(p.phone) html += '<div style="font-size:11px;color:#0C447C">'+escapeHtml(p.phone)+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  listEl.innerHTML = html;
+}
+
+function _dcmPickContact(contactIdx){
+  var ctx = window._dcmCtx;
+  var cust = window._dcmCurrentCust;
+  var contact = (window._dcmCurrentContacts||[])[contactIdx];
+  if(!ctx || !cust || !contact) return;
+  var call = {type:'contact', customerName:cust.name||'', contactName:contact.name||'', role:contact.role||'', phone:contact.phone||'', email:contact.email||''};
+  var modal = document.getElementById('drive-call-modal');
+  if(modal) modal.remove();
+  _plannerConfirmCall(ctx.dayIdx, ctx.custIdx, call);
+}
+
+function _plannerConfirmCall(dayIdx, custIdx, call){
+  var days = window._lastPlan;
+  if(!days || !days[dayIdx] || !days[dayIdx].customers[custIdx]) return;
+  var c = days[dayIdx].customers[custIdx];
+  c._driveCalls = c._driveCalls || [];
+  c._driveCalls.push(call);
+  renderPlanFromData(days);
+  showToast('📞 Anrop lagt til');
+}
+
+function plannerRemoveCall(dayIdx, custIdx, callIdx){
+  var days = window._lastPlan;
+  if(!days || !days[dayIdx] || !days[dayIdx].customers[custIdx]) return;
+  var c = days[dayIdx].customers[custIdx];
+  if(!c._driveCalls) return;
+  c._driveCalls.splice(callIdx, 1);
+  renderPlanFromData(days);
+}
+
+function plannerMarkCallDone(dayIdx, custIdx, callIdx, followupId){
+  if(typeof markDone === 'function') markDone(followupId);
+  plannerRemoveCall(dayIdx, custIdx, callIdx);
+}
+
 let _dragData = null;
 function plannerDragStart(ev, dayIdx, custIdx){
   _dragData = {dayIdx, custIdx};
@@ -2558,7 +2701,7 @@ function renderPlanFromData(days){
         const _eh=Math.floor(c._drive/60), _em=c._drive%60;
         const _ts=_eh>0?(_eh+'t'+(_em>0?' '+_em+'min':'')):(_em+' min');
         const _ks=ri&&ri.km?' · '+(ri.estimated?'≈':'')+ri.km+' km':'';
-        html+='<div class="planner-drive">🚗 Kjøring · '+_ts+_ks+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||'')+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+'</div>';
+        html+='<div class="planner-drive">🚗 Kjøring · '+_ts+_ks+' <a href="'+mapsLink((prevCity+', Norge'),((c.city||'')+', Norge'))+'" target="_blank" style="color:#1565C0;text-decoration:underline;margin-left:4px">Maps ↗</a>'+ferryHtml+_renderDriveCalls(dayIdx, custIdx, c._driveCalls||[])+'</div>';
       }
       const badge=c.isPrio?'<span style="background:#D1EAF8;color:#0A4A7A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">Prioritert</span>':'';
       const newBadge=c._autoAdded?'<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">+ Ny</span>':'';
