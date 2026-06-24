@@ -206,6 +206,12 @@ const DISTRICT_TO_REGIONS = {
   'Vest/Sør-Norge':             ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
   'Sør/Sørvest + Vestlandet':   ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
 };
+// Distrikter der tomme regioner (ingen kunder) skal skjules i automatisk dagsplanlegger.
+// Disse har mange regioner i distriktet men kunder spredt over bare noen av dem.
+// Legg til nye districtnøkler her for å aktivere for andre selgere — ingen logikkendring nødvendig.
+const HIDE_EMPTY_REGION_DISTRICTS = new Set([
+  'Sør/Sørvest + Vestlandet',
+]);
 // Naboregioner — styrer hvilke bolker som vises under den valgte regionen.
 const REGION_NEIGHBORS = {
   'Trøndelag':['Nordland','Møre og Romsdal','Innlandet'],

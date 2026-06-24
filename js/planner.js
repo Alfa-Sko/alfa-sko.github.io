@@ -89,10 +89,18 @@ function _plannerFilterArea(){
       console.warn('[planner] Ukjent district "'+district+'" — filtrering deaktivert, viser alt.');
     }
   }
+  // Ekstra filter: skjul regioner uten kunder for distrikter i HIDE_EMPTY_REGION_DISTRICTS.
+  // Utledes fra faktiske kunder — oppdateres automatisk når selgeren får nye kunder.
+  let populatedSet = null;
+  if(district && typeof HIDE_EMPTY_REGION_DISTRICTS !== 'undefined' && HIDE_EMPTY_REGION_DISTRICTS.has(district)){
+    populatedSet = new Set(_rpBaseCustomers().map(c => rpRegionOfCustomer(c)));
+  }
   sel.querySelectorAll('optgroup').forEach(g => {
     if(!allowedSet){ g.style.display = ''; return; }
     const grpRegions = (g.dataset.regions || '').split(',').map(r => r.trim()).filter(Boolean);
-    g.style.display = grpRegions.some(r => allowedSet.has(r)) ? '' : 'none';
+    const inDistrict = grpRegions.some(r => allowedSet.has(r));
+    const hasCustomers = !populatedSet || grpRegions.some(r => populatedSet.has(r));
+    g.style.display = (inDistrict && hasCustomers) ? '' : 'none';
   });
 }
 
