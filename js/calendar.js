@@ -367,36 +367,57 @@ function renderWeek(body){
   body.innerHTML=html;
 }
 
-function renderDay(body){
-  const y=calCursor.getFullYear(),m=calCursor.getMonth(),d=calCursor.getDate();
+// Bygger HTML for dagvisning. readOnly=true: ingen drag/resize/ny-hendelse-klikk/fridag-knapp.
+// Kalles av renderDay() (readOnly=false) og dashbordet (readOnly=true, TODAY_STR).
+function buildDayViewHtml(key, readOnly){
+  const parts=key.split('-');
+  const y=+parts[0],m=+parts[1]-1,d=+parts[2];
   const col=mb(new Date(y,m,d).getDay());
-  document.getElementById('cal-title').textContent=NO_LONG[col]+' '+d+'. '+NO_MONTHS[m]+' '+y;
-  const key=dk(y,m,d);
   const HSTART=4,HEND=24,SPH=4,SPX=15;
   const totalSlots=(HEND-HSTART)*SPH;
   const rawEvs=getEventsForDay(key);
   const allEvs=calAutoAddDrives(rawEvs,key);
   const normEvs=allEvs.map(e=>{if(e.startMins!==undefined)return e;return{...e,startMins:(e.h||8)*60,endMins:(e.hEnd?e.hEnd*60:((e.h||8)+1)*60)};});
   const laid=calLayoutOverlap(normEvs,HSTART,HEND);
-  const totalH=totalSlots*SPX;
-  let html='<div class="day-view"><div class="day-view-hdr"><span class="day-view-date">'+d+'. '+NO_MONTHS[m]+'</span><span class="day-view-lbl">'+NO_LONG[col]+(isToday(y,m,d)?' · I dag':'')+'</span></div>';
-  // Helligdag- eller fridag-banner
   const dayHoliday=getHolidayName(key);
   const dayVacation=getPersonalDay(key);
+
+  // Tom dag i dashbord-modus: vis banner eller enkel melding
+  if(readOnly && laid.length===0){
+    if(dayHoliday) return '<div style="background:#FBE9E7;border:1px solid #C62828;color:#C62828;padding:12px 14px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🎉</span><span>'+escapeHtml(dayHoliday)+' — offentlig fridag</span></div>';
+    if(dayVacation) return '<div style="background:#FFF4E6;border:1px solid #BA7517;color:#6D4C00;padding:12px 14px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🌴</span><span>'+escapeHtml(dayVacation.label||'Fridag')+(dayVacation.note?' — '+escapeHtml(dayVacation.note):'')+' </span></div>';
+    return '<div style="padding:20px;text-align:center;color:#888780;font-size:13px">Ingen avtaler i dag</div>';
+  }
+
+  const totalH=totalSlots*SPX;
+  const maxH=readOnly?360:580;
+  let html='<div class="day-view"><div class="day-view-hdr"><span class="day-view-date">'+d+'. '+NO_MONTHS[m]+'</span><span class="day-view-lbl">'+NO_LONG[col]+(isToday(y,m,d)?' · I dag':'')+'</span></div>';
+
+  // Helligdag- eller fridag-banner
   if(dayHoliday){
     html+='<div style="background:#FBE9E7;border:1px solid #C62828;color:#C62828;padding:10px 14px;margin:8px 0;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px"><span style="font-size:18px">🎉</span><span>'+escapeHtml(dayHoliday)+' — offentlig fridag</span></div>';
   } else if(dayVacation){
-    html+='<div style="background:#FFF4E6;border:1px solid #BA7517;color:#6D4C00;padding:10px 14px;margin:8px 0;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px"><div><span style="font-size:18px">🌴</span> '+escapeHtml(dayVacation.label||'Fridag')+(dayVacation.note?' <span style="font-weight:400;color:#5F5E5A">— '+escapeHtml(dayVacation.note)+'</span>':'')+'</div><button class="btn btn-light btn-sm" onclick="removePersonalDay(\''+key+'\')" style="color:#A23B27;font-size:11px">× Fjern</button></div>';
-  } else {
+    const rmBtn=readOnly?'':'<button class="btn btn-light btn-sm" onclick="removePersonalDay(\''+key+'\')" style="color:#A23B27;font-size:11px">× Fjern</button>';
+    html+='<div style="background:#FFF4E6;border:1px solid #BA7517;color:#6D4C00;padding:10px 14px;margin:8px 0;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px"><div><span style="font-size:18px">🌴</span> '+escapeHtml(dayVacation.label||'Fridag')+(dayVacation.note?' <span style="font-weight:400;color:#5F5E5A">— '+escapeHtml(dayVacation.note)+'</span>':'')+'</div>'+rmBtn+'</div>';
+  } else if(!readOnly){
     html+='<div style="margin:6px 0;text-align:right"><button class="btn btn-light btn-sm" onclick="addPersonalDay(\''+key+'\')" style="font-size:11px;color:#888780">+ Registrer fridag/ferie</button></div>';
   }
-  html+='<div style="display:flex;overflow-y:auto;max-height:580px">';
+
+  html+='<div style="display:flex;overflow-y:auto;max-height:'+maxH+'px">';
   html+='<div style="width:52px;flex-shrink:0;background:#F8F7F3;border-right:1px solid #D3D1C7">';
   for(let h=HSTART;h<HEND;h++){html+='<div style="height:60px;border-bottom:1px solid #D3D1C7;font-size:10px;color:#888780;text-align:right;padding:2px 6px 0 0;box-sizing:border-box">'+(h<10?'0':'')+h+':00</div>';}
   html+='</div>';
-  html+='<div style="flex:1;position:relative;height:'+totalH+'px" ondragover="calDragOver(event,\''+key+'\')" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
+
+  // Grid-kolonne: interaktiv (kalender) eller read-only (dashbord)
+  if(readOnly){
+    html+='<div style="flex:1;position:relative;height:'+totalH+'px">';
+  } else {
+    html+='<div style="flex:1;position:relative;height:'+totalH+'px" ondragover="calDragOver(event,\''+key+'\')" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
+    html+='<div id="wkghost-'+key+'" style="display:none;position:absolute;left:4px;right:4px;background:rgba(25,118,210,0.12);border:2px dashed #1976D2;border-radius:4px;pointer-events:none;z-index:2"></div>';
+  }
+
   for(let s=0;s<totalSlots;s++){const isH=(s%SPH===0);html+='<div style="position:absolute;left:0;right:0;top:'+(s*SPX)+'px;border-top:1px '+(isH?'solid #D3D1C7':'dashed #ECEAE4')+';pointer-events:none"></div>';}
-  html+='<div id="wkghost-'+key+'" style="display:none;position:absolute;left:4px;right:4px;background:rgba(25,118,210,0.12);border:2px dashed #1976D2;border-radius:4px;pointer-events:none;z-index:2"></div>';
+
   laid.forEach(e=>{
     const cc=calEvClass(e.type);
     const emoji=calEvEmoji(e.type);
@@ -409,16 +430,25 @@ function renderDay(body){
     const eEnc=encodeURIComponent(JSON.stringify(e));
     const showTime=heightPx>=30;
     const showMaps=e.type==='drive-auto';
-    html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;padding:4px 8px;font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
+    const cursor=readOnly?'pointer':'grab';
+    const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()"';
+    html+='<div class="'+cc+'"'+dragAttrs+' onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;padding:4px 8px;font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:'+cursor+';'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
     if(showTime) html+='<span style="font-size:10px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
     if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="font-size:11px;color:#1565C0;text-decoration:underline;display:block;margin-top:2px">🗺 Åpne i Google Maps ↗</a>';}
     const _siD=_calStatusIcons(e,key);
     if(_siD) html+='<span style="font-size:11px;display:block;margin-top:2px;line-height:1;opacity:0.85">'+_siD+'</span>';
-    html+='<div onmousedown="calResizeStart(event,\''+key+'\',\''+eEnc+'\')" style="position:absolute;bottom:0;left:0;right:0;height:6px;cursor:s-resize;background:rgba(0,0,0,0.12);border-radius:0 0 4px 4px"></div>';
+    if(!readOnly) html+='<div onmousedown="calResizeStart(event,\''+key+'\',\''+eEnc+'\')" style="position:absolute;bottom:0;left:0;right:0;height:6px;cursor:s-resize;background:rgba(0,0,0,0.12);border-radius:0 0 4px 4px"></div>';
     html+='</div>';
   });
   html+='</div></div></div>';
-  body.innerHTML=html;
+  return html;
+}
+
+function renderDay(body){
+  const y=calCursor.getFullYear(),m=calCursor.getMonth(),d=calCursor.getDate();
+  const col=mb(new Date(y,m,d).getDay());
+  document.getElementById('cal-title').textContent=NO_LONG[col]+' '+d+'. '+NO_MONTHS[m]+' '+y;
+  body.innerHTML=buildDayViewHtml(dk(y,m,d), false);
 }
 
 function jumpToDay(y,m,d){

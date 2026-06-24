@@ -534,30 +534,22 @@ function renderOverview(){
   const _months=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
   const _now=new Date();
   document.getElementById('today-label').textContent = _days[_now.getDay()]+' '+_now.getDate()+'. '+_months[_now.getMonth()]+' '+_now.getFullYear();
-  const todayVisits = visits.filter(v=>v.date===TODAY_STR);
   const overdue = followups.filter(f=>!f.done && f.due<TODAY_STR);
 
+  // Dagens kalender-tidslinje øverst
+  const todayCal = document.getElementById('today-calendar');
+  if(todayCal && typeof buildDayViewHtml === 'function'){
+    todayCal.innerHTML = buildDayViewHtml(TODAY_STR, true);
+    // Skroll til 08:00 (HSTART=4, 4 timer × 60px = 240px fra toppen)
+    const scrollEl = todayCal.querySelector('[style*="overflow-y"]');
+    if(scrollEl) scrollEl.scrollTop = 240;
+  }
+
+  const todayVisits = visits.filter(v=>v.date===TODAY_STR);
   document.getElementById('overview-metrics').innerHTML =
     metric(todayVisits.length,'Besøk i dag','planlagt') +
     metric(followups.filter(f=>!f.done).length,'Åpen oppfølging', overdue.length+' forfalt') +
     metric('250 km','Kjøring i dag','estimert');
-
-  const tv = document.getElementById('today-visits');
-  if(todayVisits.length===0){
-    tv.innerHTML='<div class="empty-state">Ingen besøk registrert for i dag</div>';
-  } else {
-    tv.innerHTML = todayVisits.map(v=>{
-      const c = getCustomers().find(c=>c.name===v.customer)||{class:''};
-      const bCls = c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
-      const bLbl = c.class==='A'?'A-kunde':c.class==='B'?'B-kunde':c.class==='C'?'C-kunde':'Ny';
-      const safeName = v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return `<div class="visit-row" onclick="openCustomer('${safeName}')">
-        <div class="avatar">${v.customer.slice(0,2).toUpperCase()}</div>
-        <div class="vinfo"><div class="vname">${v.customer}</div><div class="vmeta">${v.time||''}${v.timeEnd?' – '+v.timeEnd:''} · ${v.contact||''}</div></div>
-        <span class="badge ${bCls}">${bLbl}</span>
-      </div>`;
-    }).join('');
-  }
 
   const of = document.getElementById('overdue-follow');
   if(overdue.length===0){
