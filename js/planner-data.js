@@ -196,9 +196,15 @@ const CITY_COORDS = {
 const BIG_CITIES = ['Tromsø','Trondheim','Bodø','Alta','Harstad','Oslo','Bergen','Stavanger','Kristiansand','Drammen','Fredrikstad/Sarpsborg'];
 // Mapping: profiles.district → tillatte regioner i regionplanleggeren.
 // Ledere (sjef/ceo) og ukjente distrikter filtreres ikke (ser alt).
+//
+// DATAKONSISTENS-NOTAT (2026-06):
+// 'Sør/Sørvest + Vestlandet' er den faktiske verdien i Håvards profiles.district (satt manuelt i Supabase).
+// 'Vest/Sør-Norge' er verdien brukt i customers.district (satt av migrate-havard.js og patch-havard-gate.js).
+// De dekker samme geografiske område men er to ulike strenger — begge nøkler beholdes til dataene er ryddet.
 const DISTRICT_TO_REGIONS = {
   'Midt/Nord-Norge + Svalbard': ['Trøndelag','Nordland','Troms','Finnmark','Svalbard'],
-  'Vest/Sør-Norge': ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
+  'Vest/Sør-Norge':             ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
+  'Sør/Sørvest + Vestlandet':   ['Møre og Romsdal','Vestland','Rogaland','Agder','Telemark','Vestfold','Buskerud','Innlandet','Oslo','Akershus','Østfold'],
 };
 // Naboregioner — styrer hvilke bolker som vises under den valgte regionen.
 const REGION_NEIGHBORS = {

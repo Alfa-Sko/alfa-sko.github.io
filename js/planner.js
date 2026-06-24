@@ -79,13 +79,20 @@ function _plannerFilterArea(){
   if(!sel || typeof DISTRICT_TO_REGIONS === 'undefined') return;
   const isLeader = !!(window._leaderHome || window._bootLeader ||
     (window._myProfile && (window._myProfile.role==='sjef' || window._myProfile.role==='ceo')));
-  // Ledere og ukjent distrikt: vis alt
   const district = !isLeader && window._myProfile && window._myProfile.district;
-  const allowed = district ? new Set(DISTRICT_TO_REGIONS[district] || []) : null;
+  let allowedSet = null;
+  if(district){
+    const regions = DISTRICT_TO_REGIONS[district];
+    if(regions && regions.length){
+      allowedSet = new Set(regions);
+    } else {
+      console.warn('[planner] Ukjent district "'+district+'" — filtrering deaktivert, viser alt.');
+    }
+  }
   sel.querySelectorAll('optgroup').forEach(g => {
-    if(!allowed){ g.style.display = ''; return; }
-    const regions = (g.dataset.regions || '').split(',').map(r => r.trim()).filter(Boolean);
-    g.style.display = regions.some(r => allowed.has(r)) ? '' : 'none';
+    if(!allowedSet){ g.style.display = ''; return; }
+    const grpRegions = (g.dataset.regions || '').split(',').map(r => r.trim()).filter(Boolean);
+    g.style.display = grpRegions.some(r => allowedSet.has(r)) ? '' : 'none';
   });
 }
 
@@ -336,7 +343,10 @@ function _rpBaseCustomers(){
   const district = window._myProfile && window._myProfile.district;
   if(!district || typeof DISTRICT_TO_REGIONS === 'undefined') return all;
   const allowed = DISTRICT_TO_REGIONS[district];
-  if(!allowed || !allowed.length) return all;
+  if(!allowed || !allowed.length){
+    console.warn('[regionplan] Ukjent district "'+district+'" — filtrering deaktivert, viser alt.');
+    return all;
+  }
   return all.filter(c => allowed.includes(rpRegionOfCustomer(c)));
 }
 
