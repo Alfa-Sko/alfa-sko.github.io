@@ -9,7 +9,10 @@ function followItem(f){
       <div class="ftitle">${f.task} — ${f.customer}</div>
       <div class="fdue${isOverdue?' furgent':''}">Forfaller ${f.due.split('-').reverse().join('.')}${isOverdue?' · FORFALT':''}</div>
     </div>
-    ${!f.done?`<button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button>`:`<span style="font-size:11px;color:#1D9E75">✓ Ferdig</span><button onclick="deleteFollowup(${f.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0 0 0 8px" title="Slett">🗑</button>`}
+    ${!f.done
+      ? `<button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button>`
+      : `<button onclick="markUndone(${f.id})" style="background:none;border:1px solid #D3D1C7;border-radius:8px;color:#5F5E5A;font-size:11px;cursor:pointer;padding:2px 7px;white-space:nowrap">↩ Åpne igjen</button><button onclick="deleteFollowup(${f.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0 0 0 6px" title="Slett">🗑</button>`
+    }
   </div>`;
 }
 
@@ -42,6 +45,14 @@ function markDone(id){
   showToast('Oppfølging markert som fullført!');
 }
 
+function markUndone(id){
+  if(_roGuard()) return;
+  followups=followups.map(f=>f.id===id?{...f,done:false}:f);
+  saveData('alfa_followups',followups);
+  renderFollowups();
+  showToast('Oppfølging gjenåpnet');
+}
+
 function deleteFollowup(id){
   if(_roGuard()) return;
   if(!confirm('Slett denne oppfølgingen? (kan ikke angres)')) return;
@@ -55,7 +66,7 @@ function renderFollowups(){
   const open=followups.filter(f=>!f.done).sort((a,b)=>a.due.localeCompare(b.due));
   const done=followups.filter(f=>f.done);
   let html=open.length===0?'<div class="empty-state">Ingen åpne oppfølginger ✓</div>':open.map(followItem).join('');
-  if(done.length>0) html+=`<div class="section-label" style="margin-top:20px">Fullførte (${done.length})</div>`+done.slice(-5).map(followItem).join('');
+  if(done.length>0) html+=`<div class="section-label" style="margin-top:20px">Gjennomførte (${done.length})</div>`+done.map(followItem).join('');
   document.getElementById('followup-list').innerHTML=html;
   renderBookingFollowups();
 }

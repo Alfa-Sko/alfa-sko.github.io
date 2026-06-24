@@ -2077,9 +2077,11 @@ function _renderDriveCalls(dayIdx, custIdx, calls){
     h += '<div style="font-size:10px;font-weight:700;color:#6D4C00;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">📞 Anrop under kjøring</div>';
     calls.forEach(function(call, callIdx){
       if(call.type==='followup'){
+        var _fCust=(typeof getCustomers==='function'?getCustomers():[]).find(function(x){return x.name===call.customer;});
+        var _fPhone=(_fCust&&_fCust.phone)||(_fCust&&_fCust.contacts&&_fCust.contacts[0]&&_fCust.contacts[0].phone)||'';
         h += '<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid #F1EFE8;font-size:11px">';
         h += '<div style="flex:1;min-width:0"><div style="font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(call.customer||'')+'</div><div style="color:#5F5E5A">'+escapeHtml(call.task||'')+'</div>'+(call.due?'<div style="color:#888780;font-size:10px">Frist: '+escapeHtml(call.due)+'</div>':'')+'</div>';
-        h += '<button onclick="plannerMarkCallDone('+dayIdx+','+custIdx+','+callIdx+','+call.id+')" style="background:#1A5C3A;color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;padding:3px 7px;flex-shrink:0;white-space:nowrap">✓ Gjort</button>';
+        if(_fPhone) h += '<a href="tel:'+escapeHtml(_fPhone)+'" style="color:#0C447C;font-weight:600;text-decoration:none;font-size:11px;flex-shrink:0">'+escapeHtml(_fPhone)+'</a>';
         h += '<button onclick="plannerRemoveCall('+dayIdx+','+custIdx+','+callIdx+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Fjern">×</button>';
         h += '</div>';
       } else {
@@ -2234,11 +2236,6 @@ function plannerRemoveCall(dayIdx, custIdx, callIdx){
   if(!c._driveCalls) return;
   c._driveCalls.splice(callIdx, 1);
   renderPlanFromData(days);
-}
-
-function plannerMarkCallDone(dayIdx, custIdx, callIdx, followupId){
-  if(typeof markDone === 'function') markDone(followupId);
-  plannerRemoveCall(dayIdx, custIdx, callIdx);
 }
 
 let _dragData = null;

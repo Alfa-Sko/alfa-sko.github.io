@@ -941,7 +941,7 @@ function apptCustomerChange(){
     const openF = followups.filter(f=>f.customer===c.name&&!f.done);
     const ef = document.getElementById('appt-open-follows');
     if(openF.length){
-      ef.innerHTML = '<div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin:12px 0 6px">Åpne oppfølginger</div>'+openF.map(f=>{const pc=f.priority==='high'?'#D85A30':f.priority==='medium'?'#EF9F27':'#1D9E75';return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid #F1EFE8"><div style="width:7px;height:7px;border-radius:50%;background:${pc};flex-shrink:0"></div><span style="flex:1">${f.task}</span><span style="color:#888780;font-size:11px">${f.due.split('-').reverse().join('.')}</span><button class="btn btn-light btn-sm" style="padding:2px 7px;font-size:11px" onclick="markDone(${f.id});apptCustomerChange()">✓</button></div>`;}).join('');
+      ef.innerHTML = '<div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin:12px 0 6px">Åpne oppfølginger</div>'+openF.map(f=>{const pc=f.priority==='high'?'#D85A30':f.priority==='medium'?'#EF9F27':'#1D9E75';return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid #F1EFE8"><div style="width:7px;height:7px;border-radius:50%;background:${pc};flex-shrink:0"></div><span style="flex:1">${f.task}</span><span style="color:#888780;font-size:11px">${f.due.split('-').reverse().join('.')}</span></div>`;}).join('');
     } else { ef.innerHTML=''; }
   } else {
     infoDiv.style.display='none';
