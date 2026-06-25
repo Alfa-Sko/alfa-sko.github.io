@@ -421,20 +421,44 @@ function buildDayViewHtml(key, readOnly){
 
   for(let s=0;s<totalSlots;s++){const isH=(s%SPH===0);html+='<div style="position:absolute;left:0;right:0;top:'+(s*SPX)+'px;border-top:1px '+(isH?'solid #D3D1C7':'dashed #ECEAE4')+';pointer-events:none"></div>';}
 
+  // Pre-pass: compute effective topPx per column so min-height bumps don't cause visual overlap
+  const MIN_H=44;
+  const _effTop=new Map();
+  {
+    const byCol={};
+    laid.forEach(e=>{
+      const c=e._col||0;
+      if(!byCol[c]) byCol[c]=[];
+      byCol[c].push(e);
+    });
+    Object.values(byCol).forEach(col=>{
+      col.sort((a,b)=>a.startMins-b.startMins);
+      let colBottom=0;
+      col.forEach(e=>{
+        const ss=Math.round((e.startMins-HSTART*60)/15);
+        const es=Math.round((e.endMins-HSTART*60)/15);
+        const naturalTop=ss*SPX;
+        const top=Math.max(naturalTop,colBottom);
+        _effTop.set(e,top);
+        colBottom=top+Math.max((es-ss)*SPX-3,MIN_H);
+      });
+    });
+  }
+
   laid.forEach(e=>{
     const cc=calEvClass(e.type);
     const emoji=calEvEmoji(e.type);
     const startSlot=Math.round((e.startMins-HSTART*60)/15);
     const endSlot=Math.round((e.endMins-HSTART*60)/15);
-    const topPx=startSlot*SPX;
+    const topPx=_effTop.has(e)?_effTop.get(e):startSlot*SPX;
     const durPx=(endSlot-startSlot)*SPX-3;
     const isDrive=e.type==='drive-auto';
-    const heightPx=Math.max(durPx,isDrive?44:SPX);
-    const isCompact=isDrive&&durPx<44;
+    const heightPx=Math.max(durPx,MIN_H);
+    const isCompact=durPx<MIN_H;
     const wPct=100/(e._cols||1);
     const lPct=(e._col||0)*wPct;
     const eEnc=encodeURIComponent(JSON.stringify(e));
-    const showTime=heightPx>=30&&!isCompact;
+    const showTime=!isCompact;
     const showMaps=isDrive;
     const cursor=readOnly?'pointer':'grab';
     const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()"';
