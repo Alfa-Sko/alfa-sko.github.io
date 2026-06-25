@@ -232,30 +232,111 @@ function calLayoutOverlap(evs,HSTART,HEND){
 }
 
 let _calDrag=null;
-function calEvDragStart(ev,key,eEnc){ev.stopPropagation();const e=JSON.parse(decodeURIComponent(eEnc));_calDrag={key,e,dur:(e.endMins||0)-(e.startMins||0)};ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain','ev');}
+function calEvDragStart(ev,key,eEnc){ev.stopPropagation();const e=JSON.parse(decodeURIComponent(eEnc));_calDrag={key,e,dur:(e.endMins||0)-(e.startMins||0),origEnd:e.endMins||e.startMins};ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain','ev');}
 function calEvDragEnd(){_calDrag=null;}
-function calDragOver(ev,key){ev.preventDefault();}
-function calDragLeave(ev,key){}
-function calDrop(ev,newKey,colEl){
+function calDragOver(ev,key,colEl){
   ev.preventDefault();
-  if(!_calDrag)return;
-  if(_roGuard()){_calDrag=null;return;}
+  if(!_calDrag||!colEl) return;
+  const ghost=document.getElementById('wkghost-'+key);
+  if(!ghost) return;
   const rect=colEl.getBoundingClientRect();
   const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
+  const h=Math.max(1,Math.round(_calDrag.dur/15));
+  ghost.style.cssText='display:block;position:absolute;left:4px;right:4px;top:'+(slot*15)+'px;height:'+(h*15)+'px;background:rgba(25,118,210,0.18);border:2px dashed #1976D2;border-radius:5px;pointer-events:none;z-index:10;box-sizing:border-box';
+}
+function calDragLeave(ev,key){
+  const ghost=document.getElementById('wkghost-'+key);
+  if(ghost) ghost.style.display='none';
+}
+function calDrop(ev,newKey,colEl){
+  ev.preventDefault();
+  if(!_calDrag) return;
+  if(_roGuard()){_calDrag=null;return;}
+  const ghost=document.getElementById('wkghost-'+newKey);
+  if(ghost) ghost.style.display='none';
+  const rect=colEl.getBoundingClientRect();
   const HSTART=(calView==='day')?4:6;
+  const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
   const newStart=HSTART*60+slot*15;
-  const newEnd=newStart+_calDrag.dur;
   const oldKey=_calDrag.key;
   const oldE=_calDrag.e;
-  if(!oldE.auto){
-    if(calEvents[oldKey]){calEvents[oldKey]=calEvents[oldKey].filter(e=>e.label!==oldE.label||e.startMins!==oldE.startMins||e.h!==oldE.h);if(!calEvents[oldKey].length)delete calEvents[oldKey];}
-    if(!calEvents[newKey])calEvents[newKey]=[];
-    calEvents[newKey].push({...oldE,startMins:newStart,endMins:newEnd,h:Math.floor(newStart/60),hEnd:Math.ceil(newEnd/60)});
-    saveData('alfa_events',calEvents);
-    showToast((oldE.label||'')+' → '+calFmt(newStart)+'–'+calFmt(newEnd));
-  }
   _calDrag=null;
+  if(!oldE.auto) _calDoPlace(oldKey,newKey,oldE,newStart);
+}
+function _calDoPlace(oldKey,newKey,oldE,newStart){
+  if(oldKey===newKey&&newStart===oldE.startMins){renderCal();return;}
+  const dur=(oldE.endMins||0)-(oldE.startMins||0);
+  const newEnd=newStart+dur;
+  const origEnd=oldE.endMins||oldE.startMins;
+  if(calEvents[oldKey]){
+    calEvents[oldKey]=calEvents[oldKey].filter(e=>!(e.label===oldE.label&&e.startMins===oldE.startMins&&e.h===oldE.h));
+    if(!calEvents[oldKey].length) delete calEvents[oldKey];
+  }
+  if(calEvents[newKey]){
+    const dayEvs=calEvents[newKey];
+    const cols=dayEvs.filter(e=>e.startMins<newEnd&&e.endMins>newStart);
+    if(cols.length){
+      cols.sort((a,b)=>a.startMins-b.startMins);
+      const first=cols[0];
+      const origGap=Math.max(0,first.startMins-origEnd);
+      const pushAmt=Math.max(0,(newEnd-first.startMins)+origGap);
+      if(pushAmt>0) dayEvs.forEach(e=>{if(e.startMins>=first.startMins){e.startMins+=pushAmt;e.endMins+=pushAmt;e.h=Math.floor(e.startMins/60);e.hEnd=Math.ceil(e.endMins/60);}});
+    }
+  }
+  if(!calEvents[newKey]) calEvents[newKey]=[];
+  calEvents[newKey].push({...oldE,startMins:newStart,endMins:newEnd,h:Math.floor(newStart/60),hEnd:Math.ceil(newEnd/60)});
+  saveData('alfa_events',calEvents);
+  showToast((oldE.label||'')+' → '+calFmt(newStart)+'–'+calFmt(newEnd));
   renderCal();
+}
+let _calTouchDrag=null;
+function calEvTouchStart(ev,key,eEnc){
+  const e=JSON.parse(decodeURIComponent(eEnc));
+  if(e.auto) return;
+  const t0=ev.touches[0];
+  const sx=t0.clientX,sy=t0.clientY;
+  let active=false,moved=false;
+  const evEl=ev.currentTarget;
+  const timer=setTimeout(()=>{
+    if(moved) return;
+    active=true;
+    if(navigator.vibrate) navigator.vibrate(25);
+    evEl.style.opacity='0.4';
+    const g=document.createElement('div');
+    g.id='_calTG';
+    g.style.cssText='position:fixed;pointer-events:none;z-index:9999;opacity:0.88;border-radius:5px;padding:4px 10px;font-size:12px;font-weight:600;border-left:3px solid rgba(0,0,0,0.25);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;'+calEvDim(e);
+    g.textContent=calEvEmoji(e.type)+' '+(e.label||'');
+    document.body.appendChild(g);
+  },220);
+  function move(mev){
+    const t=mev.touches[0];
+    if(!active){if(Math.abs(t.clientX-sx)>8||Math.abs(t.clientY-sy)>8){moved=true;clearTimeout(timer);}return;}
+    mev.preventDefault();
+    const g=document.getElementById('_calTG');
+    if(g){g.style.left=(t.clientX-40)+'px';g.style.top=(t.clientY-40)+'px';}
+  }
+  function end(eev){
+    clearTimeout(timer);
+    document.removeEventListener('touchmove',move);
+    document.removeEventListener('touchend',end);
+    evEl.style.opacity='';
+    const g=document.getElementById('_calTG');
+    if(g) g.style.display='none';
+    if(!active){if(g)g.remove();return;}
+    const t=eev.changedTouches[0];
+    const target=document.elementFromPoint(t.clientX,t.clientY);
+    if(g) g.remove();
+    if(!target||_roGuard()) return;
+    const colEl=target.closest?target.closest('[data-calkey]'):null;
+    if(!colEl) return;
+    const newKey=colEl.getAttribute('data-calkey');
+    const rect=colEl.getBoundingClientRect();
+    const HSTART=(calView==='day')?4:6;
+    const slot=Math.max(0,Math.round((t.clientY-rect.top)/15));
+    _calDoPlace(key,newKey,e,HSTART*60+slot*15);
+  }
+  document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('touchend',end);
 }
 function calColClick(ev,key,colEl){
   if(ev.target!==colEl&&!ev.target.style.borderTop)return;
@@ -338,7 +419,7 @@ function renderWeek(body){
     const laid=calLayoutOverlap(normEvs,HSTART,HEND);
     const flex=wknd?'0 0 8%':'1';
     const totalH=totalSlots*SPX;
-    html+='<div style="flex:'+flex+';position:relative;min-width:0;height:'+totalH+'px;'+(wknd?'background:#F8F7F3;':'')+(tod?'background:rgba(25,118,210,0.025);':'')+'border-left:1px solid #D3D1C7;" ondragover="calDragOver(event,\''+key+'\')" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
+    html+='<div data-calkey="'+key+'" style="flex:'+flex+';position:relative;min-width:0;height:'+totalH+'px;'+(wknd?'background:#F8F7F3;':'')+(tod?'background:rgba(25,118,210,0.025);':'')+'border-left:1px solid #D3D1C7;" ondragover="calDragOver(event,\''+key+'\',this)" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
     for(let s=0;s<totalSlots;s++){const isH=(s%SPH===0);html+='<div style="position:absolute;left:0;right:0;top:'+(s*SPX)+'px;border-top:1px '+(isH?'solid #D3D1C7':'dashed #ECEAE4')+';pointer-events:none"></div>';}
     html+='<div id="wkghost-'+key+'" style="display:none;position:absolute;left:2px;right:2px;background:rgba(25,118,210,0.12);border:2px dashed #1976D2;border-radius:4px;pointer-events:none;z-index:2"></div>';
     laid.forEach(e=>{
@@ -356,7 +437,7 @@ function renderWeek(body){
       const showTime=heightPx>=24&&!isCompact;
       const showMaps=isDrive;
       const eEnc=encodeURIComponent(JSON.stringify(e));
-      html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;'+(isDrive?'padding:2px 52px 2px 5px;':'padding:2px 5px;')+'font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
+      html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;'+(isDrive?'padding:2px 52px 2px 5px;':'padding:2px 5px;')+'font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
       if(showTime) html+='<span style="font-size:9px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
       if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:3px;right:4px;font-size:9px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.88);border-radius:3px;padding:1px 3px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
       const _siW=_calStatusIcons(e,key);
@@ -415,7 +496,7 @@ function buildDayViewHtml(key, readOnly){
   if(readOnly){
     html+='<div style="flex:1;position:relative;height:'+totalH+'px">';
   } else {
-    html+='<div style="flex:1;position:relative;height:'+totalH+'px" ondragover="calDragOver(event,\''+key+'\')" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
+    html+='<div data-calkey="'+key+'" style="flex:1;position:relative;height:'+totalH+'px" ondragover="calDragOver(event,\''+key+'\',this)" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
     html+='<div id="wkghost-'+key+'" style="display:none;position:absolute;left:4px;right:4px;background:rgba(25,118,210,0.12);border:2px dashed #1976D2;border-radius:4px;pointer-events:none;z-index:2"></div>';
   }
 
@@ -461,7 +542,7 @@ function buildDayViewHtml(key, readOnly){
     const showTime=!isCompact;
     const showMaps=isDrive;
     const cursor=readOnly?'pointer':'grab';
-    const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()"';
+    const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')"';
     html+='<div class="'+cc+'"'+dragAttrs+' onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;'+(isDrive?'padding:4px 80px 4px 8px;':'padding:4px 8px;')+'font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:'+cursor+';'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
     if(showTime) html+='<span style="font-size:10px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
     if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:5px;right:6px;font-size:11px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.9);border-radius:3px;padding:1px 4px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
