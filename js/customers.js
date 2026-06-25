@@ -906,7 +906,10 @@ function renderContactsEditor(name){
       <button class="btn btn-sm" onclick="document.getElementById('contact-add-form').style.display='none';document.getElementById('contact-add-btn').style.display=''">Avbryt</button>
     </div>
   </div>`;
-  html+=`<button class="btn btn-sm" id="contact-add-btn" onclick="addContact('${safeName}')" style="align-self:flex-start;margin-top:2px">+ Legg til kontaktperson</button>`;
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+    <button class="btn btn-sm" id="contact-add-btn" onclick="addContact('${safeName}')">+ Legg til kontaktperson</button>
+    <button class="btn btn-sm" onclick="_vcardUploadStart('${safeName}')" style="color:#0C447C;border-color:#B8D4E8">📇 Last opp fra mobil (.vcf)</button>
+  </div>`;
   html+='</div>';
   container.innerHTML=html;
 }
@@ -1002,6 +1005,173 @@ function downloadAllVCards(customerName){
   if(!c||!c.contacts||!c.contacts.length) return;
   const all=c.contacts.map(p=>_buildVCard(p,c)).join('\r\n');
   _triggerVCardDownload(all,(c.name||'kontakter').trim()+'-kontakter.vcf');
+}
+
+// ─── VCARD OPPLASTING ───────────────────────────────────────────────────────
+
+function _vcardUploadStart(customerName){
+  var inp=document.getElementById('vcf-upload-input');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='file';
+    inp.id='vcf-upload-input';
+    inp.accept='.vcf,text/vcard';
+    inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  inp.value='';
+  inp.onchange=function(){ _vcardHandleFile(this,customerName); };
+  inp.click();
+}
+
+function _vcardHandleFile(inputEl,customerName){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const parsed=_parseVCards(e.target.result);
+      if(!parsed.length){ showToast('Ingen gyldige kontakter funnet i filen'); return; }
+      _vcardShowConfirm(parsed,customerName);
+    }catch(err){ console.warn('vCard parse feil',err); showToast('Kunne ikke lese vCard-filen'); }
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+function _vcUnesc(s){
+  return (s||'').replace(/\\n/gi,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
+}
+
+function _parseVCards(text){
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  text=text.replace(/\n[ \t]/g,''); // unfold
+  const contacts=[];
+  text.split(/BEGIN:VCARD/i).forEach(block=>{
+    if(!block.trim()) return;
+    const end=block.search(/END:VCARD/i);
+    if(end===-1) return;
+    const lines=block.substring(0,end).split('\n').filter(l=>l.trim());
+    let fn='',nLast='',nFirst='',title='',phones=[],emails=[];
+    lines.forEach(line=>{
+      const ci=line.indexOf(':');
+      if(ci===-1) return;
+      const propFull=line.substring(0,ci).toUpperCase();
+      const val=line.substring(ci+1);
+      const base=propFull.split(';')[0];
+      const params=propFull.split(';').slice(1).join(';');
+      if(base==='FN'){
+        fn=_vcUnesc(val);
+      } else if(base==='N'){
+        const p=val.split(';');
+        nLast=_vcUnesc(p[0]||'');
+        nFirst=_vcUnesc(p[1]||'');
+      } else if(base==='TITLE'){
+        title=_vcUnesc(val);
+      } else if(base==='TEL'){
+        const isCell=params.includes('CELL')||params.includes('MOBILE');
+        const isWork=params.includes('WORK');
+        phones.push({num:val.trim().replace(/[^\d\s+\-()]/g,'').trim(),cell:isCell,work:isWork});
+      } else if(base==='EMAIL'){
+        const isWork=params.includes('WORK');
+        emails.push({addr:_vcUnesc(val.trim()),work:isWork});
+      }
+    });
+    const name=(fn.trim()||[nFirst,nLast].filter(Boolean).join(' ').trim());
+    if(!name) return;
+    const ph=phones.length?(phones.find(p=>p.cell)||phones.find(p=>p.work)||phones[0]).num:'';
+    const em=emails.length?(emails.find(e=>e.work)||emails[0]).addr:'';
+    contacts.push({name,role:title.trim(),phone:ph,email:em});
+  });
+  return contacts;
+}
+
+function _vcardShowConfirm(contacts,customerName){
+  const existing=document.getElementById('vcf-confirm-modal');
+  if(existing) existing.remove();
+  window._vcfParsed=contacts;
+  window._vcfTarget=customerName;
+  const isSingle=contacts.length===1;
+  const btnStyle='padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;';
+  let body='';
+  if(isSingle){
+    const p=contacts[0];
+    body=`<div style="background:#F8F7F3;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;color:#2C2C2A;margin-bottom:4px">${escapeHtml(p.name)}</div>
+      ${p.role?`<div style="font-size:12px;color:#888780;margin-bottom:3px">💼 ${escapeHtml(p.role)}</div>`:''}
+      ${p.phone?`<div style="font-size:12px;color:#5F5E5A;margin-bottom:3px">📞 ${escapeHtml(p.phone)}</div>`:''}
+      ${p.email?`<div style="font-size:12px;color:#5F5E5A">✉ ${escapeHtml(p.email)}</div>`:''}
+    </div>
+    <div style="font-size:13px;color:#5F5E5A;margin-bottom:16px">Legg til som kontaktperson hos <strong>${escapeHtml(customerName)}</strong>?</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('vcf-confirm-modal').remove()" style="${btnStyle}background:#F1EFE8;border:1px solid #D3D1C7;color:#5F5E5A">Avbryt</button>
+      <button onclick="_vcardDoSave([0])" style="${btnStyle}background:#1A5C3A;border:none;color:#fff">✓ Legg til kontakt</button>
+    </div>`;
+  } else {
+    let rows='';
+    contacts.forEach((p,i)=>{
+      rows+=`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#F8F7F3;border-radius:8px;cursor:pointer">
+        <input type="checkbox" id="vcf-cb-${i}" checked onchange="_vcardUpdateCount()" style="width:16px;height:16px;margin-top:2px;cursor:pointer;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#2C2C2A">${escapeHtml(p.name)}</div>
+          ${p.role?`<div style="font-size:11px;color:#888780">${escapeHtml(p.role)}</div>`:''}
+          <div style="font-size:11px;color:#5F5E5A;margin-top:2px">${p.phone?'📞 '+escapeHtml(p.phone):''}${p.phone&&p.email?' · ':''}${p.email?'✉ '+escapeHtml(p.email):''}</div>
+        </div>
+      </label>`;
+    });
+    body=`<div style="font-size:13px;color:#5F5E5A;margin-bottom:10px">${contacts.length} kontakter i filen. Velg hvilke som skal legges til hos <strong>${escapeHtml(customerName)}</strong>:</div>
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin-bottom:14px">${rows}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('vcf-confirm-modal').remove()" style="${btnStyle}background:#F1EFE8;border:1px solid #D3D1C7;color:#5F5E5A">Avbryt</button>
+      <button id="vcf-save-btn" onclick="_vcardDoSaveSelected()" style="${btnStyle}background:#1A5C3A;border:none;color:#fff">✓ Legg til valgte (${contacts.length})</button>
+    </div>`;
+  }
+  const modal=document.createElement('div');
+  modal.id='vcf-confirm-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick=function(e){ if(e.target===modal) modal.remove(); };
+  modal.innerHTML=`<div style="background:#fff;border-radius:14px;width:420px;max-width:100%;padding:16px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700">📇 Legg til kontakt${contacts.length>1?'er':''} fra mobil</div>
+      <button onclick="document.getElementById('vcf-confirm-modal').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888780;line-height:1">×</button>
+    </div>${body}</div>`;
+  document.body.appendChild(modal);
+}
+
+function _vcardUpdateCount(){
+  const contacts=window._vcfParsed||[];
+  let n=0;
+  contacts.forEach((_,i)=>{ const cb=document.getElementById('vcf-cb-'+i); if(cb&&cb.checked) n++; });
+  const btn=document.getElementById('vcf-save-btn');
+  if(btn) btn.textContent='✓ Legg til valgte ('+n+')';
+}
+
+function _vcardDoSave(indices){
+  const contacts=window._vcfParsed;
+  const customerName=window._vcfTarget;
+  if(!contacts||!customerName) return;
+  const c=getCustomers().find(x=>x.name===customerName);
+  if(!c) return;
+  if(!c.contacts) c.contacts=[];
+  let added=0;
+  indices.forEach(i=>{
+    const p=contacts[i];
+    if(!p||!p.name) return;
+    c.contacts.push({name:p.name,role:p.role||'',type:'decision',phone:p.phone||'',email:p.email||''});
+    added++;
+  });
+  if(!added){ showToast('Ingen kontakter valgt'); return; }
+  saveData('alfa_customers',CUSTOMERS);
+  _sbPatchCustomerField(c.id,{contacts:c.contacts});
+  document.getElementById('vcf-confirm-modal')?.remove();
+  renderContactsEditor(customerName);
+  showToast(added===1?'Kontakt lagt til!':added+' kontakter lagt til!');
+}
+
+function _vcardDoSaveSelected(){
+  const contacts=window._vcfParsed||[];
+  const idxs=[];
+  contacts.forEach((_,i)=>{ const cb=document.getElementById('vcf-cb-'+i); if(cb&&cb.checked) idxs.push(i); });
+  _vcardDoSave(idxs);
 }
 
 // ─── KUNDELISTE-IMPORT ──────────────────────────────────────────────────────
