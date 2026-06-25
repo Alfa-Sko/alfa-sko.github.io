@@ -813,6 +813,7 @@ function runPlanner(){
   const dateStr=document.getElementById('planner-date').value||TODAY_STR;
   const startT=document.getElementById('planner-start').value||'08:00';
   const endT=document.getElementById('planner-end').value||'17:00';
+  const departT=(document.getElementById('planner-depart')||{}).value||'';
   const homeBase=(document.getElementById('planner-home')||{}).value||_plannerHomeBase;
   let startFromHome=(document.getElementById('planner-from-home')||{}).checked;
   _plannerHomeBase=homeBase;
@@ -1001,6 +1002,17 @@ function runPlanner(){
     if(d===0 && tripMeta.hasFlight && tripMeta.flyDate===dayKey && tripMeta.flyTime){
       const [fh,fm]=tripMeta.flyTime.split(':').map(Number);
       dayStartMinEff = Math.max(dayStartMin, roundUpTo30(fh*60+fm+45));
+    }
+    let _departFromHome = null;
+    if(d===0 && departT && startFromHome && homeBase && !tripMeta.hasFlight){
+      const [_dh,_dm]=departT.split(':').map(Number);
+      const _departMins=_dh*60+_dm;
+      const _firstHint=(pool.length>0&&pool[custIdx]&&pool[custIdx].city)?pool[custIdx].city:area;
+      const _driveFromHome=getDriveMin(homeBase,_firstHint);
+      const _arrivalMins=_departMins+_driveFromHome;
+      const _isOvernight=_arrivalMins>dayEndMin;
+      if(!_isOvernight){ dayStartMinEff=_departMins; } else { dayStartCity=_firstHint; }
+      _departFromHome={departMins:_departMins,arrivalMins:_arrivalMins,driveMins:_driveFromHome,overnight:_isOvernight,from:homeBase,to:_firstHint};
     }
     // LANG TRANSPORT TIL DAGENS OMRÅDE? Hvis kjøringen fra dagens startsted til
     // dagens første by er over 3 timer, legges transporten som en KVELDSETAPPE
@@ -1204,7 +1216,9 @@ function runPlanner(){
       const firstDrive = firstC._drive || 0;
       const firstCity = firstC.city || '';
       if(firstDrive>0 && firstCity && firstCity!==dayStartCity){
-        const driveStart = Math.max(dayStartMin, firstC._start - firstDrive);
+        const driveStart = (_departFromHome && !_departFromHome.overnight)
+          ? _departFromHome.departMins
+          : Math.max(dayStartMin, firstC._start - firstDrive);
         driveHomeBlock = {kind:'drive-home', startMins:driveStart, endMins:firstC._start, from:dayStartCity, to:firstCity, min:firstDrive};
         timeline.push(driveHomeBlock);
       }
@@ -1223,7 +1237,9 @@ function runPlanner(){
     // Hvilke soner dekker denne dagen?
     const zones=[...new Set(dayCustomers.map(c=>customerZone.get(c.name)).filter(Boolean))];
     if(!customRouteActive) _workDays++;
-    days.push({label:dayLabel,date:dayDate,customers:dayCustomers,timeline:timeline,startMin:dayStartMin,fixedCount:fixedAppts.length,zones:zones,startCity:dayStartCity});
+    const _dayObj={label:dayLabel,date:dayDate,customers:dayCustomers,timeline:timeline,startMin:dayStartMin,fixedCount:fixedAppts.length,zones:zones,startCity:dayStartCity};
+    if(_departFromHome) _dayObj._departFromHome=_departFromHome;
+    days.push(_dayObj);
     // Oppdater "forrige dags sluttsted" for neste iterasjon
     if(dayCustomers.length>0){
       const lastVisit = dayCustomers[dayCustomers.length-1];
@@ -1304,6 +1320,14 @@ function runPlanner(){
     const _mxOpts=['','30','45','60','90'].map(v=>'<option value="'+v+'"'+((v&&day._maxVisitDuration===+v)?' selected':(!v&&!day._maxVisitDuration?' selected':''))+'>'+(v?v+' min':'Fri tid')+'</option>').join('');
     const _mxSel='<select onchange="setDayMaxVisit('+dayIdx+',this.value)" onclick="event.stopPropagation()" style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:7px;font-size:10px;color:#5F5E5A;padding:2px 5px;cursor:pointer;margin-left:8px;font-weight:600" title="Maks besøkstid per kunde (låste og manuelt justerte besøk røres ikke)">'+_mxOpts+'</select>';
     html+='<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span>'+_mxSel+'</div>';
+    if(day._departFromHome && day._departFromHome.overnight){
+      const _df=day._departFromHome;
+      const _ft=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+      const _dh2=Math.floor(_df.driveMins/60),_dm2=_df.driveMins%60;
+      const _ds=_dh2>0?(_dh2+'t'+(_dm2>0?' '+_dm2+'min':'')):((_dm2)+' min');
+      const _mapsH='https://www.google.com/maps/dir/'+encodeURIComponent(_df.from+', Norge')+'/'+encodeURIComponent(_df.to+', Norge');
+      html+='<div style="background:#EEE9F7;border:1px solid #C5B8E0;border-radius:8px;padding:8px 12px;margin:4px 0"><div style="font-size:12px;font-weight:700;color:#4A2E8A">🌙 Kveldsavreise — overnatting underveis</div><div style="font-size:11px;color:#4A2E8A;margin-top:3px">🏠 Avreise kl. '+_ft(_df.departMins)+' fra '+escapeHtml(_df.from.split(',')[0])+' → '+escapeHtml(_df.to)+' · <span style="background:#D8CCEF;color:#4A2E8A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">'+_ds+'</span> · Fremkomst '+_ft(_df.arrivalMins)+' · <a href="'+_mapsH+'" target="_blank" style="color:#1565C0;text-decoration:underline">Maps ↗</a></div></div>';
+    }
     // Vis fridag-/helligdag-banner og hopp over resten av dagen
     if(day.skippedReason){
       const icon = day.isHoliday ? '🎉' : '🌴';
@@ -2699,6 +2723,14 @@ function renderPlanFromData(days){
     const _mxOpts2=['','30','45','60','90'].map(v=>'<option value="'+v+'"'+((v&&day._maxVisitDuration===+v)?' selected':(!v&&!day._maxVisitDuration?' selected':''))+'>'+(v?v+' min':'Fri tid')+'</option>').join('');
     const _mxSel2='<select onchange="setDayMaxVisit('+dayIdx+',this.value)" onclick="event.stopPropagation()" style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:7px;font-size:10px;color:#5F5E5A;padding:2px 5px;cursor:pointer;margin-left:8px;font-weight:600" title="Maks besøkstid per kunde (låste og manuelt justerte besøk røres ikke)">'+_mxOpts2+'</select>';
     html += '<div class="planner-day"><div class="planner-day-title">'+day.label+' <span style="font-weight:400;color:#888780;font-size:12px">· '+day.customers.length+' besøk'+fixedInfo+zoneInfo+'</span>'+_mxSel2+'</div>';
+    if(day._departFromHome && day._departFromHome.overnight){
+      const _df2=day._departFromHome;
+      const _ft2=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+      const _dh3=Math.floor(_df2.driveMins/60),_dm3=_df2.driveMins%60;
+      const _ds2=_dh3>0?(_dh3+'t'+(_dm3>0?' '+_dm3+'min':'')):((_dm3)+' min');
+      const _mapsH2='https://www.google.com/maps/dir/'+encodeURIComponent(_df2.from+', Norge')+'/'+encodeURIComponent(_df2.to+', Norge');
+      html+='<div style="background:#EEE9F7;border:1px solid #C5B8E0;border-radius:8px;padding:8px 12px;margin:4px 0"><div style="font-size:12px;font-weight:700;color:#4A2E8A">🌙 Kveldsavreise — overnatting underveis</div><div style="font-size:11px;color:#4A2E8A;margin-top:3px">🏠 Avreise kl. '+_ft2(_df2.departMins)+' fra '+escapeHtml(_df2.from.split(',')[0])+' → '+escapeHtml(_df2.to)+' · <span style="background:#D8CCEF;color:#4A2E8A;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600">'+_ds2+'</span> · Fremkomst '+_ft2(_df2.arrivalMins)+' · <a href="'+_mapsH2+'" target="_blank" style="color:#1565C0;text-decoration:underline">Maps ↗</a></div></div>';
+    }
     if(day.skippedReason){
       const icon = day.isHoliday ? '🎉' : '🌴';
       html += '<div style="background:#FBE9E7;border:1px solid #C62828;color:#C62828;padding:12px 14px;margin:8px 0;border-radius:8px;font-size:13px;font-weight:600">'+icon+' '+escapeHtml(day.skippedReason)+' — ingen besøk planlagt</div></div>';
