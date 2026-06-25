@@ -134,18 +134,31 @@ function deleteFollowup(id){
   showToast('Oppfølging slettet');
 }
 
+function _followMatch(f, words){
+  if(!words.length) return true;
+  const prio={high:'høy',medium:'medium',low:'lav'}[f.priority]||f.priority||'';
+  const dueFmt=f.due?f.due.split('-').reverse().join('.'):'';
+  const hay=[f.task||'',f.customer||'',f.due||'',dueFmt,prio].join(' ').toLowerCase();
+  return words.every(w=>hay.includes(w));
+}
+
 function renderFollowups(){
   const myId=((_sbSession()||{}).user||{}).id||'';
   if(window._sbUser&&!window._demoMode&&!window._viewOnlyMode&&!window._leaderHome) _fetchSharedFollowups();
+  const q=((document.getElementById('follow-search')||{}).value||'').toLowerCase();
+  const words=q.split(/\s+/).filter(Boolean);
   const allOpen=[
     ...followups.filter(f=>!f.done).map(f=>({...f,_src:'local'})),
     ..._sharedFollowups.filter(f=>!f.done).map(f=>({...f,_src:'shared'}))
-  ].sort((a,b)=>a.due.localeCompare(b.due));
+  ].sort((a,b)=>a.due.localeCompare(b.due)).filter(f=>_followMatch(f,words));
   const allDone=[
     ...followups.filter(f=>f.done).map(f=>({...f,_src:'local'})),
     ..._sharedFollowups.filter(f=>f.done).map(f=>({...f,_src:'shared'}))
-  ];
-  let html=allOpen.length===0?'<div class="empty-state">Ingen åpne oppfølginger ✓</div>':allOpen.map(f=>followItem(f,myId)).join('');
+  ].filter(f=>_followMatch(f,words));
+  const emptyMsg=words.length
+    ?'<div class="empty-state">Ingen treff for «'+escapeHtml(q)+'»</div>'
+    :'<div class="empty-state">Ingen åpne oppfølginger ✓</div>';
+  let html=allOpen.length===0?emptyMsg:allOpen.map(f=>followItem(f,myId)).join('');
   if(allDone.length>0) html+='<div class="section-label" style="margin-top:20px">Gjennomførte ('+allDone.length+')</div>'+allDone.map(f=>followItem(f,myId)).join('');
   document.getElementById('followup-list').innerHTML=html;
   renderBookingFollowups();
