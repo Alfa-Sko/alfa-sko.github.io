@@ -10,7 +10,7 @@ function followItem(f){
       <div class="fdue${isOverdue?' furgent':''}">Forfaller ${f.due.split('-').reverse().join('.')}${isOverdue?' · FORFALT':''}</div>
     </div>
     ${!f.done
-      ? `<button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button>`
+      ? `<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="_openFollowupEditModal(${f.id})" style="background:none;border:1px solid #D3D1C7;border-radius:8px;color:#5F5E5A;font-size:14px;cursor:pointer;padding:3px 8px;line-height:1" title="Rediger">✎</button><button class="btn btn-light btn-sm" onclick="markDone(${f.id})">✓</button></div>`
       : `<button onclick="markUndone(${f.id})" style="background:none;border:1px solid #D3D1C7;border-radius:8px;color:#5F5E5A;font-size:11px;cursor:pointer;padding:2px 7px;white-space:nowrap">↩ Åpne igjen</button><button onclick="deleteFollowup(${f.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0 0 0 6px" title="Slett">🗑</button>`
     }
   </div>`;
@@ -149,4 +149,55 @@ function markTravelBooked(dateKey, startMins, label){
   saveData('alfa_events', calEvents);
   renderBookingFollowups();
   showToast('✅ '+label+' merket som bestilt');
+}
+
+function _openFollowupEditModal(id){
+  if(_roGuard()) return;
+  const f = followups.find(x=>x.id===id);
+  if(!f) return;
+  const existing = document.getElementById('follow-edit-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'follow-edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:480px;max-width:100%;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.18)">'
+    +'<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
+    +'<div><div style="font-size:15px;font-weight:700;color:#2C2C2A">Rediger oppfølging</div>'
+    +'<div style="font-size:12px;color:#5F5E5A;margin-top:2px">'+escapeHtml(f.customer)+'</div></div>'
+    +'<button onclick="document.getElementById(\'follow-edit-modal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888780;padding:0 4px;line-height:1;flex-shrink:0">×</button>'
+    +'</div>'
+    +'<div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">'
+    +'<div><label style="font-size:12px;font-weight:600;color:#5F5E5A;display:block;margin-bottom:4px">Oppgave</label>'
+    +'<textarea id="follow-edit-task" style="width:100%;min-height:90px;padding:10px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;font-family:inherit;color:#2C2C2A"></textarea></div>'
+    +'<div><label style="font-size:12px;font-weight:600;color:#5F5E5A;display:block;margin-bottom:4px">Frist</label>'
+    +'<input type="date" id="follow-edit-due" style="width:100%;padding:10px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:inherit;color:#2C2C2A"></div>'
+    +'</div>'
+    +'<div style="padding:0 16px 14px;display:flex;gap:8px">'
+    +'<button onclick="window._followEditSave()" style="flex:1;padding:10px;background:#2C2C2A;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Lagre</button>'
+    +'<button onclick="document.getElementById(\'follow-edit-modal\').remove()" style="padding:10px 18px;background:#F1EFE8;border:none;border-radius:8px;font-size:13px;cursor:pointer;color:#5F5E5A">Avbryt</button>'
+    +'</div>'
+    +'</div>';
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  window._followEditSave = function(){
+    const ta = document.getElementById('follow-edit-task');
+    const dt = document.getElementById('follow-edit-due');
+    if(!ta || !dt) return;
+    const newTask = ta.value.trim();
+    const newDue = dt.value;
+    if(!newTask || !newDue){ showToast('Fyll ut oppgave og frist'); return; }
+    modal.remove();
+    delete window._followEditSave;
+    followups = followups.map(x=>x.id===id ? {...x, task:newTask, due:newDue} : x);
+    saveData('alfa_followups', followups);
+    renderFollowups();
+    showToast('Oppfølging oppdatert');
+  };
+  document.body.appendChild(modal);
+  setTimeout(function(){
+    const ta = document.getElementById('follow-edit-task');
+    const dt = document.getElementById('follow-edit-due');
+    if(ta){ ta.value = f.task; ta.focus(); }
+    if(dt) dt.value = f.due;
+  }, 30);
 }
