@@ -868,6 +868,7 @@ function renderContactsEditor(name){
   const typeClass={decision:'ct-decision',buyer:'ct-buyer',influence:'ct-influence'};
   let html='<div style="display:flex;flex-direction:column;gap:6px">';
   contacts.forEach((p,idx)=>{
+    const safeIdx=idx;
     html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:#F8F7F3;border-radius:8px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:#2C2C2A">${escapeHtml(p.name||'')}${p.type?` <span class="contact-type ${typeClass[p.type]||'ct-influence'}" style="margin-left:4px">${typeLabel[p.type]||''}</span>`:''}</div>
@@ -877,9 +878,13 @@ function renderContactsEditor(name){
           ${p.email?`<a href="mailto:${escapeHtml(p.email)}" style="color:#0C447C;text-decoration:none">✉ ${escapeHtml(p.email)}</a>`:''}
         </div>
       </div>
+      <button onclick="downloadVCard('${safeName}',${safeIdx})" style="background:none;border:1px solid #D3D1C7;border-radius:6px;font-size:11px;color:#5F5E5A;cursor:pointer;padding:3px 7px;flex-shrink:0;white-space:nowrap" title="Last ned vCard (.vcf)">📇</button>
       <button onclick="deleteContact('${safeName}',${idx})" style="background:none;border:none;font-size:18px;color:#B4B2A9;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0" title="Slett">×</button>
     </div>`;
   });
+  if(contacts.length>=2){
+    html+=`<button onclick="downloadAllVCards('${safeName}')" style="background:#F1EFE8;border:1px solid #D3D1C7;border-radius:8px;font-size:12px;color:#5F5E5A;cursor:pointer;padding:6px 12px;align-self:flex-start;margin-top:2px">📇 Last ned alle kontakter (.vcf)</button>`;
+  }
   html+=`<div id="contact-add-form" style="display:none;padding:10px 12px;background:#F0EEF8;border-radius:8px">
     <div class="form-row-2" style="margin-bottom:6px">
       <div class="form-group" style="margin-bottom:0"><label style="font-size:10px">Navn</label><input type="text" id="cnew-name" placeholder="Kari Nordmann"></div>
@@ -944,6 +949,59 @@ function deleteContact(name,idx){
   _sbPatchCustomerField(c.id,{contacts:c.contacts});
   renderContactsEditor(name);
   showToast('Kontaktperson fjernet');
+}
+
+// ─── VCARD NEDLASTING ───────────────────────────────────────────────────────
+
+function _vcEsc(s){
+  return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+}
+
+function _buildVCard(p,c){
+  const lines=['BEGIN:VCARD','VERSION:3.0'];
+  lines.push('FN:'+_vcEsc(p.name||''));
+  const parts=(p.name||'').trim().split(/\s+/);
+  const last=parts.length>1?parts[parts.length-1]:'';
+  const first=parts.length>1?parts.slice(0,-1).join(' '):(parts[0]||'');
+  lines.push('N:'+_vcEsc(last)+';'+_vcEsc(first)+';;;');
+  if(p.role) lines.push('TITLE:'+_vcEsc(p.role));
+  if(c&&c.name) lines.push('ORG:'+_vcEsc(c.name));
+  if(p.phone) lines.push('TEL;TYPE=WORK,VOICE:'+_vcEsc(p.phone));
+  if(p.email) lines.push('EMAIL;TYPE=INTERNET,WORK:'+_vcEsc(p.email));
+  if(c){
+    const street=_vcEsc(c.gate||c.address||'');
+    const city=_vcEsc(c.poststed||c.city||'');
+    const postcode=_vcEsc(c.postnr||'');
+    if(street||city||postcode) lines.push('ADR;TYPE=WORK:;;'+street+';'+city+';;'+postcode+';Norge');
+  }
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+
+function _triggerVCardDownload(vcText,filename){
+  const blob=new Blob([vcText],{type:'text/vcard;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=filename.replace(/[\/\\:*?"<>|]/g,'_');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+function downloadVCard(customerName,idx){
+  const c=getCustomers().find(x=>x.name===customerName);
+  if(!c||!c.contacts||!c.contacts[idx]) return;
+  const p=c.contacts[idx];
+  _triggerVCardDownload(_buildVCard(p,c),(p.name||'kontakt').trim()+'.vcf');
+}
+
+function downloadAllVCards(customerName){
+  const c=getCustomers().find(x=>x.name===customerName);
+  if(!c||!c.contacts||!c.contacts.length) return;
+  const all=c.contacts.map(p=>_buildVCard(p,c)).join('\r\n');
+  _triggerVCardDownload(all,(c.name||'kontakter').trim()+'-kontakter.vcf');
 }
 
 // ─── KUNDELISTE-IMPORT ──────────────────────────────────────────────────────
