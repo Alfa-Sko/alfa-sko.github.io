@@ -247,10 +247,16 @@ async function _shareFollowup(id){
   window._shareFollowupConfirm=async function(){
     const checked=[...modal.querySelectorAll('.share-cb:checked')].map(cb=>cb.value);
     if(!checked.length){ showToast('Velg minst én person'); return; }
+    // Les fersk sesjon inne i callbacken — ikke stol på closure-variabel
+    const _s=_sbSession();
+    if(!_s||!_s.access_token||!(_s.user||{}).id){
+      showToast('Økt utløpt — last siden på nytt'); return;
+    }
+    const uid=_s.user.id;
     const btn=document.getElementById('share-confirm-btn');
     if(btn){ btn.disabled=true; btn.textContent='Deler…'; }
     const payload={
-      owner_id:myId,
+      owner_id:uid,
       shared_with:checked,
       customer:f.customer,
       task:f.task,
@@ -264,7 +270,10 @@ async function _shareFollowup(id){
         headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify(payload)
       });
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        let body=''; try{ body=(await r.text()).slice(0,200); }catch(e){}
+        throw new Error('HTTP '+r.status+(body?' — '+body:''));
+      }
       // Fjern fra lokal ETTER vellykket INSERT
       followups=followups.filter(x=>x.id!==id);
       saveData('alfa_followups',followups);
