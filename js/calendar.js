@@ -1106,3 +1106,226 @@ function saveAppt(){
 }
 
 document.getElementById('appt-overlay').addEventListener('click', function(e){ if(e.target===this) closeAppt(); });
+
+// ─── ICS IMPORT ──────────────────────────────────────────────────────────────
+
+function _icsImportStart(){
+  var inp=document.getElementById('ics-upload-input');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='file';
+    inp.id='ics-upload-input';
+    inp.accept='.ics,text/calendar';
+    inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  inp.value='';
+  inp.onchange=function(){ _icsHandleFile(this); };
+  inp.click();
+}
+
+function _icsHandleFile(inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file) return;
+  if(file.size===0){ showToast('Filen er tom'); return; }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const parsed=_parseICSEvents(e.target.result);
+      if(!parsed.length){ showToast('Ingen gyldige avtaler funnet i .ics-filen'); return; }
+      _icsShowImportConfirm(parsed);
+    }catch(err){ console.warn('ICS parse feil',err); showToast('Kunne ikke lese .ics-filen — ugyldig format?'); }
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+function _icsUnescapeVal(s){
+  return String(s==null?'':s).replace(/\\n/gi,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
+}
+
+function _icsParseDT(val, params){
+  val=(val||'').trim();
+  params=(params||'').toUpperCase();
+  const isAllDay=params.includes('VALUE=DATE')||/^\d{8}$/.test(val);
+  if(isAllDay){
+    if(val.length<8) return null;
+    const y=+val.slice(0,4),m=+val.slice(4,6),d=+val.slice(6,8);
+    if(!y||!m||!d) return null;
+    return{dateKey:y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'),startMins:480,isAllDay:true};
+  }
+  if(val.length<15) return null;
+  const isUTC=val.endsWith('Z');
+  const vy=+val.slice(0,4),vm=+val.slice(4,6)-1,vd=+val.slice(6,8);
+  const vh=+val.slice(9,11),vmi=+val.slice(11,13);
+  // UTC: convert via JS Date (handles DST automatically). Non-UTC: treat as local Norwegian time.
+  const dt=isUTC?new Date(Date.UTC(vy,vm,vd,vh,vmi)):new Date(vy,vm,vd,vh,vmi);
+  const lY=dt.getFullYear(),lM=dt.getMonth()+1,lD=dt.getDate();
+  const lH=dt.getHours(),lMi=dt.getMinutes();
+  return{dateKey:lY+'-'+String(lM).padStart(2,'0')+'-'+String(lD).padStart(2,'0'),startMins:lH*60+lMi,isAllDay:false};
+}
+
+function _parseICSEvents(text){
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  text=text.replace(/\n[ \t]/g,''); // line-unfolding
+  const events=[];
+  text.split(/BEGIN:VEVENT/i).forEach(function(block){
+    const end=block.search(/END:VEVENT/i);
+    if(end===-1) return;
+    const lines=block.substring(0,end).split('\n');
+    let uid='',summary='',dtstart='',dtend='',location='',description='',dtstartParams='',dtendParams='';
+    lines.forEach(function(line){
+      const ci=line.indexOf(':');
+      if(ci===-1) return;
+      const propFull=line.substring(0,ci);
+      const val=line.substring(ci+1).trim();
+      const base=propFull.split(';')[0].toUpperCase();
+      const paramStr=propFull.split(';').slice(1).join(';');
+      switch(base){
+        case 'UID':         uid=val; break;
+        case 'SUMMARY':     summary=_icsUnescapeVal(val); break;
+        case 'DTSTART':     dtstart=val; dtstartParams=paramStr; break;
+        case 'DTEND':       dtend=val; dtendParams=paramStr; break;
+        case 'LOCATION':    location=_icsUnescapeVal(val); break;
+        case 'DESCRIPTION': description=_icsUnescapeVal(val); break;
+      }
+    });
+    if(!dtstart) return;
+    const start=_icsParseDT(dtstart,dtstartParams);
+    if(!start) return;
+    let endMins=start.startMins+60;
+    if(dtend){
+      const endDt=_icsParseDT(dtend,dtendParams);
+      if(endDt&&!start.isAllDay){
+        endMins=endDt.startMins;
+        if(endMins<=start.startMins) endMins=start.startMins+60;
+      }
+    }
+    if(start.isAllDay) endMins=start.startMins+480;
+    const ev={
+      type:'other',
+      label:summary||'Uten tittel',
+      h:Math.floor(start.startMins/60),
+      hEnd:Math.ceil(endMins/60),
+      startMins:start.startMins,
+      endMins:endMins,
+      _dateKey:start.dateKey
+    };
+    if(location) ev.city=location;
+    if(description) ev.agenda=description;
+    if(uid) ev._icsUid=uid;
+    events.push(ev);
+  });
+  return events;
+}
+
+function _icsFindExisting(uid){
+  if(!uid) return null;
+  for(const dk in calEvents){
+    const ev=(calEvents[dk]||[]).find(function(e){ return e._icsUid===uid; });
+    if(ev) return{dateKey:dk,ev:ev};
+  }
+  return null;
+}
+
+function _icsShowImportConfirm(events){
+  const existing=document.getElementById('ics-confirm-modal');
+  if(existing) existing.remove();
+  window._icsParsed=events;
+  const MAX_SHOW=100;
+  const shown=events.slice(0,MAX_SHOW);
+  const overflow=events.length-MAX_SHOW;
+  let newCount=0,updateCount=0;
+  events.forEach(function(ev){ if(ev._icsUid&&_icsFindExisting(ev._icsUid)) updateCount++; else newCount++; });
+  const countTxt=newCount+' nye'+(updateCount?', '+updateCount+' oppdateringer':'');
+  const btnStyle='padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;';
+  let rows='';
+  shown.forEach(function(ev,i){
+    const isUpdate=ev._icsUid&&_icsFindExisting(ev._icsUid);
+    const dateDisplay=ev._dateKey.split('-').reverse().join('.');
+    const sh=Math.floor(ev.startMins/60),sm=ev.startMins%60,eh=Math.floor(ev.endMins/60),em=ev.endMins%60;
+    const timeDisplay=ev.startMins!==undefined?(String(sh).padStart(2,'0')+':'+String(sm).padStart(2,'0')+'–'+String(eh).padStart(2,'0')+':'+String(em).padStart(2,'0')):'(heldags)';
+    rows+=`<label style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;background:#F8F7F3;border-radius:8px;cursor:pointer;margin-bottom:6px">
+      <input type="checkbox" id="ics-cb-${i}" checked onchange="_icsUpdateCount()" style="width:16px;height:16px;margin-top:2px;cursor:pointer;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ev.label)}</div>
+        <div style="font-size:11px;color:#888780;margin-top:2px">${escapeHtml(dateDisplay)} · ${escapeHtml(timeDisplay)}${ev.city?' · 📍'+escapeHtml(ev.city):''}</div>
+        ${isUpdate?'<div style="font-size:10px;color:#BA7517;margin-top:1px">↻ Oppdaterer eksisterende</div>':''}
+      </div>
+    </label>`;
+  });
+  if(overflow>0) rows+=`<div style="font-size:11px;color:#888780;text-align:center;padding:6px">… og ${overflow} til (importeres automatisk)</div>`;
+  const modal=document.createElement('div');
+  modal.id='ics-confirm-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick=function(e){ if(e.target===modal) modal.remove(); };
+  modal.innerHTML=`<div style="background:#fff;border-radius:14px;width:460px;max-width:100%;padding:16px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:15px;font-weight:700">📅 Importer fra Outlook</div>
+      <button onclick="document.getElementById('ics-confirm-modal').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888780;line-height:1">×</button>
+    </div>
+    <div style="font-size:12px;color:#888780;margin-bottom:12px">${events.length} avtaler funnet · ${countTxt}</div>
+    <div style="display:flex;flex-direction:column;max-height:340px;overflow-y:auto;margin-bottom:14px">${rows}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button onclick="document.getElementById('ics-confirm-modal').remove()" style="${btnStyle}background:#F1EFE8;border:1px solid #D3D1C7;color:#5F5E5A">Avbryt</button>
+      <button id="ics-save-btn" onclick="_icsDoImportSelected()" style="${btnStyle}background:#0C447C;border:none;color:#fff">✓ Importer alle (${events.length})</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+function _icsUpdateCount(){
+  const events=window._icsParsed||[];
+  const shown=Math.min(events.length,100);
+  let n=0;
+  for(let i=0;i<shown;i++){ const cb=document.getElementById('ics-cb-'+i); if(cb&&cb.checked) n++; }
+  const overflow=events.length>100?events.length-100:0;
+  const btn=document.getElementById('ics-save-btn');
+  if(btn) btn.textContent='✓ Importer valgte ('+(n+overflow)+')';
+}
+
+function _icsDoImportSelected(){
+  const events=window._icsParsed||[];
+  const shown=events.slice(0,100);
+  const selected=[];
+  shown.forEach(function(ev,i){ const cb=document.getElementById('ics-cb-'+i); if(cb&&cb.checked) selected.push(ev); });
+  _icsDoImport(selected.concat(events.slice(100)));
+}
+
+function _icsDoImport(events){
+  if(!events||!events.length){ showToast('Ingen avtaler valgt'); return; }
+  if(_roGuard()) return;
+  let added=0,updated=0;
+  events.forEach(function(ev){
+    const dateKey=ev._dateKey;
+    if(!dateKey) return;
+    const stored={type:ev.type||'other',label:ev.label,h:ev.h,hEnd:ev.hEnd,startMins:ev.startMins,endMins:ev.endMins};
+    if(ev.city) stored.city=ev.city;
+    if(ev.agenda) stored.agenda=ev.agenda;
+    if(ev._icsUid) stored._icsUid=ev._icsUid;
+    if(ev._icsUid){
+      const match=_icsFindExisting(ev._icsUid);
+      if(match){
+        const arr=calEvents[match.dateKey]||[];
+        const idx=arr.indexOf(match.ev);
+        if(match.dateKey===dateKey){
+          if(idx>=0) arr[idx]=stored;
+        } else {
+          if(idx>=0) arr.splice(idx,1);
+          if(!arr.length) delete calEvents[match.dateKey];
+          if(!calEvents[dateKey]) calEvents[dateKey]=[];
+          calEvents[dateKey].push(stored);
+        }
+        updated++;
+        return;
+      }
+    }
+    if(!calEvents[dateKey]) calEvents[dateKey]=[];
+    calEvents[dateKey].push(stored);
+    added++;
+  });
+  saveData('alfa_events',calEvents);
+  document.getElementById('ics-confirm-modal')?.remove();
+  renderCal();
+  const msg=added>0&&updated>0?(added+' importert, '+updated+' oppdatert'):added>0?(added+' avtaler importert!'):( updated+' avtaler oppdatert!');
+  showToast(msg);
+}
