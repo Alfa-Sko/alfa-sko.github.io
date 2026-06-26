@@ -842,6 +842,13 @@ function saveEvTimes(dateKey, oldStart, label){
   showToast('Tid endret: '+sv+'–'+ev2);
 }
 
+function _calPrivBtn(dateKey, e){
+  if(window._viewOnlyMode) return '';
+  const lbl = (e.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const isPriv = e.private === true;
+  return '<button class="btn btn-sm" onclick="toggleCalPrivate(\''+dateKey+'\','+(e.startMins||0)+',\''+lbl+'\')" style="'+(isPriv?'background:#5F5E5A;color:#fff;border:none':'background:#F8F7F3;border:1px solid #D3D1C7;color:#5F5E5A')+'" title="'+(isPriv?'Privat — klikk for å gjøre synlig for team':'Jobb-avtale — klikk for å gjøre privat')+'">'+(isPriv?'🔒':'🌐')+'</button>';
+}
+
 function openEvPopup(evt, dateKey, e){
   closeEvPopup();
   const popup = document.getElementById('ev-popup');
@@ -852,13 +859,13 @@ function openEvPopup(evt, dateKey, e){
     const icon = e.type==='hotel' ? '🏨' : (e.type==='rental' ? '🚙' : '✈');
     const bookBtn = '<button class="btn btn-sm" onclick="toggleCalBooked(\''+dateKey+'\','+e.startMins+',\''+(e.label||'').replace(/'/g,"\\'")+'\')" style="'+(isBooked?'background:#1A5C3A;color:#fff':'background:#FFF6E6;color:#6D4C00;border:1px solid #E6D9B8')+'">'+(isBooked?'✓ Bestilt':'Merk som bestilt')+'</button>';
     const delBtnTravel = '<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEventGeneric(\''+dateKey+'\','+e.startMins+',\''+e.type+'\',\''+(e.label||'').replace(/'/g,"\\'")+'\')">🗑 Fjern</button>';
-    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#185FA5"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${icon} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr}${isBooked?' · ✓ bestilt':' · ikke bestilt'}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px">${bookBtn}${delBtnTravel}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
+    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#185FA5"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${icon} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr}${isBooked?' · ✓ bestilt':' · ikke bestilt'}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px">${bookBtn}${delBtnTravel}${_calPrivBtn(dateKey,e)}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
   } else if(SIMPLE_TYPES.includes(e.type)){
     const _safeEvLbl = (e.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const _delOrNote = e.type==='drive-auto'
       ? '<div style="font-size:11px;color:#888780;padding:4px 0 2px">Kjøretid beregnes automatisk mellom besøk og kan ikke slettes direkte — flytt eller slett ett av besøkene.</div>'
       : '<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEventGeneric(\''+dateKey+'\','+e.startMins+',\''+e.type+'\',\''+_safeEvLbl+'\')">🗑 Fjern</button>';
-    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#5F5E5A"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${calEvEmoji(e.type)} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr} · ${calFmt(e.startMins)}–${calFmt(e.endMins)}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px;flex-wrap:wrap">${_delOrNote}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
+    popup.innerHTML = `<div class="ev-popup-hdr" style="background:#5F5E5A"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${calEvEmoji(e.type)} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr} · ${calFmt(e.startMins)}–${calFmt(e.endMins)}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px;flex-wrap:wrap">${_delOrNote}${_calPrivBtn(dateKey,e)}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
   } else {
     const cname = e.label;
     const c = getCustomers().find(c=>c.name===cname)||{};
@@ -869,7 +876,7 @@ function openEvPopup(evt, dateKey, e){
     const bCls = c.class==='A'?'badge-a':c.class==='B'?'badge-b':c.class==='C'?'badge-c':'badge-new';
     const bLbl = c.class==='A'?'A':c.class==='B'?'B':c.class==='C'?'C':'Ny';
     const safeName = cname.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    popup.innerHTML = `<div class="ev-popup-hdr"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">🏪 ${cname}</div><div class="ev-popup-hdr-sub">${dateStr}${e.h!==undefined?' · '+(e.h<10?'0':'')+e.h+':00':''} · ${c.city||''}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-body">${c.l12>0||c.class?`<div class="ev-popup-row"><div class="ev-popup-icon">📈</div><div><div class="ev-popup-lbl">Omsetning / Budsjett</div><div class="ev-popup-val">${c.l12>0?c.l12.toLocaleString('no-NO')+' kr':'–'} / ${c.budget>0?c.budget.toLocaleString('no-NO')+' kr':'–'} <span class="badge ${bCls}" style="margin-left:6px">${bLbl}</span></div></div></div>`:''} ${e.agenda||c.concept?`<div class="ev-popup-row"><div class="ev-popup-icon">◈</div><div><div class="ev-popup-lbl">Agenda</div><div class="ev-popup-val">${e.agenda||c.concept||''}</div></div></div>`:''} ${lastV?`<hr class="ev-popup-sep"><div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">${todayV?'Notat fra besøket':'Siste besøksnotat ('+lastV.date.split('-').reverse().join('.')+')'}</div><div class="ev-popup-note">${lastV.notes||'Ingen notater ennå.'}</div><div id="ev-popup-photos" style="margin-top:8px"></div><label class="btn btn-light btn-sm" style="cursor:pointer;display:inline-block;font-size:11px;margin-top:4px">📷 Legg til bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoToVisit(${lastV.id},this)"></label>`:'<div style="font-size:12px;color:#888780;padding:4px 0">Ingen besøksnotater ennå.</div>'} ${openF.length>0?`<hr class="ev-popup-sep"><div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Åpen oppfølging (${openF.length})</div>${openF.slice(0,3).map(f=>{const pc=f.priority==='high'?'#D85A30':f.priority==='medium'?'#EF9F27':'#1D9E75';return '<div class="ev-popup-follow"><div class="ev-popup-follow-dot" style="background:'+pc+'"></div><span style="flex:1">'+f.task+'</span><span style="color:#888780;font-size:10px">'+f.due.split('-').reverse().join('.')+'</span></div>';}).join('')}`:''}<div id="ev-popup-custphotos" style="margin-top:6px"></div></div><div class="ev-popup-actions">${e.type==='visit'?`<button class="btn btn-sm" onclick="toggleCalAppointed('${dateKey}',${e.startMins},'${safeName}')" style="${e.appointed===true?'background:#1A5C3A;color:#fff':'background:#FFF6E6;color:#6D4C00;border:1px solid #E6D9B8'}">${e.appointed===true?'✓ Avtalt':'Merk som avtalt'}</button>`:''}<button class="btn btn-dark btn-sm" onclick="closeEvPopup();goToCustomer('${safeName}')">🏪 Kundekort</button><button class="btn btn-green btn-sm" onclick="closeEvPopup();openApptFor('${safeName}','${dateKey}')">📝 Notat</button><label class="btn btn-sm" style="background:#EEF4FB;color:#185FA5;border:1px solid #C5D9F0;cursor:pointer;font-size:11px">📷 Bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addCustomerPhoto('${safeName}',this)"></label>${lastV?`<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteVisit(${lastV.id})">🗑 Slett besøk</button>`:`<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEvent('${dateKey}',${e.startMins},'${safeName}')">🗑 Slett planlagt besøk</button>`}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
+    popup.innerHTML = `<div class="ev-popup-hdr"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">🏪 ${cname}</div><div class="ev-popup-hdr-sub">${dateStr}${e.h!==undefined?' · '+(e.h<10?'0':'')+e.h+':00':''} · ${c.city||''}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-body">${c.l12>0||c.class?`<div class="ev-popup-row"><div class="ev-popup-icon">📈</div><div><div class="ev-popup-lbl">Omsetning / Budsjett</div><div class="ev-popup-val">${c.l12>0?c.l12.toLocaleString('no-NO')+' kr':'–'} / ${c.budget>0?c.budget.toLocaleString('no-NO')+' kr':'–'} <span class="badge ${bCls}" style="margin-left:6px">${bLbl}</span></div></div></div>`:''} ${e.agenda||c.concept?`<div class="ev-popup-row"><div class="ev-popup-icon">◈</div><div><div class="ev-popup-lbl">Agenda</div><div class="ev-popup-val">${e.agenda||c.concept||''}</div></div></div>`:''} ${lastV?`<hr class="ev-popup-sep"><div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">${todayV?'Notat fra besøket':'Siste besøksnotat ('+lastV.date.split('-').reverse().join('.')+')'}</div><div class="ev-popup-note">${lastV.notes||'Ingen notater ennå.'}</div><div id="ev-popup-photos" style="margin-top:8px"></div><label class="btn btn-light btn-sm" style="cursor:pointer;display:inline-block;font-size:11px;margin-top:4px">📷 Legg til bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoToVisit(${lastV.id},this)"></label>`:'<div style="font-size:12px;color:#888780;padding:4px 0">Ingen besøksnotater ennå.</div>'} ${openF.length>0?`<hr class="ev-popup-sep"><div style="font-size:10px;color:#888780;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Åpen oppfølging (${openF.length})</div>${openF.slice(0,3).map(f=>{const pc=f.priority==='high'?'#D85A30':f.priority==='medium'?'#EF9F27':'#1D9E75';return '<div class="ev-popup-follow"><div class="ev-popup-follow-dot" style="background:'+pc+'"></div><span style="flex:1">'+f.task+'</span><span style="color:#888780;font-size:10px">'+f.due.split('-').reverse().join('.')+'</span></div>';}).join('')}`:''}<div id="ev-popup-custphotos" style="margin-top:6px"></div></div><div class="ev-popup-actions">${e.type==='visit'?`<button class="btn btn-sm" onclick="toggleCalAppointed('${dateKey}',${e.startMins},'${safeName}')" style="${e.appointed===true?'background:#1A5C3A;color:#fff':'background:#FFF6E6;color:#6D4C00;border:1px solid #E6D9B8'}">${e.appointed===true?'✓ Avtalt':'Merk som avtalt'}</button>`:''}<button class="btn btn-dark btn-sm" onclick="closeEvPopup();goToCustomer('${safeName}')">🏪 Kundekort</button><button class="btn btn-green btn-sm" onclick="closeEvPopup();openApptFor('${safeName}','${dateKey}')">📝 Notat</button><label class="btn btn-sm" style="background:#EEF4FB;color:#185FA5;border:1px solid #C5D9F0;cursor:pointer;font-size:11px">📷 Bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addCustomerPhoto('${safeName}',this)"></label>${lastV?`<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteVisit(${lastV.id})">🗑 Slett besøk</button>`:`<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEvent('${dateKey}',${e.startMins},'${safeName}')">🗑 Slett planlagt besøk</button>`}${_calPrivBtn(dateKey,e)}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
     if(lastV) _loadEvPopupPhotos(lastV);
     const _cpEl = document.getElementById('ev-popup-custphotos');
     if(_cpEl && typeof _renderCustPhotoInPopup === 'function') _renderCustPhotoInPopup(_cpEl, cname);
@@ -914,6 +921,18 @@ function toggleCalAppointed(dateKey, startMins, label){
   closeEvPopup();
   renderCal();
   showToast(ev.appointed ? '✓ Avtale bekreftet' : 'Merket som uanmeldt besøk');
+}
+
+function toggleCalPrivate(dateKey, startMins, label){
+  if(_roGuard()) return;
+  const evs = calEvents[dateKey]||[];
+  const ev = evs.find(x=>x.startMins===startMins && (x.label||'')===label);
+  if(!ev) return;
+  ev.private = ev.private===true ? false : true;
+  saveData('alfa_events', calEvents);
+  closeEvPopup();
+  renderCal();
+  showToast(ev.private ? '🔒 Privat — skjult for teamet' : '🌐 Synlig for teamet');
 }
 function closeEvPopup(){ const p=document.getElementById('ev-popup'); if(p) p.style.display='none'; document.removeEventListener('click',outsideClose); }
 function deleteCalEvent(dateKey, startMins, label){
@@ -1008,6 +1027,7 @@ function openAppt(dateKey, evt, presetHour){
   document.getElementById('appt-order').value = '';
   document.getElementById('appt-ftask').value = '';
   document.getElementById('appt-fdate').value = dateKey;
+  const _pEl = document.getElementById('appt-private'); if(_pEl) _pEl.checked = false;
   document.getElementById('appt-open-follows').innerHTML = '';
   apptTab('avtale', document.querySelector('.appt-tab'));
   document.getElementById('appt-overlay').classList.add('open');
@@ -1086,8 +1106,9 @@ function saveAppt(){
   if(!cname){ showToast('Velg en kunde'); return; }
   const h = parseInt(tStart.split(':')[0]);
   if(!calEvents[_apptDate]) calEvents[_apptDate]=[];
+  const isPrivate = !!(document.getElementById('appt-private')||{}).checked;
   if(!calEvents[_apptDate].find(e=>e.label===cname)){
-    calEvents[_apptDate].push({type, label:cname, h, agenda, contact});
+    calEvents[_apptDate].push({type, label:cname, h, agenda, contact, ...(isPrivate ? {private:true} : {})});
     saveData('alfa_events', calEvents);
   }
   if(type==='visit'){
