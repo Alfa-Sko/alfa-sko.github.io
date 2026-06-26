@@ -110,8 +110,18 @@ function renderMonth(body){
   const prev=new Date(y,m,0).getDate();
   let h='<div class="cal-grid-month">';
   NO_SHORT.forEach(n=>{h+=`<div class="cal-dname">${n}</div>`});
+  const pm=m===0?11:m-1, py=m===0?y-1:y;
   for(let i=0;i<first;i++){
-    h+=`<div class="cal-day other-month"><div class="cal-dnum">${prev-first+1+i}</div></div>`;
+    const pd=prev-first+1+i, pkey=dk(py,pm,pd);
+    const pallEvs=getEventsForDay(pkey);
+    const pevHtml=pallEvs.slice(0,3).map(e=>{
+      const cc=calEvClass(e.type);
+      const sl=(e.label||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const si=_calStatusIcons(e,pkey);
+      return `<div class="cal-ev ${cc}" style="${calEvDim(e)}" onclick="event.stopPropagation();monthEvClick('${pkey}')">${calBookedMark(e)}${sl}${si?'<span style="font-size:9px;margin-left:2px;opacity:0.9">'+si+'</span>':''}</div>`;
+    }).join('');
+    const pmore=pallEvs.length>3?`<div class="cal-ev" style="color:#0C447C;font-weight:600">+${pallEvs.length-3} til</div>`:'';
+    h+=`<div class="cal-day other-month${pallEvs.length>0?' has-events':''}" onclick="jumpToDayFromMonth(${py},${pm},${pd})"><div class="cal-dnum">${pd}</div>${pevHtml}${pmore}</div>`;
   }
   for(let d=1;d<=dim;d++){
     const col=mb(new Date(y,m,d).getDay());
@@ -142,8 +152,18 @@ function renderMonth(body){
   }
   const used=first+dim;
   const rem=used%7===0?0:7-(used%7);
+  const nm=m===11?0:m+1, ny=m===11?y+1:y;
   for(let i=0;i<rem;i++){
-    h+=`<div class="cal-day other-month"><div class="cal-dnum">${i+1}</div></div>`;
+    const nd=i+1, nkey=dk(ny,nm,nd);
+    const nallEvs=getEventsForDay(nkey);
+    const nevHtml=nallEvs.slice(0,3).map(e=>{
+      const cc=calEvClass(e.type);
+      const sl=(e.label||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const si=_calStatusIcons(e,nkey);
+      return `<div class="cal-ev ${cc}" style="${calEvDim(e)}" onclick="event.stopPropagation();monthEvClick('${nkey}')">${calBookedMark(e)}${sl}${si?'<span style="font-size:9px;margin-left:2px;opacity:0.9">'+si+'</span>':''}</div>`;
+    }).join('');
+    const nmore=nallEvs.length>3?`<div class="cal-ev" style="color:#0C447C;font-weight:600">+${nallEvs.length-3} til</div>`:'';
+    h+=`<div class="cal-day other-month${nallEvs.length>0?' has-events':''}" onclick="jumpToDayFromMonth(${ny},${nm},${nd})"><div class="cal-dnum">${nd}</div>${nevHtml}${nmore}</div>`;
   }
   h+='</div>';
   body.innerHTML=h;
