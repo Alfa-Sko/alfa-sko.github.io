@@ -43,6 +43,7 @@ function showSection(id, el){
   if(id==='profil'){ loadProfileIntoForm(); if(window._syncCardUpdate) window._syncCardUpdate(); }
   if(id==='rabatt'){ rkCalculate(); }
   if(id==='kart') mapInitOverview();
+  if(id==='hjelp') renderHelp();
 }
 
 // ─── KUNDEVELGER MED LIVE-LISTE ───────────────────────────────────────────────

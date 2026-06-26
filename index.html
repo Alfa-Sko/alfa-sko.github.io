@@ -57,6 +57,7 @@
     <div class="nav-item" onclick="showSection('lookbooks',this)">&#128213; Workbooks</div>
     <div class="nav-item" onclick="showSection('rabatt',this)">&#129518; Rabattkalk</div>
     <div class="nav-item" onclick="showSection('profil',this)">&#9881; Min profil</div>
+    <div class="nav-item" onclick="showSection('hjelp',this)">&#10067; Hjelp</div>
   </nav>
 
   <div class="content">
@@ -1088,6 +1089,9 @@
   </div>
 </div>
 
+    <!-- HJELP -->
+    <div id="sec-hjelp" class="section" style="display:none"></div>
+
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mobile-nav" id="mobile-nav">
   <button class="mobile-nav-item active" id="mni-oversikt" onclick="mobileNav('oversikt',this)">
@@ -1119,6 +1123,7 @@
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('lookbooks',null);closeMer()">📕 Workbooks</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('rabatt',null);closeMer()">🧮 Rabattkalkulator</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('profil',null);closeMer()">⚙ Min profil</button>
+  <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('hjelp',null);closeMer()">❓ Hjelp</button>
   <button class="btn btn-light" style="width:100%;color:#888780" onclick="closeMer()">Lukk</button>
 </div>
 
@@ -1148,6 +1153,8 @@
 <script src="js/workbooks.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/map.js"></script>
+<script src="js/help-content.js"></script>
+<script src="js/help.js"></script>
 <script src="js/init.js"></script>
 </body>
 </html>
