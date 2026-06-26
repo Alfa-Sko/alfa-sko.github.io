@@ -88,6 +88,10 @@ const HELP_CONTENT = [
       {
         tittel: 'Importere kalender fra Outlook (.ics)',
         svar: '1. Eksporter kalenderen fra Outlook som .ics-fil.\n2. Trykk «📅 Importer .ics» i Kompass-kalenderen.\n3. Velg filen. Du får en liste over avtalene som vil importeres — velg bort de du ikke vil ha med.\n4. Trykk «Importer». Avtalene legges inn og er redigerbare som vanlige Kompass-avtaler.\n\nImporterer du samme fil på nytt, oppdateres eksisterende avtaler i stedet for å lage duplikater.'
+      },
+      {
+        tittel: 'Eksportere kalenderfil (.ics) fra Outlook',
+        svar: 'Fremgangsmåten er litt ulik i ny og gammel Outlook. Velg den du bruker.\n\nGAMMEL OUTLOOK (klassisk skrivebordsapp på PC):\n1. Åpne Outlook og gå til Kalender-visningen.\n2. Klikk Fil, så Lagre kalender.\n3. Klikk Flere alternativer før du lagrer.\n4. Under Datoområde: velg et fornuftig vindu, for eksempel neste 30 dager (ikke hele kalenderen hvis du har mange år med avtaler).\n5. Under Detaljer: velg Fullstendige detaljer, så tittel, tid, sted og beskrivelse følger med.\n6. Lagre. Du får en .ics-fil som kan lastes opp i Kompass.\n\nNY OUTLOOK FOR WINDOWS / OUTLOOK PÅ WEB (outlook.office.com):\n1. Gå til Kalender.\n2. Klikk tannhjulet (Innstillinger) øverst til høyre.\n3. Velg Kalender, så Delte kalendere (eller Publiser kalender, avhengig av versjon).\n4. Under Publiser kalender: velg kalenderen og hvor mye som skal deles, og klikk Publiser.\n5. Du får en ICS-lenke. Kopier lenken og lim den inn i nettleseren — da lastes .ics-filen ned.\n\nTIPS:\n- Velg et fornuftig datoområde, ikke alt — importen til Kompass blir ryddigere med for eksempel de neste par månedene.\n- Fullstendige detaljer gir best resultat, så sted og beskrivelse følger med, ikke bare tittelen.\n- iPhone-kalenderen lar deg ikke enkelt eksportere som .ics direkte — gjør denne jobben fra en PC.'
       }
     ]
   },
