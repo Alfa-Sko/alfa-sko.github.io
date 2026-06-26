@@ -12,7 +12,16 @@ a{color:inherit;text-decoration:none}
 .logo{font-size:18px;font-weight:600;color:#F1EFE8;letter-spacing:0.1em}
 .logo span{color:#9FE1CB}
 .topbar-right{display:flex;align-items:center;gap:10px}
-.topbar-date{font-size:11px;color:#888780}
+/* ─── Hero banner ─────────────────────────────────────────────────────────── */
+.hero-banner{position:relative;background-image:url('../assets/jotunheimen-banner.jpg');background-size:cover;background-position:center 40%;height:100px;overflow:hidden}
+.hero-banner::before{content:'';position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,0.52) 0%,rgba(0,0,0,0.2) 55%,rgba(0,0,0,0.44) 100%);z-index:0}
+.hero-content{position:relative;z-index:1;height:100%;display:flex;align-items:center;justify-content:space-between;padding:0 18px;padding-top:var(--safe-top,0px);box-sizing:border-box}
+.hero-logo{color:#fff;display:flex;align-items:center;flex-shrink:0}
+.hero-right{text-align:right;flex-shrink:0}
+.topbar-date{font-size:11px;color:rgba(255,255,255,0.92);text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+.hero-username{font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.6);margin-top:2px}
+#demo-hero-map{display:none;width:100%;height:100px;object-fit:cover;object-position:center}
+@media(min-width:601px){.hero-banner,#demo-hero-map{height:155px}.hero-logo svg{height:48px !important}}
 
 .nav{display:flex;background:#3a3a38;border-bottom:1px solid #1a1a18;overflow-x:auto}
 .nav-item{padding:11px 20px;font-size:13px;color:#B4B2A9;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:color 0.15s}
@@ -360,8 +369,6 @@ a{color:inherit;text-decoration:none}
 
   /* TOPBAR */
   .topbar { padding: 10px 16px; padding-top: calc(10px + var(--safe-top)); }
-  .banner-desktop { display: none !important; }
-  .banner-mobile { display: block !important; height: 170px; max-height: 170px; object-fit: cover; object-position: 50% 30%; }
   .topbar-right { display: none; }
 
   /* DESKTOP NAV → skjul, erstattes av bottom nav */

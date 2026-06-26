@@ -534,6 +534,8 @@ function renderOverview(){
   const _months=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
   const _now=new Date();
   document.getElementById('today-label').textContent = _days[_now.getDay()]+' '+_now.getDate()+'. '+_months[_now.getMonth()]+' '+_now.getFullYear();
+  const _unEl=document.getElementById('banner-user-name');
+  if(_unEl) _unEl.textContent=(userProfile&&userProfile.name)?userProfile.name:((window._sbUser&&window._sbUser.email)?window._sbUser.email.split('@')[0]:'');
   const overdue = followups.filter(f=>!f.done && f.due<TODAY_STR);
 
   // Dagens kalender-tidslinje øverst
