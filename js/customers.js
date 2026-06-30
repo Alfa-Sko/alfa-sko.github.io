@@ -715,6 +715,14 @@ async function _loadChPhotos(v){
     }).join('')+'</div>';
 }
 
+function _custMapsUrl(c){
+  const q = c.gate
+    ? (c.gate + (c.postnr ? ', '+c.postnr : '') + (c.poststed ? ' '+c.poststed : ''))
+    : (c.address ? (c.address + (c.city ? ', '+c.city : '')) : (c.city||''));
+  if(!q) return '';
+  return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);
+}
+
 function openCustomer(name){
   const c=getCustomers().find(c=>c.name===name);
   if(!c) return;
@@ -745,6 +753,7 @@ function openCustomer(name){
           <div id="customer-detail-name" data-customer="${c.name}" style="font-size:20px;font-weight:700;color:#2C2C2A">${c.name}</div>
           <div style="font-size:13px;color:#888780;margin-top:3px">${c.city||''}${c.chain?' · '+c.chain:''}</div>
           ${(c.gate||c.address)?`<div style="font-size:12px;color:#888780;margin-top:2px">📍 ${c.gate?`${c.gate}, ${c.postnr} ${c.poststed}`:c.address}</div>`:''}
+          ${_custMapsUrl(c)?`<a href="${_custMapsUrl(c)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#1565C0;font-weight:500;text-decoration:none;margin-top:5px">🗺️ Åpne i Google Maps</a>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
           <span class="badge ${bCls}">${bLbl}</span>
