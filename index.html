@@ -55,7 +55,7 @@
     <div class="nav-item" onclick="showSection('kart',this)">&#128506; Kart</div>
     <div class="nav-item" onclick="showSection('oppfolging',this)">&#10003; Oppfølging</div>
     <div class="nav-item" onclick="showSection('lookbooks',this)">&#128213; Workbooks</div>
-    <div class="nav-item" onclick="showSection('rabatt',this)">&#129518; Rabattkalk</div>
+    <div class="nav-item" onclick="showSection('prisliste',this)">&#128202; Prisliste</div>
     <div class="nav-item" onclick="showSection('profil',this)">&#9881; Min profil</div>
     <div class="nav-item" onclick="showSection('hjelp',this)">&#10067; Hjelp</div>
   </nav>
@@ -279,8 +279,26 @@
       </div>
     </div>
 
-    <!-- RABATTKALKULATOR -->
-    <div id="sec-rabatt" class="section" style="display:none">
+    <!-- PRISLISTE + RABATTKALKULATOR -->
+    <div id="sec-prisliste" class="section" style="display:none">
+
+      <!-- Prisliste -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:22px;font-weight:700;color:#2C2C2A">📋 Prisliste</div>
+          <div style="font-size:13px;color:#888780;margin-top:4px">ALFA PRICAT — veiledende priser for hele teamet</div>
+        </div>
+        <div>
+          <button class="btn btn-dark btn-sm" onclick="plUploadClick()">📤 Last opp prisliste (.xlsx)</button>
+          <input type="file" id="pl-file-input" accept=".xlsx" style="display:none" onchange="plHandleUpload(this)">
+        </div>
+      </div>
+      <div id="pl-meta" style="font-size:12px;color:#888780;margin-bottom:8px;min-height:16px"></div>
+      <input type="search" id="pl-search" placeholder="Søk modell, farge, modellnr…" oninput="plSearch()" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px;font-family:inherit;color:#2C2C2A">
+      <div id="pl-list"></div>
+
+      <!-- Rabattkalkulator -->
+      <div id="pl-calc-divider" style="border-top:2px solid #E3D9C8;margin:28px 0 20px"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
         <div>
           <div style="font-size:22px;font-weight:700;color:#2C2C2A">🧮 Rabattkalkulator</div>
@@ -1125,7 +1143,7 @@
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('tidslinje',null);closeMer()">⏱ Tidslinje</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('oppfolging',null);closeMer()">✓ Oppfølging</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('lookbooks',null);closeMer()">📕 Workbooks</button>
-  <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('rabatt',null);closeMer()">🧮 Rabattkalkulator</button>
+  <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('prisliste',null);closeMer()">📋 Prisliste</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('profil',null);closeMer()">⚙ Min profil</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('hjelp',null);closeMer()">❓ Hjelp</button>
   <button class="btn btn-light" style="width:100%;color:#888780" onclick="closeMer()">Lukk</button>
@@ -1154,6 +1172,7 @@
 <script src="js/timeline.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/calculator.js"></script>
+<script src="js/prisliste.js"></script>
 <script src="js/workbooks.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/map.js"></script>

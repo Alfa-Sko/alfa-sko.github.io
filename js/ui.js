@@ -41,7 +41,7 @@ function showSection(id, el){
   if(id==='nytt-besok') populateVisitCustomers();
   if(id==='tidslinje'){ document.getElementById('free-note-date').value=TODAY_STR; renderTimeline(); }
   if(id==='profil'){ loadProfileIntoForm(); if(window._syncCardUpdate) window._syncCardUpdate(); }
-  if(id==='rabatt'){ rkCalculate(); }
+  if(id==='prisliste'){ plLoad(); rkCalculate(); }
   if(id==='kart') mapInitOverview();
   if(id==='hjelp') renderHelp();
 }
