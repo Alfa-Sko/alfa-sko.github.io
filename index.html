@@ -289,8 +289,8 @@
           <div style="font-size:13px;color:#888780;margin-top:4px">ALFA PRICAT — veiledende priser for hele teamet</div>
         </div>
         <div>
-          <button class="btn btn-dark btn-sm" onclick="plUploadClick()">📤 Last opp prisliste (.xlsx)</button>
-          <input type="file" id="pl-file-input" accept=".xlsx" style="display:none" onchange="plHandleUpload(this)">
+          <button class="btn btn-dark btn-sm" onclick="plUploadClick()">📤 Last opp prisliste (.xlsx / .pdf)</button>
+          <input type="file" id="pl-file-input" accept=".xlsx,.pdf" style="display:none" onchange="plHandleUpload(this)">
         </div>
       </div>
 
@@ -309,7 +309,8 @@
             <label>Sesongnavn</label>
             <input type="text" id="pl-confirm-name" placeholder="f.eks. SS26" style="max-width:180px">
           </div>
-          <div style="font-size:12px;color:#5F5E5A;margin-bottom:14px">Gyldig: <span id="pl-confirm-from"></span> – <span id="pl-confirm-to"></span></div>
+          <div style="font-size:12px;color:#5F5E5A;margin-bottom:10px">Gyldig: <span id="pl-confirm-from"></span> – <span id="pl-confirm-to"></span></div>
+          <div id="pl-confirm-preview" style="margin-bottom:12px"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-dark btn-sm" onclick="plConfirmUpload()">📤 Last opp sesong</button>
             <button class="btn btn-light btn-sm" onclick="plCancelUpload()">Avbryt</button>
