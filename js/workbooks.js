@@ -81,6 +81,9 @@ async function sbUploadCatalogs(input){
     if(file.size > 50*1048576){ alert(file.name+' er over 50 MB — komprimer PDF-en først (gratisplanen har 1 GB totalt).'); continue; }
     showToast('Laster opp '+file.name+' …');
     try{
+      const _wbS = _sbSession(), _wbT = (_wbS && _wbS.access_token) || '';
+      let _wbExp = 0; try { _wbExp = JSON.parse(atob(_wbT.split('.')[1])).exp - Math.floor(Date.now()/1000); } catch(_){}
+      console.log('[workbooks] Token: Bearer ' + (_wbT ? _wbT.slice(0,20)+'…' : 'MANGLER') + ', utløper om ' + _wbExp + 's');
       const r = await sbFetch('/storage/v1/object/kataloger/'+encodeURIComponent(file.name), {
         method:'POST',
         headers:{'Content-Type': file.type||'application/pdf'},

@@ -139,6 +139,18 @@ async function plConfirmUpload() {
     items: _plPending.items
   };
   showToast('Laster opp ' + season + ' …');
+  // Sjekk token-utløp og forny FØR opplasting (token kan utløpe under forhåndsvisning)
+  var _s0 = _sbSession(), _t0 = (_s0 && _s0.access_token) || '';
+  var _exp = 0; try { _exp = JSON.parse(atob(_t0.split('.')[1])).exp - Math.floor(Date.now()/1000); } catch(_){}
+  console.log('[prisliste] Token: Bearer ' + (_t0 ? _t0.slice(0,20)+'…' : 'MANGLER') + ', utløper om ' + _exp + 's');
+  if (_exp < 120) {
+    console.log('[prisliste] Fornyer token (utløper om ' + _exp + 's) …');
+    var refreshed = await sbRefresh();
+    var _s1 = _sbSession(), _t1 = (_s1 && _s1.access_token) || '';
+    var _exp1 = 0; try { _exp1 = JSON.parse(atob(_t1.split('.')[1])).exp - Math.floor(Date.now()/1000); } catch(_){}
+    console.log('[prisliste] Token etter fornying: utløper om ' + _exp1 + 's (ok=' + refreshed + ')');
+    if (!refreshed && _exp <= 0) { showToast('Sesjonen har utløpt — logg inn på nytt'); return; }
+  }
   var storageName = _plStorageName(season);
   var storageUrl  = '/storage/v1/object/kataloger/' + encodeURIComponent(storageName);
   var body        = new Blob([JSON.stringify(payload)], { type: 'application/octet-stream' });
