@@ -142,20 +142,10 @@ async function plConfirmUpload() {
   var storageName = _plStorageName(season);
   var storageUrl  = '/storage/v1/object/kataloger/' + encodeURIComponent(storageName);
   var body        = new Blob([JSON.stringify(payload)], { type: 'application/octet-stream' });
-  var uploadOpts  = { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: body };
+  var uploadOpts  = { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' }, body: body };
   console.log('[prisliste] Laster opp:', storageName, '—', payload.items.length, 'produkter');
   try {
     var res = await sbFetch(storageUrl, uploadOpts);
-    if (res.status === 409) {
-      // Filen finnes fra før — slett, last opp igjen (same pattern as workbooks)
-      var delRes = await sbFetch(storageUrl, { method: 'DELETE' });
-      if (!delRes.ok && delRes.status !== 404) {
-        var delErr = ''; try { delErr = await delRes.text(); } catch (_) {}
-        console.error('[prisliste] DELETE feilet ' + delRes.status + ':', delErr);
-        throw new Error('Kunne ikke slette eksisterende sesong: HTTP ' + delRes.status);
-      }
-      res = await sbFetch(storageUrl, uploadOpts);
-    }
     if (!res.ok) {
       var errBody = ''; try { errBody = await res.text(); } catch (_) {}
       console.error('[prisliste] Opplasting HTTP ' + res.status + ':', errBody);
