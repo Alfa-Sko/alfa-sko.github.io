@@ -139,12 +139,20 @@ async function plConfirmUpload() {
     items: _plPending.items
   };
   showToast('Laster opp ' + season + ' …');
+  var storageName = _plStorageName(season);
+  console.log('[prisliste] Laster opp:', storageName, '—', payload.items.length, 'produkter');
   try {
-    var res = await sbFetch('/storage/v1/object/kataloger/' + _plStorageName(season), {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-upsert': 'true' },
-      body: JSON.stringify(payload)
+    var res = await sbFetch('/storage/v1/object/kataloger/' + encodeURIComponent(storageName), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' },
+      body: new Blob([JSON.stringify(payload)], { type: 'application/octet-stream' })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      var errBody = '';
+      try { errBody = await res.text(); } catch (_) {}
+      console.error('[prisliste] Opplasting HTTP ' + res.status + ':', errBody);
+      throw new Error('HTTP ' + res.status + (errBody ? ' — ' + errBody : ''));
+    }
     _plSeasons[season] = payload;
     _plActiveSeason = season;
     _plFiltered = payload.items;
