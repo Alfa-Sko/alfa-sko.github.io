@@ -82,56 +82,47 @@ async function _plParseXlsx(file) {
         var wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
         var ws = wb.Sheets['Pricat'];
         if (!ws) throw new Error('Fant ikke ark "Pricat" i filen — kontroller at riktig PRICAT-fil er valgt');
-        var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        // Header-rad er rad 6 (0-indeksert) = Excel rad 7
-        var hdrs = (rows[6] || []).map(function (h) { return String(h).trim(); });
+        // { range: 6 } = Excel rad 6 (0-indeksert) brukes eksplisitt som header-rad.
+        // SheetJS hopper over tomme rader med {header:1}, så rows[6] ville peike feil.
+        // Med {range:6} får vi objekter keyed direkte på kolonnenavnene fra rad 6.
+        var rows = XLSX.utils.sheet_to_json(ws, { range: 6, defval: '' });
 
-        function col(name) {
-          var i = hdrs.indexOf(name);
-          if (i === -1) throw new Error('Mangler kolonne: "' + name + '"');
-          return i;
-        }
+        // Verifiser at nødvendige kolonner finnes (sjekk unionen av alle raders nøkler)
+        var allKeys = {};
+        rows.forEach(function (r) { Object.keys(r).forEach(function (k) { allKeys[k] = true; }); });
+        var required = ['Action', 'Name (Supplier)', 'Model no (Supplier)', 'Color', 'Size', 'Gender (Supplier)', 'Rec retail price:1 NOK'];
+        var missing = required.filter(function (c) { return !allKeys[c]; });
+        if (missing.length) throw new Error('Mangler kolonner: ' + missing.join(', '));
 
-        var iAction  = col('Action');
-        var iName    = col('Name (Supplier)');
-        var iModelNo = col('Model no (Supplier)');
-        var iColor   = col('Color');
-        var iSize    = col('Size');
-        var iGender  = col('Gender (Supplier)');
-        var iRrp     = col('Rec retail price:1 NOK');
-        var iBrand   = hdrs.indexOf('Brand'); // valgfritt
-
-        // Data fra rad 8 (0-indeksert) = Excel rad 9
+        // Rad 7 (tekniske feltnavn som "i:action") filtreres bort av Action !== 'Add'-sjekken.
         var groups = {};
-        for (var i = 8; i < rows.length; i++) {
-          var row = rows[i];
-          if (!row || row.every(function (c) { return c === '' || c === null; })) continue;
-          if (String(row[iAction] || '').trim() !== 'Add') continue;
+        rows.forEach(function (row) {
+          if (String(row['Action'] || '').trim() !== 'Add') return;
 
-          var modelNo = String(row[iModelNo] || '').trim();
-          var color   = String(row[iColor]   || '').trim();
+          var modelNo = String(row['Model no (Supplier)'] || '').trim();
+          var color   = String(row['Color']               || '').trim();
           var key     = modelNo + '\x00' + color;
 
           if (!groups[key]) {
-            var rrpRaw = row[iRrp];
+            var rrpRaw = row['Rec retail price:1 NOK'];
             var rrp = (rrpRaw !== '' && rrpRaw !== null && !isNaN(Number(rrpRaw)))
               ? Math.round(Number(rrpRaw)) : null;
             groups[key] = {
-              name:    String(row[iName]   || '').trim(),
+              name:    String(row['Name (Supplier)']    || '').trim(),
               modelNo: modelNo,
               color:   color,
-              gender:  String(row[iGender] || '').trim(),
+              gender:  String(row['Gender (Supplier)']  || '').trim(),
               rrp:     rrp,
-              brand:   iBrand >= 0 ? String(row[iBrand] || '').trim() : '',
+              brand:   String(row['Brand']              || '').trim(),
               sizes:   []
             };
           }
-          var sz = String(row[iSize] || '').trim();
+          var sz = String(row['Size'] || '').trim();
           if (sz && groups[key].sizes.indexOf(sz) === -1) {
             groups[key].sizes.push(sz);
           }
-        }
+        });
 
         var items = Object.values(groups).map(function (g) {
           g.sizeSpan = _plSizeSpan(g.sizes);
