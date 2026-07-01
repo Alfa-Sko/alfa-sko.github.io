@@ -1139,6 +1139,11 @@ function saveAppt(){
     if(!existing){ visits.push({id:Date.now(), customer:cname, date:_apptDate, time:tStart, contact, notes:fullNotes, followup:ftask, photoCount:0}); }
     else { if(fullNotes) existing.notes=fullNotes; if(contact) existing.contact=contact; }
     saveData('alfa_visits', visits);
+    const _photoInput = document.getElementById('appt-photos');
+    if(_photoInput && _photoInput.files && _photoInput.files.length > 0){
+      const _savedVisit = existing || visits[visits.length-1];
+      if(typeof addPhotoToVisit === 'function') addPhotoToVisit(_savedVisit.id, _photoInput);
+    }
   }
   if(ftask && fdate){ followups.push({id:Date.now()+1, customer:cname, task:ftask, due:fdate, priority:fprio, done:false}); saveData('alfa_followups', followups); }
   closeAppt();
