@@ -538,14 +538,8 @@ function renderOverview(){
   if(_unEl) _unEl.textContent=(userProfile&&userProfile.name)?userProfile.name:((window._sbUser&&window._sbUser.email)?window._sbUser.email.split('@')[0]:'');
   const overdue = followups.filter(f=>!f.done && f.due<TODAY_STR);
 
-  // Dagens kalender-tidslinje øverst
-  const todayCal = document.getElementById('today-calendar');
-  if(todayCal && typeof buildDayViewHtml === 'function'){
-    todayCal.innerHTML = buildDayViewHtml(TODAY_STR, true);
-    // Skroll til 08:00 (HSTART=4, 4 timer × 60px = 240px fra toppen)
-    const scrollEl = todayCal.querySelector('[style*="overflow-y"]');
-    if(scrollEl) scrollEl.scrollTop = 240;
-  }
+  // Dagens plan — kompakt agendaliste
+  renderTodayAgenda();
 
   const todayVisits = visits.filter(v=>v.date===TODAY_STR);
   document.getElementById('overview-metrics').innerHTML =
@@ -563,5 +557,97 @@ function renderOverview(){
 
 function metric(val,lbl,sub){
   return `<div class="metric"><div class="metric-val">${val}</div><div class="metric-lbl">${lbl}</div><div class="metric-sub">${sub}</div></div>`;
+}
+
+// ── Dagens plan: kompakt agendaliste ────────────────────────────────────────
+function renderTodayAgenda(){
+  var el=document.getElementById('today-calendar');
+  if(!el) return;
+
+  var key=TODAY_STR;
+  // Normaliser startMins/endMins for alle hendingar
+  var rawEvs=(calEvents[key]||[]).map(function(e){
+    if(e.startMins!==undefined) return e;
+    return Object.assign({},e,{startMins:(e.h||8)*60,endMins:e.hEnd?e.hEnd*60:((e.h||8)+1)*60});
+  });
+
+  // Legg til automatiske kjøreetappar mellom kundebesøk
+  var allEvs=typeof calAutoAddDrives==='function' ? calAutoAddDrives(rawEvs,key) : rawEvs;
+
+  var sorted=allEvs.slice().sort(function(a,b){ return a.startMins-b.startMins; });
+
+  if(!sorted.length){
+    el.innerHTML='<div style="padding:20px 16px;color:#888780;font-size:13px;text-align:center">Ingen avtaler i dag</div>';
+    return;
+  }
+
+  var now=new Date();
+  var nowMins=now.getHours()*60+now.getMinutes();
+
+  // Finn neste kommande avtale (ikkje kjøring)
+  var nextIdx=-1;
+  for(var i=0;i<sorted.length;i++){
+    var ev=sorted[i];
+    if(ev.type==='drive'||ev.type==='drive-auto') continue;
+    if((ev.endMins||(ev.startMins+60))>nowMins){ nextIdx=i; break; }
+  }
+
+  var TYPE_LBL={visit:'Besøk',phone:'Telefon',nydalen:'Nydalen',teams:'Teams',clinic:'Clinic',external:'Ekstern',dinner:'Middag',hotel:'Hotell','hotel-start':'Hotell',flight:'Fly',rental:'Leiebil',adm:'Adm',lunch:'Lunsj',training:'Trening',leisure:'Fritid',other:'Annet',drive:'Kjøring','drive-auto':'Kjøring'};
+  var TYPE_CLR={visit:'#185FA5',phone:'#1A5C3A',nydalen:'#4D3085',teams:'#0C447C',clinic:'#B06000',external:'#5F5E5A',dinner:'#7A3A00',hotel:'#0C447C','hotel-start':'#0C447C',flight:'#0C447C',rental:'#888780',adm:'#5F5E5A',lunch:'#7A3A00',training:'#1A5C3A',leisure:'#2D7D32',other:'#5F5E5A'};
+
+  var fmtFn=typeof calFmt==='function'?calFmt:function(m){var h=Math.floor(m/60),mm=m%60;return(h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;};
+  var emojiFn=typeof calEvEmoji==='function'?calEvEmoji:function(){ return '📅'; };
+
+  var html='';
+
+  for(var j=0;j<sorted.length;j++){
+    var e=sorted[j];
+    var isDrive=e.type==='drive'||e.type==='drive-auto';
+    var endM=e.endMins||(e.startMins+60);
+    var isPast=endM<=nowMins;
+    var isNext=j===nextIdx;
+    var bdr=j<sorted.length-1?'border-bottom:1px solid #F1EFE8;':'';
+
+    if(isDrive){
+      var durMins=Math.max(1,endM-e.startMins);
+      var durText=durMins>=60?Math.floor(durMins/60)+' t'+(durMins%60?' '+(durMins%60)+' min':''):durMins+' min';
+      var mf=e.mapsFrom||e.from||'';
+      var mt=e.mapsTo||e.to||'';
+      var mapsHref=(mf&&mt)?'https://www.google.com/maps/dir/'+encodeURIComponent(mf)+'/'+encodeURIComponent(mt):'';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 14px;min-height:32px;'+bdr+(isPast?'opacity:0.4;':'')+'">';
+      html+='<span style="font-size:12px;color:#B4B2A9;flex-shrink:0">🚗</span>';
+      html+='<span style="font-size:12px;font-weight:500;color:#888780;flex-shrink:0">'+durText+'</span>';
+      html+='<span style="font-size:12px;color:#B4B2A9;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(e.label||'')+'</span>';
+      if(mapsHref) html+='<a href="'+mapsHref+'" target="_blank" onclick="event.stopPropagation()" style="flex-shrink:0;font-size:11px;color:#1565C0;text-decoration:none;white-space:nowrap;border:1px solid #B8D4E8;border-radius:4px;padding:1px 6px;line-height:1.5">🗺 Maps</a>';
+      html+='</div>';
+    } else {
+      var typeLbl=TYPE_LBL[e.type]||(e.type||'Avtale');
+      var typeClr=TYPE_CLR[e.type]||'#5F5E5A';
+      var emoji=emojiFn(e.type);
+
+      var relText='';
+      if(isNext){
+        var diff=e.startMins-nowMins;
+        if(diff<=0) relText='Pågår nå';
+        else if(diff<60) relText='Om '+diff+' min';
+        else relText='Om '+Math.floor(diff/60)+' t'+(diff%60?' '+diff%60+' min':'');
+      }
+
+      var bgStyle=isNext?'background:'+typeClr+'0D;':'';
+      var leftBdr=isNext?'border-left:3px solid '+typeClr+';':'border-left:3px solid transparent;';
+      var opStyle=isPast?'opacity:0.45;':'';
+
+      html+='<div onclick="showSection(\'kalender\');setTimeout(function(){if(typeof calGoToday===\'function\')calGoToday();},60);" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;min-height:44px;'+bdr+leftBdr+bgStyle+opStyle+'">';
+      html+='<div style="flex-shrink:0;width:42px;font-size:12px;font-weight:600;color:'+(isPast?'#B4B2A9':'#5F5E5A')+';font-variant-numeric:tabular-nums">'+fmtFn(e.startMins)+'</div>';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-size:13px;font-weight:700;color:'+(isPast?'#B4B2A9':'#2C2C2A')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(e.label||typeLbl)+'</div>';
+      if(relText) html+='<div style="font-size:11px;color:'+typeClr+';font-weight:600;margin-top:1px">'+relText+'</div>';
+      html+='</div>';
+      html+='<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;background:'+typeClr+'18;color:'+typeClr+';border:1px solid '+typeClr+'28;white-space:nowrap;line-height:1.5">'+emoji+' '+typeLbl+'</span>';
+      html+='</div>';
+    }
+  }
+
+  el.innerHTML=html;
 }
 
