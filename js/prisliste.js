@@ -164,15 +164,18 @@ async function plConfirmUpload() {
   var body        = new Blob([JSON.stringify(payload)], { type: 'application/octet-stream' });
   console.log('[prisliste] Laster opp:', storageName, '—', payload.items.length, 'produkter');
   try {
-    // Slett eksisterande fil om han finst (unngår x-upsert som krev UPDATE-policy)
-    var delRes = await sbFetch(storageUrl, { method: 'DELETE' });
-    console.log('[prisliste] DELETE:', delRes.status);
-    // Frisk opts per kall — sbFetch muterer opts.headers, så gjenbruk gir gammal token
-    var res = await sbFetch(storageUrl, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: body });
+    // Atomisk upsert — fungerer både når fila finst (overskriver) og ikkje finst (oppretter).
+    // UPDATE-policy er bekrefta på plass for admin. Frisk opts per kall — sbFetch muterer opts.headers.
+    var res = await sbFetch(storageUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' },
+      body: body
+    });
+    var resBody = ''; try { resBody = await res.text(); } catch (_) {}
+    console.log('[prisliste] POST upsert HTTP ' + res.status + ':', resBody || '(tom body)');
     if (!res.ok) {
-      var errBody = ''; try { errBody = await res.text(); } catch (_) {}
-      console.error('[prisliste] Opplasting HTTP ' + res.status + ':', errBody);
-      throw new Error('HTTP ' + res.status + (errBody ? ' — ' + errBody : ''));
+      console.error('[prisliste] Opplasting feilet:', res.status, resBody);
+      throw new Error('HTTP ' + res.status + (resBody ? ' — ' + resBody : ''));
     }
     _plSeasons[season] = payload;
     _plActiveSeason = season;
@@ -214,7 +217,12 @@ async function plDeleteSeason(key, ev) {
   if (!confirm('Slette prislisten «' + key + '»?\nDette kan ikke angres.')) return;
   try {
     var res = await sbFetch('/storage/v1/object/kataloger/' + _plStorageName(key), { method: 'DELETE' });
-    if (!res.ok && res.status !== 404) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      var delBody = ''; try { delBody = await res.text(); } catch(_) {}
+      // Supabase Storage returnerer HTTP 400 med body {statusCode:"404"} når fila ikkje finst
+      var notFound = res.status === 404 || (res.status === 400 && /"statusCode"\s*:\s*"404"/.test(delBody));
+      if (!notFound) throw new Error('HTTP ' + res.status + (delBody ? ' — ' + delBody : ''));
+    }
     delete _plSeasons[key];
     if (_plActiveSeason === key) {
       _plActiveSeason = _plPickCurrentSeason();
