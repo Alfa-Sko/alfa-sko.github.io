@@ -74,7 +74,7 @@ setTimeout(()=>{ try{ syncProfileToPlanner(); }catch(e){} }, 100);
   if(lv) lv.textContent = 'Alfa Kompass · '+APP_VERSION;
   const avl = document.getElementById('app-version-label');
   if(avl) avl.textContent = APP_VERSION;
-  sbInitAuth().then(updateSyncCard);
+  sbInitAuth().then(updateSyncCard).then(function(){ if(typeof nfInit==='function' && window._sbUser) nfInit(); });
   // Oppdater også kortet når profilseksjonen åpnes
   const _origShow = window.showSection || showSection;
   window._syncCardUpdate = updateSyncCard;

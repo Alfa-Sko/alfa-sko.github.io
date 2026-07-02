@@ -38,13 +38,21 @@
       <div class="hero-logo">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 783.4 216.0" style="height:36px;width:auto" role="img" aria-label="KOMPASS"><g transform="translate(40.00,176.00) scale(0.17143,-0.17143)"><path d="M65 12V688L76 700H150L162 688V311H170L383 515H441L453 503V445L301 299V290L462 69V12L450 0H389L225 227H216L162 174V12L150 0H76Z" fill="currentColor"/></g><g transform="translate(224.63,176.00) scale(0.17143,-0.17143)"><path d="M60 11V504L71 515H145L157 504V450H165Q190 487 227.0 506.0Q264 525 311 525Q363 525 404.0 502.0Q445 479 467 439H475Q499 479 543.5 502.0Q588 525 641 525Q691 525 732.0 501.5Q773 478 796.0 436.5Q819 395 819 343V11L808 0H733L722 11V322Q722 374 695.0 403.0Q668 432 619 432Q558 432 523.5 384.0Q489 336 489 245V11L478 0H404L393 11V322Q393 374 366.0 403.0Q339 432 290 432Q228 432 192.5 381.5Q157 331 157 245V11L145 0H71Z" fill="currentColor"/></g><g transform="translate(372.23,176.00) scale(0.17143,-0.17143)"><path d="M60 -154V503L71 515H144L155 503V452H164Q215 525 314 525Q384 525 435.5 491.5Q487 458 514.5 397.5Q542 337 542 257Q542 178 514.5 117.5Q487 57 436.5 23.5Q386 -10 317 -10Q221 -10 165 58H157V-154L145 -165H71ZM443 257Q443 339 404.5 385.0Q366 431 298 431Q230 431 191.5 385.0Q153 339 153 257Q153 176 191.5 130.0Q230 84 298 84Q366 84 404.5 130.0Q443 176 443 257Z" fill="currentColor"/></g><g transform="translate(471.31,176.00) scale(0.17143,-0.17143)"><path d="M33 145Q33 226 88.5 268.5Q144 311 251 311H361L370 320V345Q370 390 344.5 410.5Q319 431 260 431Q204 431 177.0 413.5Q150 396 145 357L133 346H58L47 357Q52 438 106.0 481.5Q160 525 260 525Q362 525 414.5 479.5Q467 434 467 348V117Q467 105 473.5 98.0Q480 91 493 91H515L527 80V8L515 -3H478Q445 -3 419.0 14.0Q393 31 383 63H375Q350 24 312.5 7.0Q275 -10 215 -10Q128 -10 80.5 30.5Q33 71 33 145ZM370 205V223L361 232H258Q192 232 162.0 212.5Q132 193 132 153Q132 83 231 83Q370 83 370 205Z" fill="currentColor"/></g><g transform="translate(564.40,176.00) scale(0.17143,-0.17143)"><path d="M36 159 48 170H125L136 159Q147 84 269 84Q325 84 351.5 99.5Q378 115 378 145Q378 197 290 212L207 227Q133 240 92.0 279.5Q51 319 51 378Q51 446 103.5 485.5Q156 525 246 525Q341 525 401.5 478.5Q462 432 467 356L455 345H379L368 356Q363 393 336.0 412.0Q309 431 250 431Q200 431 174.0 416.0Q148 401 148 372Q148 349 167.5 336.0Q187 323 230 316L306 302Q391 287 434.0 247.0Q477 207 477 150Q477 77 421.5 33.5Q366 -10 269 -10Q165 -10 103.5 36.5Q42 83 36 159Z" fill="currentColor"/></g><g transform="translate(653.89,176.00) scale(0.17143,-0.17143)"><path d="M36 159 48 170H125L136 159Q147 84 269 84Q325 84 351.5 99.5Q378 115 378 145Q378 197 290 212L207 227Q133 240 92.0 279.5Q51 319 51 378Q51 446 103.5 485.5Q156 525 246 525Q341 525 401.5 478.5Q462 432 467 356L455 345H379L368 356Q363 393 336.0 412.0Q309 431 250 431Q200 431 174.0 416.0Q148 401 148 372Q148 349 167.5 336.0Q187 323 230 316L306 302Q391 287 434.0 247.0Q477 207 477 150Q477 77 421.5 33.5Q366 -10 269 -10Q165 -10 103.5 36.5Q42 83 36 159Z" fill="currentColor"/></g><circle cx="174.91" cy="131.86" r="45.91" fill="none" stroke="currentColor" stroke-width="13.4"/><polygon points="174.91,85.95 162.91,128.86 186.91,128.86" fill="#D85A30"/><polygon points="174.91,177.77 162.91,134.86 186.91,134.86" fill="currentColor"/></svg>
 </div>
-      <div class="hero-right">
-        <div id="today-label" class="topbar-date"></div>
-        <div id="banner-user-name" class="hero-username"></div>
+      <div class="hero-right" style="display:flex;align-items:center;gap:8px">
+        <div style="text-align:right">
+          <div id="today-label" class="topbar-date"></div>
+          <div id="banner-user-name" class="hero-username"></div>
+        </div>
+        <div id="notif-bell-wrap" style="display:none;position:relative;flex-shrink:0">
+          <button id="notif-bell-btn" onclick="nfTogglePanel()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px;line-height:1;color:#fff;position:relative;-webkit-tap-highlight-color:transparent" title="Varsler" aria-label="Varsler">🔔<span id="notif-badge" style="display:none;position:absolute;top:-1px;right:-3px;background:#D85A30;color:#fff;font-size:9px;font-weight:700;border-radius:99px;min-width:15px;height:15px;line-height:15px;text-align:center;padding:0 3px;box-sizing:border-box;pointer-events:none"></span></button>
+        </div>
       </div>
     </div>
   </div>
   <script>(function(){var d=!!window._DEMO_ACTIVE,m=document.getElementById('demo-hero-map'),b=document.querySelector('.hero-banner');if(!d||!m)return;m.style.setProperty('display','block','important');if(b)b.style.setProperty('display','none','important');})()</script>
+
+<!-- Varselsenter-panel (position:fixed, posisjonerast dynamisk av nfOpenPanel) -->
+<div id="notif-panel" style="display:none;position:fixed;top:112px;right:8px;width:340px;max-width:calc(100vw - 16px);max-height:min(70vh,480px);overflow-y:auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.18);z-index:1500;border:1px solid #D3D1C7"></div>
 
   <nav class="nav">
     <div class="nav-item active" onclick="showSection('oversikt',this)">&#9632; Oversikt</div>
@@ -1195,6 +1203,7 @@
 <script src="js/followups.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/comments.js"></script>
+<script src="js/notifications.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/calculator.js"></script>
 <script src="js/prisliste.js"></script>

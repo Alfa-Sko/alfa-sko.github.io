@@ -165,7 +165,7 @@ function renderTimeline(){
       const accent=isFree?'#1A7A4E':isCustPhoto?'#185FA5':t.color;
       const bg=isFree?'#E8F4ED':isCustPhoto?'#EEF4FB':'#fff';
       const delFn=isFree?'deleteFreeNote':isCustPhoto?'deleteCustomerPhoto':'deleteVisit';
-      html+='<div class="card" style="margin-bottom:10px;padding:14px;border-left:3px solid '+accent+';background:'+bg+'">';
+      html+='<div id="tl-entry-'+it.kind+'-'+it.id+'" class="card" style="margin-bottom:10px;padding:14px;border-left:3px solid '+accent+';background:'+bg+'">';
       html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">';
       html+='<div style="flex:1;min-width:0">';
       html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px"><span style="font-size:16px">'+t.ico+'</span><span style="font-size:14px;font-weight:600;color:#2C2C2A">'+escapeHtml(it.title||'(ingen tittel)')+'</span>';
