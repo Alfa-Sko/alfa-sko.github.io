@@ -387,7 +387,6 @@ function renderDistrictDashboard(){
 
   // ── Per-kunde hjelparar ──────────────────────────────────────────────────
   function custVisitDates(name){ return (visits||[]).filter(v=>v.customer===name).map(v=>v.date); }
-  function lastVisit(name){ const ds=custVisitDates(name).sort(); return ds.length?ds[ds.length-1]:null; }
 
   // Signal 1: Forfalte oppfølgingar — kjelde: oppfølgings-data. Vekt: ×3 (tyngst)
   const overdueByCustomer={};
@@ -410,15 +409,6 @@ function renderDistrictDashboard(){
   // Proxy for relasjonsbygging; tidspunkt for registrering lagras ikkje enno.
   function hasContacts(c){ return !!(c.contacts&&c.contacts.length); }
 
-  // Signal 4: Besøksfrekvens mot kundeklasse — kjelde: besøkshistorikk
-  // A: 90 dg, B: 120 dg, C: 180 dg. null = aldri registrert aktivitet → ukjent
-  function visitFreq(c){
-    const last=lastVisit(c.name);
-    if(!last&&!custVisitDates(c.name).length) return null;
-    const days=last?Math.floor((new Date(today)-new Date(last))/864e5):9999;
-    return days>(c.class==='A'?90:c.class==='B'?120:180)?'overdue':'ok';
-  }
-
   // Score per kunde: lågt = dårleg helse. null = ukjent (ingen datagrunnlag)
   function scoreCustomer(c){
     let score=0, signals=0;
@@ -431,13 +421,10 @@ function renderDistrictDashboard(){
     if(t!==null){ signals++; if(t==='down') score-=2; else if(t==='up') score+=1; }
     // Kontaktpersonar
     if(hasContacts(c)){ score+=1; signals++; }
-    // Besøksfrekvens
-    const freq=visitFreq(c);
-    if(freq!==null){ signals++; if(freq==='overdue') score-=2; }
     return signals>0?score:null;
   }
 
-  const custData=customers.map(c=>({c,score:scoreCustomer(c),trend:actTrend(c.name),od:overdueByCustomer[c.name]||0,freq:visitFreq(c)}));
+  const custData=customers.map(c=>({c,score:scoreCustomer(c),trend:actTrend(c.name),od:overdueByCustomer[c.name]||0}));
   const ranked=custData.filter(x=>x.score!==null).sort((a,b)=>a.score-b.score);
   const unknownCount=custData.filter(x=>x.score===null).length;
 
@@ -445,8 +432,6 @@ function renderDistrictDashboard(){
   let tUp=0,tDown=0,tFlat=0;
   customers.forEach(c=>{ const t=actTrend(c.name); if(t==='up')tUp++;else if(t==='down')tDown++;else if(t==='flat')tFlat++; });
   const withContacts=customers.filter(c=>hasContacts(c)).length;
-  const aCustomers=customers.filter(c=>c.class==='A');
-  const aOverdue=aCustomers.filter(c=>{ const l=lastVisit(c.name); return !l||l<d90; });
 
   // ── Innsatsrad: km og besøk (ikkje del av score) ─────────────────────────
   let kmMonth=0,kmLast30=0;
@@ -499,7 +484,6 @@ function renderDistrictDashboard(){
       const issues=[];
       if(x.od>0) issues.push(x.od+(x.od===1?' forfalt':' forfalt'));
       if(x.trend==='down') issues.push('aktivitet↓');
-      if(x.freq==='overdue') issues.push('besøk forfalt');
       if(!hasContacts(c)) issues.push('ingen kontakt');
       return '<div onclick="openCustomer(\''+safe+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1EFE8;cursor:pointer">'
         +healthDot(x.score)
@@ -544,13 +528,6 @@ function renderDistrictDashboard(){
           withContacts>customers.length*0.5?'#1A7A4E':'#BA7517',
           'Kundar med minst éin registrert kontaktperson. Proxy for relasjonsbygging.',
           'Kundekort')}
-        ${sigCard('🔴','A-kundar forfalt',
-          aOverdue.length+' / '+aCustomers.length,
-          aOverdue.length>0?'Ikkje besøkt 90+ dagar':'Alle A-kundar besøkt nyleg ✓',
-          aOverdue.length>0?'#A23B27':'#1A7A4E',
-          'A-kundar utan besøk siste 90 dagar. Klikk for liste.',
-          'Besøkshistorikk',
-          'openOverdueAList()')}
         ${turnoverCards}
       </div>
 
@@ -597,12 +574,8 @@ function renderDistrictDashboard(){
     </div>
   `;
 
-  window._dashOverdueA=aOverdue;
 }
 
-function openOverdueAList(){
-  showCustomerListModal('A-kundar forfalt (90+ dagar utan besøk)', window._dashOverdueA||[]);
-}
 function openFallingList(){
   // Parkert bak HEALTH_TURNOVER_ENABLED — reaktiver når salgstall-import er på plass
   showCustomerListModal('Kunder med fallende omsetning (ikkje aktivt)', []);
