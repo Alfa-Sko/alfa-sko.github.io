@@ -1010,6 +1010,10 @@ function openApptFor(name, dateKey){
     if(typeof window._csp_appt_setSelected==='function') window._csp_appt_setSelected(name);
     else document.getElementById('appt-customer').value=name;
     apptCustomerChange();
+    // Fyll inn eksisterende notat så bruker ser det og kan redigere/legge til
+    const _existV = visits.find(function(v){ return v.customer===name && v.date===dateKey; });
+    const _notesEl = document.getElementById('appt-notes');
+    if(_existV && _existV.notes && _notesEl) _notesEl.value = _existV.notes;
     apptTab('notat', document.querySelectorAll('.appt-tab')[1]);
   }, 80);
 }
