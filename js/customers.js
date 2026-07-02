@@ -85,18 +85,27 @@ async function fetchCustomersFromSupabase() {
 
 // PATCH éin eller fleire felt direkte på customers-tabellen (delt).
 // Bruker sbFetch (apikey + Bearer access_token, auto-retry på 401).
+// 403 = manglande GRANT (permanent) → bryt kretsen for sesjonen, ikkje retry.
 // Fallback: feilen loggast men stoppar ikkje flyten.
 async function _sbPatchCustomerField(id, patch){
   if(window._DEMO_ACTIVE) return;
   if(!id || typeof sbFetch==='undefined') return;
+  if(window._custPatch403) return; // GRANT manglar — retry er meiningslaust
   try{
     const r=await sbFetch('/rest/v1/customers?id=eq.'+encodeURIComponent(id),{
       method:'PATCH',
       headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify(patch),
     });
-    if(!r.ok) console.warn('customers PATCH feilet',r.status,await r.text());
-  }catch(e){ console.warn('customers PATCH feil',e); }
+    if(!r.ok){
+      if(r.status===403){
+        window._custPatch403=true;
+        console.error('[customers] PATCH 403 (kode 42501) — kjør supabase/002_grants.sql i Supabase SQL-editor. Vidare PATCH-kall stansa for denne sesjonen.');
+      } else {
+        console.warn('[customers] PATCH feilet',r.status,await r.text());
+      }
+    }
+  }catch(e){ console.warn('[customers] PATCH feil',e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
