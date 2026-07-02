@@ -70,7 +70,7 @@ function saveVisit(){
   const [sh,sm]=time.split(':').map(Number);
   const [eh,em]=timeEnd.split(':').map(Number);
   if(eh*60+em<=sh*60+sm){ showToast('Slutttidspunkt må være etter start'); return; }
-  const id=Date.now();
+  const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'v_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   sbUploadVisitPhotos(id, files).then(({count,paths})=>{
     const v={id,customer,type,date,time,timeEnd,contact,notes,followup,photoCount:count,photoPaths:paths};
     if(otherLabel) v.otherLabel=otherLabel;
@@ -121,7 +121,7 @@ async function addCustomerPhoto(customerName, input){
   input.value = '';
   if(!files.length) return;
   showToast('Laster opp …');
-  var groupId = Date.now();
+  var groupId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'cp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   var result = await sbUploadVisitPhotos(groupId, files);
   if(!result.count){
     showToast('Opplasting feilet – sjekk konsollen');

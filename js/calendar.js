@@ -1140,7 +1140,7 @@ function saveAppt(){
     if(agenda) fullNotes = 'Agenda: '+agenda+(notes?'\n\n'+notes:'');
     if(order) fullNotes += (fullNotes?'\n\nOrdre: ':'Ordre: ')+order;
     const existing = visits.find(v=>v.customer===cname&&v.date===_apptDate);
-    if(!existing){ visits.push({id:Date.now(), customer:cname, date:_apptDate, time:tStart, contact, notes:fullNotes, followup:ftask, photoCount:0}); }
+    if(!existing){ visits.push({id:(typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'v_'+Date.now()+'_'+Math.random().toString(36).slice(2)), customer:cname, date:_apptDate, time:tStart, contact, notes:fullNotes, followup:ftask, photoCount:0}); }
     else { if(fullNotes) existing.notes=fullNotes; if(contact) existing.contact=contact; }
     saveData('alfa_visits', visits);
     const _photoInput = document.getElementById('appt-photos');

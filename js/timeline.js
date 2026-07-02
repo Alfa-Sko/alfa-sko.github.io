@@ -26,7 +26,7 @@ function saveFreeNote(){
   const tag=document.getElementById('free-note-tag').value.trim();
   if(!text){ showToast('Skriv inn et notat først'); return; }
   if(!date){ showToast('Sett dato'); return; }
-  freeNotes.push({id:Date.now(), date, text, tag, createdAt:new Date().toISOString()});
+  freeNotes.push({id:(typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'fn_'+Date.now()+'_'+Math.random().toString(36).slice(2)), date, text, tag, createdAt:new Date().toISOString()});
   saveData('alfa_free_notes', freeNotes);
   document.getElementById('free-note-text').value='';
   document.getElementById('free-note-tag').value='';
