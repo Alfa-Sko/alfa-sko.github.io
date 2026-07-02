@@ -177,13 +177,20 @@ function renderTimeline(){
       html+='<button class="btn btn-light btn-sm" style="font-size:10px;color:#A23B27" onclick="'+delFn+'('+it.id+')">×</button>';
       html+='</div>';
       if(it.notes){
+        const _tlSafeCust=(it.title||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const _tlEditFn=it.kind==='activity'
+          ?'openApptFor(\''+_tlSafeCust+'\',\''+it.date+'\')'
+          :it.kind==='free'?'editFreeNote('+it.id+')':'';
         const _noteEditBtn=it.kind==='activity'
-          ?'<button onclick="editVisitNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Rediger notat">✏</button>'
+          ?'<button onclick="'+_tlEditFn+'" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Rediger notat">✏</button>'
           +'<button onclick="clearVisitNote('+it.id+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Slett notat">🗑</button>'
           :it.kind==='free'
           ?'<button onclick="editFreeNote('+it.id+')" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;line-height:1" title="Rediger notat">✏</button>'
           :'';
-        html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span><div style="display:flex;gap:2px;flex-shrink:0">'+_noteEditBtn+'</div></div>';
+        const _tlNoteSpan=_tlEditFn
+          ?'<span onclick="'+_tlEditFn+'" style="cursor:pointer;border-radius:4px;padding:3px 5px;margin:-3px -5px;transition:background 0.12s" onmouseover="this.style.background=\'#F0EDE5\'" onmouseout="this.style.background=\'\'" title="Klikk for å redigere">'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span>'
+          :'<span>'+escapeHtml(it.notes).replace(/\n/g,'<br>')+'</span>';
+        html+='<div style="font-size:13px;color:#2C2C2A;line-height:1.55;margin-top:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+_tlNoteSpan+'<div style="display:flex;gap:2px;flex-shrink:0">'+_noteEditBtn+'</div></div>';
       }
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
       if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
@@ -292,7 +299,9 @@ async function renderNotesWithPhotos(){
     const photoHtml = `<div style="margin-top:12px">${allPhotos.length>0?`<div style="font-size:11px;color:#888780;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Bilder (${allPhotos.length})</div>`:''}${thumbsHtml}<label class="btn btn-light btn-sm" style="font-size:11px;cursor:pointer;display:inline-block">+ Legg til bilde<input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoToVisit(${v.id},this)"></label></div>`;
     const t=tMap[v.type]||tMap.visit;
     const typePill=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#F1EFE8;color:#444441;font-weight:600;margin-left:6px">${t.ico} ${t.lbl}</span>`;
-    const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span>${escapeHtml(v.notes).replace(/\n/g,'<br>')}</span><button onclick="clearVisitNote(${v.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0;flex-shrink:0" title="Slett notat">🗑</button></div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';
+    const _nwpSafe=v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const _nwpEditFn="openApptFor('"+_nwpSafe+"','"+v.date+"')";
+    const notesHtml = v.notes ? `<div style="font-size:13px;color:#2C2C2A;line-height:1.6;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span onclick="${_nwpEditFn}" style="cursor:pointer;border-radius:4px;padding:3px 5px;margin:-3px -5px;transition:background 0.12s" onmouseover="this.style.background='#F0EDE5'" onmouseout="this.style.background=''" title="Klikk for å redigere">${escapeHtml(v.notes).replace(/\n/g,'<br>')}</span><div style="display:flex;gap:2px;flex-shrink:0"><button onclick="${_nwpEditFn}" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1" title="Rediger notat">✏</button><button onclick="clearVisitNote(${v.id})" style="background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:2px 4px;flex-shrink:0" title="Slett notat">🗑</button></div></div>` : '<div style="font-size:12px;color:#888780;font-style:italic">Ingen notat</div>';
     return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div><div style="font-size:14px;font-weight:600;color:#2C2C2A">${v.customer}${typePill}</div><div style="font-size:11px;color:#888780">${v.date.split('-').reverse().join('.')} · ${v.time||''}${v.timeEnd?' – '+v.timeEnd:''} · ${v.contact||''}</div></div><button class="btn btn-red btn-sm" onclick="deleteVisit(${v.id})">Slett</button></div>${notesHtml}${v.followup?`<div style="margin-top:10px;font-size:12px;color:#633806;background:#FAEEDA;padding:6px 10px;border-radius:6px">▶ Oppfølging: ${v.followup}</div>`:''} ${photoHtml}</div>`;
   }));
   document.getElementById('notes-list').innerHTML=items.join('');
