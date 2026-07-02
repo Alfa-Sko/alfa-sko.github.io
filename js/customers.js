@@ -666,7 +666,7 @@ async function _renderCustHistory(name, filter){
     return '<div class="tl-item"><div class="tl-dot tl-dot-visit">'+t.ico+'</div><div class="tl-body">'
       +'<div class="tl-date">'+v.date.split('-').reverse().join('.')+' · '+(v.time||'')+(v.timeEnd?' – '+v.timeEnd:'')+' · '+(v.contact||'')+'</div>'
       +'<div class="tl-title">'+t.lbl+'</div>'
-      +(v.notes?(function(){ var _sc=v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var _ef="openApptFor('"+_sc+"','"+v.date+"')"; return '<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span onclick="'+_ef+'" style="cursor:pointer;border-radius:4px;padding:3px 5px;margin:-3px -5px;transition:background 0.12s" onmouseover="this.style.background=\'#F0EDE5\'" onmouseout="this.style.background=\'\'" title="Klikk for å redigere">'+escapeHtml(v.notes)+'</span><div style="display:flex;gap:0;flex-shrink:0"><button onclick="'+_ef+'" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1" title="Rediger notat">✏</button><button onclick="clearVisitNote('+v.id+')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">🗑</button></div></div>'; })():'')
+      +(v.notes?(function(){ var _sc=v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var _ef="openApptFor('"+_sc+"','"+v.date+"')"; return '<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span onclick="'+_ef+'" style="cursor:pointer;border-radius:4px;padding:3px 5px;margin:-3px -5px;transition:background 0.12s" onmouseover="this.style.background=\'#F0EDE5\'" onmouseout="this.style.background=\'\'" title="Klikk for å redigere">'+escapeHtml(v.notes)+'</span><div style="display:flex;gap:0;flex-shrink:0"><button onclick="'+_ef+'" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1" title="Rediger notat">✏</button><button onclick="clearVisitNote(\''+v.id+'\')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">🗑</button></div></div>'; })():'')
       +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
       +ph+'</div></div>';
   }).join('');
@@ -675,7 +675,7 @@ async function _renderCustHistory(name, filter){
       +'<div class="tl-date">'+p.date.split('-').reverse().join('.')+'</div>'
       +'<div class="tl-title" style="color:#185FA5">Kundekort-bilde</div>'
       +'<div id="ch-custphotos-'+p.id+'" style="margin-top:8px"></div>'
-      +'<button onclick="deleteCustomerPhoto('+p.id+')" style="margin-top:6px;background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0">🗑 Slett</button>'
+      +'<button onclick="deleteCustomerPhoto(\''+p.id+'\')" style="margin-top:6px;background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0">🗑 Slett</button>'
       +'</div></div>';
   }).join('');
   el.innerHTML=visitHtml+custPhotoHtml;
@@ -694,7 +694,7 @@ async function _loadChCustPhotos(p){
       var safeName=ph.name.replace(/'/g,"\\'");
       return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
         +'<img src="'+ph.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+ph.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
-        +(ph.path?'<button onclick="deleteSingleCustPhoto('+p.id+',\''+ph.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+        +(ph.path?'<button onclick="deleteSingleCustPhoto(\''+p.id+'\',\''+ph.path.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
         +'</div>';
     }).join('')+'</div>';
 }
@@ -710,7 +710,7 @@ async function _loadChPhotos(v){
       var safeName=p.name.replace(/'/g,"\\'");
       return '<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid #D3D1C7;position:relative">'
         +'<img src="'+p.url+'" style="width:100%;height:100%;object-fit:cover;cursor:pointer" loading="lazy" alt="'+p.name+'" onclick="viewPhoto(\''+safeUrl+'\',\''+safeName+'\')">'
-        +(p.path?'<button onclick="deleteSingleVisitPhoto('+v.id+',\''+p.path+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
+        +(p.path?'<button onclick="deleteSingleVisitPhoto(\''+v.id+'\',\''+p.path.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')" style="position:absolute;top:2px;right:2px;background:rgba(162,59,39,0.82);color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;padding:1px 5px;line-height:1.4">🗑</button>':'')
         +'</div>';
     }).join('')+'</div>';
 }
