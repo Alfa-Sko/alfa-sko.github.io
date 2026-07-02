@@ -356,171 +356,256 @@ function _demoRerender(){
   ].forEach(fn=>{ try{ fn(); }catch(e){} });
 }
 
-// ─── OVERVIEW ───────────────────────────────────────────────────────────────
+// ─── DISTRIKTS-HELSESJEKK ────────────────────────────────────────────────────
+// Helsesignaler basert BERRE på appens eigne data (aktivitetar, oppfølgingar,
+// kalender, kontaktpersonar). Ingen omsetning/L12 — sjå feature-flag under.
+//
+// HEALTH_TURNOVER_ENABLED: sett til true når salgstall-import er på plass.
+// Reaktiverer: budsjettoppnåing, fallande omsetning, L12-basert vekting.
+const HEALTH_TURNOVER_ENABLED = false;
 
 function renderDistrictDashboard(){
   const container = document.getElementById('district-dashboard');
   if(!container) return;
+
   const now = new Date();
   const year = now.getFullYear();
-  // Hvor mange dager av året er gått (for å estimere YTD-andel)
-  const startYear = new Date(year,0,1);
-  const daysIntoYear = Math.floor((now-startYear)/(24*60*60*1000))+1;
-  const yearProgress = daysIntoYear/365;
+  const daysIntoYear = Math.floor((now-new Date(year,0,1))/864e5)+1;
+  const weekNum = Math.ceil(daysIntoYear/7);
 
-  // 1. Budsjettoppnåelse
-  let totalBudget=0, totalY2026=0, totalY2025=0;
-  getCustomers().forEach(c=>{
-    totalBudget += (c.budget||0);
-    const sales = getCustomerSales()[c.name];
-    if(sales){
-      sales.forEach(a=>{
-        totalY2026 += a.y2026||0;
-        totalY2025 += a.y2025||0;
-      });
-    }
+  // Datostrengar
+  function dStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function daysAgo(n){ const d=new Date(now); d.setDate(d.getDate()-n); return dStr(d); }
+  function daysAhead(n){ const d=new Date(now); d.setDate(d.getDate()+n); return dStr(d); }
+
+  const today=TODAY_STR;
+  const d90=daysAgo(90), d45=daysAgo(45), d30=daysAgo(30);
+  const monthStart=year+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  const next30=daysAhead(30);
+
+  const customers=getCustomers();
+
+  // ── Per-kunde hjelparar ──────────────────────────────────────────────────
+  function custVisitDates(name){ return (visits||[]).filter(v=>v.customer===name).map(v=>v.date); }
+  function lastVisit(name){ const ds=custVisitDates(name).sort(); return ds.length?ds[ds.length-1]:null; }
+
+  // Signal 1: Forfalte oppfølgingar — kjelde: oppfølgings-data. Vekt: ×3 (tyngst)
+  const overdueByCustomer={};
+  (followups||[]).filter(f=>!f.done&&f.due<today).forEach(f=>{
+    if(f.customer) overdueByCustomer[f.customer]=(overdueByCustomer[f.customer]||0)+1;
   });
-  const budgetPct = totalBudget>0 ? (totalY2026/totalBudget*100) : 0;
-  const expectedPct = yearProgress*100;
-  const budgetTrend = budgetPct >= expectedPct ? 'opp' : 'ned';
+  const totalOverdue=Object.values(overdueByCustomer).reduce((s,n)=>s+n,0);
 
-  // 2. A-kunder uten besøk siste 90 dager
-  const cutoff = new Date(now);
-  cutoff.setDate(cutoff.getDate()-90);
-  const cutoffKey = cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
-  function lastVisitDate(name){
-    const vs = visits.filter(v=>v.customer===name);
-    if(vs.length===0) return null;
-    return vs.map(v=>v.date).sort().pop();
+  // Signal 2: Aktivitetstrend siste 90 dg — kjelde: besøkshistorikk
+  // p1 = siste 45 dg, p0 = 45–90 dg sidan. null = ukjent (ingen data i begge periodar)
+  function actTrend(name){
+    const dates=custVisitDates(name);
+    const p0=dates.filter(d=>d>=d90&&d<d45).length;
+    const p1=dates.filter(d=>d>=d45&&d<=today).length;
+    if(p0===0&&p1===0) return null;
+    return p1>p0?'up':p1<p0?'down':'flat';
   }
-  const aCustomers = getCustomers().filter(c=>c.class==='A');
-  const aOverdue = aCustomers.filter(c=>{
-    const last = lastVisitDate(c.name);
-    return !last || last < cutoffKey;
-  });
 
-  // 3. Kunder med fallende omsetning (2026 ratejustert < 70% av 2025)
-  // Sammenlign 2026 YTD vs 2025 YTD (samme periode)
-  const fallingCustomers = getCustomers().filter(c=>{
-    if(c.l12===0) return false;
-    const sales = getCustomerSales()[c.name];
-    if(!sales || sales.length===0) return false;
-    let s25=0, s26=0;
-    sales.forEach(a=>{ s25+=a.y2025||0; s26+=a.y2026||0; });
-    if(s25<10000) return false; // for små til å være meningsfullt
-    // Ratejustert: 2026 YTD bør være ≥ 2025 × yearProgress
-    const expected26 = s25 * yearProgress;
-    return s26 < expected26 * 0.7;
-  });
-  fallingCustomers.sort((a,b)=>(b.l12||0)-(a.l12||0));
+  // Signal 3: Har kontaktpersonar — kjelde: kundekort
+  // Proxy for relasjonsbygging; tidspunkt for registrering lagras ikkje enno.
+  function hasContacts(c){ return !!(c.contacts&&c.contacts.length); }
 
-  // 4. Nye relasjoner uten besøk
-  const newWithoutVisit = getCustomers().filter(c=>c.priority==='Ny relasjon' && !lastVisitDate(c.name));
+  // Signal 4: Besøksfrekvens mot kundeklasse — kjelde: besøkshistorikk
+  // A: 90 dg, B: 120 dg, C: 180 dg. null = aldri registrert aktivitet → ukjent
+  function visitFreq(c){
+    const last=lastVisit(c.name);
+    if(!last&&!custVisitDates(c.name).length) return null;
+    const days=last?Math.floor((new Date(today)-new Date(last))/864e5):9999;
+    return days>(c.class==='A'?90:c.class==='B'?120:180)?'overdue':'ok';
+  }
 
-  // 5. Forfalte oppfølginger
-  const overdueFollowups = (followups||[]).filter(f=>!f.done && f.due < TODAY_STR);
+  // Score per kunde: lågt = dårleg helse. null = ukjent (ingen datagrunnlag)
+  function scoreCustomer(c){
+    let score=0, signals=0;
+    // Overdue oppfølgingar (vekt ×3)
+    const od=overdueByCustomer[c.name]||0;
+    if(od>0){ score-=od*3; signals++; }
+    else if((followups||[]).some(f=>f.customer===c.name)){ signals++; } // har oppfølgingar, ingen forfalt
+    // Aktivitetstrend
+    const t=actTrend(c.name);
+    if(t!==null){ signals++; if(t==='down') score-=2; else if(t==='up') score+=1; }
+    // Kontaktpersonar
+    if(hasContacts(c)){ score+=1; signals++; }
+    // Besøksfrekvens
+    const freq=visitFreq(c);
+    if(freq!==null){ signals++; if(freq==='overdue') score-=2; }
+    return signals>0?score:null;
+  }
 
-  // 6. Planlagt aktivitet neste 30 dager
-  const future = new Date(now);
-  future.setDate(future.getDate()+30);
-  let plannedNext30 = 0;
+  const custData=customers.map(c=>({c,score:scoreCustomer(c),trend:actTrend(c.name),od:overdueByCustomer[c.name]||0,freq:visitFreq(c)}));
+  const ranked=custData.filter(x=>x.score!==null).sort((a,b)=>a.score-b.score);
+  const unknownCount=custData.filter(x=>x.score===null).length;
+
+  // Distrikt-aggregatar
+  let tUp=0,tDown=0,tFlat=0;
+  customers.forEach(c=>{ const t=actTrend(c.name); if(t==='up')tUp++;else if(t==='down')tDown++;else if(t==='flat')tFlat++; });
+  const withContacts=customers.filter(c=>hasContacts(c)).length;
+  const aCustomers=customers.filter(c=>c.class==='A');
+  const aOverdue=aCustomers.filter(c=>{ const l=lastVisit(c.name); return !l||l<d90; });
+
+  // ── Innsatsrad: km og besøk (ikkje del av score) ─────────────────────────
+  let kmMonth=0,kmLast30=0;
   Object.keys(calEvents||{}).forEach(key=>{
-    if(key >= TODAY_STR && key <= future.getFullYear()+'-'+String(future.getMonth()+1).padStart(2,'0')+'-'+String(future.getDate()).padStart(2,'0')){
-      plannedNext30 += (calEvents[key]||[]).filter(e=>e.type==='visit').length;
-    }
+    (calEvents[key]||[]).forEach(e=>{
+      if((e.type==='drive'||e.type==='drive-auto')&&e.dist){
+        const d=parseFloat(e.dist)||0;
+        if(key>=monthStart&&key<=today) kmMonth+=d;
+        if(key>=d30&&key<=today) kmLast30+=d;
+      }
+    });
+  });
+  const visMonth=(visits||[]).filter(v=>v.date>=monthStart&&v.date<=today).length;
+  const visLast30=(visits||[]).filter(v=>v.date>=d30&&v.date<=today).length;
+  let planned30=0;
+  Object.keys(calEvents||{}).forEach(key=>{
+    if(key>=today&&key<=next30) planned30+=(calEvents[key]||[]).filter(e=>e.type==='visit').length;
   });
 
-  // Bygg kortene
-  function card(opts){
-    const {icon, label, value, sub, color, action, tooltip} = opts;
-    return '<div class="dash-card" '+(action?'onclick="'+action+'" style="cursor:pointer"':'')+' title="'+escapeHtml(tooltip||'')+'">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:18px">'+icon+'</span><span style="font-size:11px;color:#888780;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">'+label+'</span></div>'+
-      '<div style="font-size:22px;font-weight:700;color:'+(color||'#2C2C2A')+';line-height:1.1">'+value+'</div>'+
-      (sub?'<div style="font-size:11px;color:#888780;margin-top:4px">'+sub+'</div>':'')+
-      '</div>';
+  // ── HTML-hjelpefunksjonar ────────────────────────────────────────────────
+  function srcTag(lbl){
+    return '<span style="font-size:9px;color:#888780;background:#F1EFE8;border:1px solid #D3D1C7;border-radius:4px;padding:1px 5px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">'+escapeHtml(lbl)+'</span>';
   }
 
-  function nokCompact(n){
-    if(n>=1000000) return (n/1000000).toFixed(1)+' mill';
-    if(n>=1000) return Math.round(n/1000)+'k';
-    return Math.round(n);
+  function sigCard(icon,label,value,sub,color,tooltip,source,action){
+    return '<div class="dash-card"'+(action?' onclick="'+action+'" style="cursor:pointer"':'')+' title="'+escapeHtml(tooltip||'')+'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:5px">'
+      +'<div style="display:flex;align-items:center;gap:5px"><span style="font-size:15px">'+icon+'</span>'
+      +'<span style="font-size:10px;color:#888780;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;line-height:1.2">'+label+'</span></div>'
+      +srcTag(source)+'</div>'
+      +'<div style="font-size:22px;font-weight:700;color:'+(color||'#2C2C2A')+';line-height:1.1">'+value+'</div>'
+      +(sub?'<div style="font-size:11px;color:#888780;margin-top:3px">'+sub+'</div>':'')
+      +'</div>';
   }
 
-  const html = `
+  // Trendstreng for aktivitetssignalet
+  const trendDown=tDown>0, trendVal=tDown>0?tDown+' ↓':tUp>0?tUp+' ↑':tFlat>0?tFlat+' →':'—';
+  const trendSub=tDown>0?tDown+' med fallande aktivitet':tUp>0?tUp+' med stigande aktivitet':'Stabil trend';
+  const trendColor=tDown>0?'#A23B27':tUp>0?'#1A7A4E':'#888780';
+
+  // Verste kunder (topp 5 med score < 0)
+  const worst=ranked.filter(x=>x.score<0).slice(0,5);
+  function healthDot(score){ return score>=0?'<span style="color:#1A7A4E;font-size:10px">●</span>':score>=-2?'<span style="color:#BA7517;font-size:10px">●</span>':'<span style="color:#A23B27;font-size:10px">●</span>'; }
+
+  const worstRows=worst.length===0
+    ?'<div style="color:#1A7A4E;font-size:12px;padding:8px 0">✓ Ingen kunder med store helseutfordringar</div>'
+    :worst.map(function(x){
+      const c=x.c;
+      const safe=c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const issues=[];
+      if(x.od>0) issues.push(x.od+(x.od===1?' forfalt':' forfalt'));
+      if(x.trend==='down') issues.push('aktivitet↓');
+      if(x.freq==='overdue') issues.push('besøk forfalt');
+      if(!hasContacts(c)) issues.push('ingen kontakt');
+      return '<div onclick="openCustomer(\''+safe+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1EFE8;cursor:pointer">'
+        +healthDot(x.score)
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:700;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</div>'
+        +'<div style="font-size:11px;color:#888780">'+escapeHtml(issues.join(' · '))+'</div>'
+        +'</div>'
+        +(c.class?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:'+(c.class==='A'?'#FBE6E6':c.class==='B'?'#FFF6E6':'#F1EFE8')+';color:'+(c.class==='A'?'#A23B27':c.class==='B'?'#6D4C00':'#5F5E5A')+'">'+c.class+'</span>':'')
+        +'</div>';
+    }).join('');
+
+  // Omsetningssignalar er parkert — reaktiver HEALTH_TURNOVER_ENABLED når salgstall-import er klar
+  let turnoverCards='';
+  if(HEALTH_TURNOVER_ENABLED){
+    // TODO: legg til budsjettoppnåing og fallande-omsetning-kort her
+  }
+
+  container.innerHTML=`
     <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#F8F7F3 0%,#FAFAF7 100%);border:1px solid #D3D1C7">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px">
         <div style="font-size:14px;font-weight:700;color:#2C2C2A">📊 Distrikts-helsesjekk</div>
-        <div style="font-size:11px;color:#888780">${year} · uke ${Math.ceil(daysIntoYear/7)}</div>
+        <div style="font-size:11px;color:#888780">${year} · uke ${weekNum}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
-        ${card({
-          icon:'🎯',
-          label:'Budsjett ' + year,
-          value: budgetPct.toFixed(0)+'%',
-          sub: nokCompact(totalY2026)+' kr av ' + nokCompact(totalBudget) + ' kr · forventet ' + expectedPct.toFixed(0) + '%',
-          color: budgetTrend==='opp' ? '#1A7A4E' : '#A23B27',
-          tooltip:'Sum 2026-omsetning vs sum budsjett. Forventet andel basert på årsprogresjon.'
-        })}
-        ${card({
-          icon:'🔴',
-          label:'A-kunder forfalt',
-          value: aOverdue.length + ' / ' + aCustomers.length,
-          sub: aOverdue.length>0 ? 'Ikke besøkt 90+ dager' : 'Alle besøkt nylig ✓',
-          color: aOverdue.length>0 ? '#A23B27' : '#1A7A4E',
-          action:"openOverdueAList()",
-          tooltip:'A-kunder som ikke har vært besøkt på 90 dager. Klikk for liste.'
-        })}
-        ${card({
-          icon:'📉',
-          label:'Fallende kunder',
-          value: fallingCustomers.length,
-          sub: fallingCustomers.length>0 ? 'Omsetning < 70% av forventet' : 'Ingen vesentlige fall',
-          color: fallingCustomers.length>0 ? '#A23B27' : '#1A7A4E',
-          action:"openFallingList()",
-          tooltip:'Kunder hvor 2026 YTD er mindre enn 70% av ratejustert 2025-nivå.'
-        })}
-        ${card({
-          icon:'🌱',
-          label:'Nye relasjoner',
-          value: newWithoutVisit.length,
-          sub: newWithoutVisit.length>0 ? 'Uten første besøk' : 'Alle introdusert ✓',
-          color: newWithoutVisit.length>0 ? '#BA7517' : '#1A7A4E',
-          action:"openNewList()",
-          tooltip:'Kunder merket som ny relasjon som ennå ikke er besøkt.'
-        })}
-        ${card({
-          icon:'⏰',
-          label:'Forfalt oppfølging',
-          value: overdueFollowups.length,
-          sub: overdueFollowups.length>0 ? 'Krever handling' : 'Alt under kontroll ✓',
-          color: overdueFollowups.length>0 ? '#A23B27' : '#1A7A4E',
-          action:"showSection('oppfolging',document.querySelector('.nav-item:nth-child(7)'))",
-          tooltip:'Oppfølginger med forfallsdato før i dag.'
-        })}
-        ${card({
-          icon:'📅',
-          label:'Plan neste 30 dager',
-          value: plannedNext30,
-          sub: plannedNext30>0 ? 'planlagte besøk' : 'Ingen besøk i kalenderen',
-          color: '#0C447C',
-          action:"showSection('kalender',document.querySelector('.nav-item:nth-child(3)'))",
-          tooltip:'Antall besøk lagt inn i kalenderen de neste 30 dagene.'
-        })}
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px">
+        ${sigCard('⏰','Forfalt oppfølging',
+          totalOverdue,
+          totalOverdue>0?totalOverdue+' krev handling':'Alt under kontroll ✓',
+          totalOverdue>0?'#A23B27':'#1A7A4E',
+          'Oppfølgingar med forfallsdato passert. Klikk for å gå til oppfølging.',
+          'Oppfølgings-data',
+          "showSection('oppfolging',document.querySelector('.nav-item:nth-child(7)'));")}
+        ${sigCard('📈','Aktivitetstrend 90 dg',
+          trendVal,
+          trendSub,
+          trendColor,
+          'Samanliknar aktivitetsvolum siste 45 dg mot dei 45 før. ↑ stigande · → stabil · ↓ fallande.',
+          'Besøkshistorikk')}
+        ${sigCard('👤','Med kontaktperson',
+          withContacts+' / '+customers.length,
+          withContacts>0?withContacts+' kundar med min. 1 kontakt':'Ingen kundar har kontaktperson',
+          withContacts>customers.length*0.5?'#1A7A4E':'#BA7517',
+          'Kundar med minst éin registrert kontaktperson. Proxy for relasjonsbygging.',
+          'Kundekort')}
+        ${sigCard('🔴','A-kundar forfalt',
+          aOverdue.length+' / '+aCustomers.length,
+          aOverdue.length>0?'Ikkje besøkt 90+ dagar':'Alle A-kundar besøkt nyleg ✓',
+          aOverdue.length>0?'#A23B27':'#1A7A4E',
+          'A-kundar utan besøk siste 90 dagar. Klikk for liste.',
+          'Besøkshistorikk',
+          'openOverdueAList()')}
+        ${turnoverCards}
+      </div>
+
+      ${worst.length>0?`
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#5F5E5A;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Kundar som treng merksemd <span style="font-weight:400;color:#B4B2A9">(klikk for å opne kundekort)</span></div>
+        <div style="background:#fff;border:1px solid #E5E3DB;border-radius:8px;padding:4px 12px">${worstRows}</div>
+        ${unknownCount>0?'<div style="font-size:10px;color:#B4B2A9;margin-top:4px">● '+unknownCount+' kundar utan aktivitetsdata — vist som ukjent, ikkje dårleg helse</div>':''}
+      </div>`:''}
+
+      <div style="border-top:1px solid #E5E3DB;padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:#5F5E5A;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Innsatsrad</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+          <div class="dash-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:10px;color:#888780;font-weight:700;text-transform:uppercase">🚗 Km kjørt</span>
+              ${srcTag('Kjøreetappar')}
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${kmMonth>0?Math.round(kmMonth)+' km':'—'}</div><div style="font-size:10px;color:#888780">Inneværande md.</div></div>
+              <div><div style="font-size:18px;font-weight:700;color:#5F5E5A">${kmLast30>0?Math.round(kmLast30)+' km':'—'}</div><div style="font-size:10px;color:#888780">Siste 30 dg</div></div>
+            </div>
+          </div>
+          <div class="dash-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:10px;color:#888780;font-weight:700;text-transform:uppercase">🏪 Besøk gjennomført</span>
+              ${srcTag('Besøkshistorikk')}
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${visMonth}</div><div style="font-size:10px;color:#888780">Inneværande md.</div></div>
+              <div><div style="font-size:18px;font-weight:700;color:#5F5E5A">${visLast30}</div><div style="font-size:10px;color:#888780">Siste 30 dg</div></div>
+            </div>
+          </div>
+          <div class="dash-card" onclick="showSection('kalender',document.querySelector('.nav-item:nth-child(3)'))" style="cursor:pointer" title="Gå til kalender">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:10px;color:#888780;font-weight:700;text-transform:uppercase">📅 Planlagt neste 30 dg</span>
+              ${srcTag('Kalender')}
+            </div>
+            <div style="font-size:18px;font-weight:700;color:#0C447C">${planned30}</div>
+            <div style="font-size:11px;color:#888780;margin-top:2px">${planned30===0?'Ingen besøk i kalender':'planlagte besøk'}</div>
+          </div>
+        </div>
       </div>
     </div>
   `;
-  container.innerHTML = html;
-  // Lagre lister for klikk
-  window._dashOverdueA = aOverdue;
-  window._dashFalling = fallingCustomers;
-  window._dashNew = newWithoutVisit;
+
+  window._dashOverdueA=aOverdue;
 }
 
 function openOverdueAList(){
-  showCustomerListModal('A-kunder forfalt (90+ dager uten besøk)', window._dashOverdueA||[]);
+  showCustomerListModal('A-kundar forfalt (90+ dagar utan besøk)', window._dashOverdueA||[]);
 }
 function openFallingList(){
-  showCustomerListModal('Kunder med fallende omsetning', window._dashFalling||[]);
+  // Parkert bak HEALTH_TURNOVER_ENABLED — reaktiver når salgstall-import er på plass
+  showCustomerListModal('Kunder med fallende omsetning (ikkje aktivt)', []);
 }
 function openNewList(){
   showCustomerListModal('Nye relasjoner uten besøk', window._dashNew||[]);
