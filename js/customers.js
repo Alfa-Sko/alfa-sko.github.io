@@ -668,7 +668,7 @@ async function _renderCustHistory(name, filter){
       +'<div class="tl-title">'+t.lbl+'</div>'
       +(v.notes?(function(){ var _sc=v.customer.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); var _ef="openApptFor('"+_sc+"','"+v.date+"')"; return '<div class="tl-text" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span onclick="'+_ef+'" style="cursor:pointer;border-radius:4px;padding:3px 5px;margin:-3px -5px;transition:background 0.12s" onmouseover="this.style.background=\'#F0EDE5\'" onmouseout="this.style.background=\'\'" title="Klikk for å redigere">'+escapeHtml(v.notes)+'</span><div style="display:flex;gap:0;flex-shrink:0"><button onclick="'+_ef+'" style="background:none;border:none;color:#5F5E5A;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1" title="Rediger notat">✏</button><button onclick="clearVisitNote(\''+v.id+'\')" style="background:none;border:none;color:#A23B27;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">🗑</button></div></div>'; })():'')
       +(v.followup?'<div style="margin-top:6px;font-size:11px;color:#633806;background:#FAEEDA;padding:4px 8px;border-radius:6px;display:inline-block">Oppfølging: '+v.followup+'</div>':'')
-      +ph+'</div></div>';
+      +ph+'<div id="ec-activity-'+v.id+'"></div></div></div>';
   }).join('');
   var custPhotoHtml=shownCustPhotos.map(function(p){
     return '<div class="tl-item" style="border-left:3px solid #185FA5"><div class="tl-dot" style="background:#185FA5;color:#fff;font-size:12px">📷</div><div class="tl-body">'
@@ -676,11 +676,25 @@ async function _renderCustHistory(name, filter){
       +'<div class="tl-title" style="color:#185FA5">Kundekort-bilde</div>'
       +'<div id="ch-custphotos-'+p.id+'" style="margin-top:8px"></div>'
       +'<button onclick="deleteCustomerPhoto(\''+p.id+'\')" style="margin-top:6px;background:none;border:none;color:#A23B27;font-size:11px;cursor:pointer;padding:0">🗑 Slett</button>'
-      +'</div></div>';
+      +'<div id="ec-custphoto-'+p.id+'"></div></div></div>';
   }).join('');
   el.innerHTML=visitHtml+custPhotoHtml;
   shown.forEach(function(v){if(v.photoPaths&&v.photoPaths.length)_loadChPhotos(v);});
   shownCustPhotos.forEach(function(p){_loadChCustPhotos(p);});
+  if(window._sbUser && typeof ecFetchBatch==='function'){
+    var _chOwner=window._sbUser.id;
+    var _chEntries=shown.map(function(v){return {id:v.id};}).concat(shownCustPhotos.map(function(p){return {id:p.id};}));
+    ecFetchBatch(_chEntries, _chOwner).then(function(byId){
+      shown.forEach(function(v){
+        var rows=byId['visit::'+String(v.id)]||[];
+        ecInjectBlock('ec-activity-'+v.id, 'visit', v.id, _chOwner, rows);
+      });
+      shownCustPhotos.forEach(function(p){
+        var rows=byId['cust_photo::'+String(p.id)]||[];
+        ecInjectBlock('ec-custphoto-'+p.id, 'cust_photo', p.id, _chOwner, rows);
+      });
+    });
+  }
 }
 
 async function _loadChCustPhotos(p){

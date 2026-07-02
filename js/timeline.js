@@ -194,11 +194,23 @@ function renderTimeline(){
       }
       if(it.followup){html+='<div style="margin-top:8px;font-size:11px;color:#633806;background:#FAEEDA;padding:5px 9px;border-radius:6px;display:inline-block">▶ Oppfølging: '+escapeHtml(it.followup)+'</div>';}
       if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length){html+='<div id="tl-photos-'+it.id+'" style="margin-top:8px"></div>';}
+      html+='<div id="ec-'+it.kind+'-'+it.id+'"></div>';
       html+='</div>';
     });
   });
   list.innerHTML=html;
   filtered.forEach(function(it){ if((it.kind==='activity'||it.kind==='custphoto') && it.photoPaths && it.photoPaths.length) _loadTlPhotos(it); });
+  if(window._sbUser && typeof ecFetchBatch==='function'){
+    var _ecOwner=window._sbUser.id;
+    ecFetchBatch(filtered, _ecOwner).then(function(byId){
+      filtered.forEach(function(it){
+        if(it.id==null) return;
+        var cid='ec-'+it.kind+'-'+it.id;
+        var rows=byId[ecTargetType(it)+'::'+String(it.id)]||[];
+        ecInjectBlock(cid, ecTargetType(it), it.id, _ecOwner, rows);
+      });
+    });
+  }
 }
 // ─── FELLES TEAM-TIDSLINJE (ledervisning) ──────────────────────────────────
 
