@@ -35,29 +35,43 @@ async function plLoad() {
   if (_plLoaded) { _plRenderSeasons(); _plRenderMeta(); _plRender(); return; }
   listEl.innerHTML = '<div style="color:#888780;padding:20px;text-align:center;font-size:13px">Laster prislister …</div>';
   try {
+    console.log('[prisliste] henter sesongliste …');
+    // prefix:'' = list rotnivå i bucketen. prefix:'pl-' ville sett etter ein virtuell mappe
+    // kalla "pl-/" og finna ingenting — det er den tidlegare feilen.
     var listRes = await sbFetch('/storage/v1/object/list/kataloger', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prefix: _PL_PREFIX, limit: 50, sortBy: { column: 'name', order: 'asc' } })
+      body: JSON.stringify({ prefix: '', limit: 100, sortBy: { column: 'name', order: 'asc' } })
     });
-    if (!listRes.ok) throw new Error('HTTP ' + listRes.status);
+    if (!listRes.ok) {
+      var listErr = ''; try { listErr = await listRes.text(); } catch(_) {}
+      throw new Error('Liste HTTP ' + listRes.status + (listErr ? ' — ' + listErr : ''));
+    }
     var files = await listRes.json();
+    console.log('[prisliste] sesongliste: ' + (files || []).length + ' objekt totalt');
     var seasonFiles = (files || []).filter(function (f) { return f.name && /^pl-.+\.json$/.test(f.name); });
+    console.log('[prisliste] sesongfiler funne: ' + seasonFiles.length, seasonFiles.map(function(f){ return f.name; }));
     if (!seasonFiles.length) { _plLoaded = true; if (seasEl) seasEl.innerHTML = ''; _plShowEmpty(); return; }
     await Promise.all(seasonFiles.map(async function (f) {
       try {
         var r = await sbFetch('/storage/v1/object/authenticated/kataloger/' + encodeURIComponent(f.name), { method: 'GET' });
-        if (!r.ok) return;
+        console.log('[prisliste] henta ' + f.name + ' → HTTP ' + r.status);
+        if (!r.ok) {
+          var fetchErr = ''; try { fetchErr = await r.text(); } catch(_) {}
+          console.error('[prisliste] ' + f.name + ' feila:', r.status, fetchErr);
+          return;
+        }
         _plSeasons[_plSeasonKey(f.name)] = await r.json();
-      } catch (e) { console.warn('[prisliste] Kunne ikke hente', f.name, e.message); }
+      } catch (e) { console.error('[prisliste] Kunne ikkje hente', f.name, e.message); }
     }));
+    console.log('[prisliste] lasta ' + Object.keys(_plSeasons).length + ' sesong(ar):', Object.keys(_plSeasons));
     _plLoaded = true;
     if (!Object.keys(_plSeasons).length) { _plShowEmpty(); return; }
     if (!_plActiveSeason || !_plSeasons[_plActiveSeason]) _plActiveSeason = _plPickCurrentSeason();
     _plFiltered = _plActiveSeason ? ((_plSeasons[_plActiveSeason] || {}).items || []) : [];
     _plRenderSeasons(); _plRenderMeta(); _plRender();
   } catch (e) {
-    listEl.innerHTML = '<div style="color:#A23B27;padding:20px;font-size:13px">Kunne ikke hente prislister: ' + escapeHtml(e.message || '') + '</div>';
-    console.warn('[prisliste] Load feilet:', e);
+    listEl.innerHTML = '<div style="color:#A23B27;padding:20px;font-size:13px">Kunne ikkje hente prislister: ' + escapeHtml(e.message || '') + '</div>';
+    console.error('[prisliste] Load feilet:', e);
   }
 }
 
