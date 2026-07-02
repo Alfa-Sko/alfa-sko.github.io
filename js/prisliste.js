@@ -7,6 +7,13 @@ var _plLoaded       = false;
 var _plPending      = null; // { items, suggestedSeason, validFrom, validTo, filename }
 var _PL_PREFIX      = 'pl-';
 
+var ADMIN_UIDS = ['f0cff8a8-d538-431b-8d1f-95db1d75fa03', '1cd8ee06-8fb2-40e6-8634-e17bb08792dd'];
+function _plIsAdmin() { return !!(window._sbUser && ADMIN_UIDS.indexOf(window._sbUser.id) !== -1); }
+function plRefreshAdminSection() {
+  var el = document.getElementById('pl-admin-section');
+  if (el) el.style.display = _plIsAdmin() ? 'block' : 'none';
+}
+
 function _plStorageName(season) {
   return 'pl-' + season.replace(/[^a-zA-Z0-9_\-]/g, '_') + '.json';
 }
@@ -73,6 +80,7 @@ function _plIsCurrentSeason(key) {
 
 function plUploadClick() {
   if (!window._sbUser) { showToast('Logg inn først'); return; }
+  if (!_plIsAdmin()) { showToast('Berre administratorar kan laste opp prislistar'); return; }
   document.getElementById('pl-file-input').click();
 }
 
@@ -154,10 +162,13 @@ async function plConfirmUpload() {
   var storageName = _plStorageName(season);
   var storageUrl  = '/storage/v1/object/kataloger/' + encodeURIComponent(storageName);
   var body        = new Blob([JSON.stringify(payload)], { type: 'application/octet-stream' });
-  var uploadOpts  = { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' }, body: body };
   console.log('[prisliste] Laster opp:', storageName, '—', payload.items.length, 'produkter');
   try {
-    var res = await sbFetch(storageUrl, uploadOpts);
+    // Slett eksisterande fil om han finst (unngår x-upsert som krev UPDATE-policy)
+    var delRes = await sbFetch(storageUrl, { method: 'DELETE' });
+    console.log('[prisliste] DELETE:', delRes.status);
+    // Frisk opts per kall — sbFetch muterer opts.headers, så gjenbruk gir gammal token
+    var res = await sbFetch(storageUrl, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: body });
     if (!res.ok) {
       var errBody = ''; try { errBody = await res.text(); } catch (_) {}
       console.error('[prisliste] Opplasting HTTP ' + res.status + ':', errBody);
@@ -228,7 +239,7 @@ function _plRenderSeasons() {
       return '<button class="pl-season-btn' + (active ? ' active' : '') + '" onclick="plSelectSeason(\'' + esc + '\')">' +
         escapeHtml(k) +
         (cur ? ' <span class="pl-cur-dot" title="Gjeldende sesong">●</span>' : '') +
-        ' <span class="pl-season-del" onclick="plDeleteSeason(\'' + esc + '\',event)" title="Slett ' + escapeHtml(k) + '">✕</span>' +
+        (_plIsAdmin() ? ' <span class="pl-season-del" onclick="plDeleteSeason(\'' + esc + '\',event)" title="Slett ' + escapeHtml(k) + '">✕</span>' : '') +
         '</button>';
     }).join('') + '</div>';
 }

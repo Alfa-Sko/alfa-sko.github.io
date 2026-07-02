@@ -283,15 +283,9 @@
     <div id="sec-prisliste" class="section" style="display:none">
 
       <!-- Prisliste -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:12px">
-        <div>
-          <div style="font-size:22px;font-weight:700;color:#2C2C2A">📋 Prisliste</div>
-          <div style="font-size:13px;color:#888780;margin-top:4px">ALFA PRICAT — veiledende priser for hele teamet</div>
-        </div>
-        <div>
-          <button class="btn btn-dark btn-sm" onclick="plUploadClick()">📤 Last opp prisliste (.xlsx / .pdf)</button>
-          <input type="file" id="pl-file-input" accept=".xlsx,.pdf" style="display:none" onchange="plHandleUpload(this)">
-        </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:22px;font-weight:700;color:#2C2C2A">📋 Prisliste</div>
+        <div style="font-size:13px;color:#888780;margin-top:4px">ALFA PRICAT — veiledende priser for hele teamet</div>
       </div>
 
       <!-- Sesong-knapper -->
@@ -299,24 +293,6 @@
 
       <!-- Meta for aktiv sesong -->
       <div id="pl-meta" style="font-size:12px;color:#888780;margin-bottom:8px;min-height:16px"></div>
-
-      <!-- Bekreft opplasting (skjult inntil fil er valgt) -->
-      <div id="pl-upload-confirm" style="display:none">
-        <div class="card" style="border:1.5px solid #0C447C;background:#F0F6FB;margin-bottom:12px">
-          <div class="card-title" style="color:#0C447C">Bekreft opplasting</div>
-          <div style="font-size:12px;color:#5F5E5A;margin-bottom:12px">Fil: <span id="pl-confirm-file" style="font-weight:600"></span></div>
-          <div class="form-group" style="margin-bottom:10px">
-            <label>Sesongnavn</label>
-            <input type="text" id="pl-confirm-name" placeholder="f.eks. SS26" style="max-width:180px">
-          </div>
-          <div style="font-size:12px;color:#5F5E5A;margin-bottom:10px">Gyldig: <span id="pl-confirm-from"></span> – <span id="pl-confirm-to"></span></div>
-          <div id="pl-confirm-preview" style="margin-bottom:12px"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-dark btn-sm" onclick="plConfirmUpload()">📤 Last opp sesong</button>
-            <button class="btn btn-light btn-sm" onclick="plCancelUpload()">Avbryt</button>
-          </div>
-        </div>
-      </div>
 
       <input type="search" id="pl-search" placeholder="Søk modell, farge, modellnr…" oninput="plSearch()" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box;margin-bottom:10px;font-family:inherit;color:#2C2C2A">
       <div id="pl-list"></div>
@@ -579,6 +555,30 @@
         </div>
         <div style="font-size:11px;color:#888780;margin-top:8px">
           Antall kunder nå: <strong id="current-customer-count">–</strong> · Trykk "Eksportér" for å lagre en kopi av dagens kundeliste før du importerer ny.
+        </div>
+      </div>
+
+      <!-- Prisliste-administrasjon (berre admin) -->
+      <div id="pl-admin-section" style="display:none;margin-bottom:14px">
+        <div class="card" style="border:1.5px solid #0C447C;background:#F0F6FB">
+          <div class="card-title" style="color:#0C447C">📋 Prisliste-administrasjon</div>
+          <div style="font-size:12px;color:#5F5E5A;margin-bottom:14px">Last opp eller fjern prislistesesongar for heile teamet.</div>
+          <button class="btn btn-dark btn-sm" onclick="plUploadClick()">📤 Last opp prisliste (.xlsx / .pdf)</button>
+          <input type="file" id="pl-file-input" accept=".xlsx,.pdf" style="display:none" onchange="plHandleUpload(this)">
+          <div id="pl-upload-confirm" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #B8D4E8">
+            <div style="font-size:13px;font-weight:600;color:#0C447C;margin-bottom:10px">Bekreft opplasting</div>
+            <div style="font-size:12px;color:#5F5E5A;margin-bottom:10px">Fil: <span id="pl-confirm-file" style="font-weight:600"></span></div>
+            <div class="form-group" style="margin-bottom:10px">
+              <label>Sesongnavn</label>
+              <input type="text" id="pl-confirm-name" placeholder="f.eks. SS26" style="max-width:180px">
+            </div>
+            <div style="font-size:12px;color:#5F5E5A;margin-bottom:10px">Gyldig: <span id="pl-confirm-from"></span> – <span id="pl-confirm-to"></span></div>
+            <div id="pl-confirm-preview" style="margin-bottom:12px"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-dark btn-sm" onclick="plConfirmUpload()">📤 Last opp sesong</button>
+              <button class="btn btn-light btn-sm" onclick="plCancelUpload()">Avbryt</button>
+            </div>
+          </div>
         </div>
       </div>
 
