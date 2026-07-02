@@ -176,7 +176,7 @@ function nfMarkRead(key) {
   if (!window._sbUser) return;
   sbFetch(NF_READS_TABLE, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Prefer': 'return=minimal'},
+    headers: {'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'},
     body: JSON.stringify({user_id: window._sbUser.id, notif_key: key})
   }).catch(function(e) { console.error('[nf] nfMarkRead feil:', e); });
 }
@@ -194,7 +194,7 @@ async function nfMarkAllRead() {
   try {
     var r = await sbFetch(NF_READS_TABLE, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Prefer': 'return=minimal'},
+      headers: {'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates'},
       body: JSON.stringify(toInsert)
     });
     if (!r.ok) {
