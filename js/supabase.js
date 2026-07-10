@@ -8,9 +8,57 @@
 const APP_VERSION = 'v2026.06.11-36';
 
 // ── Vedlikeholdssperre ────────────────────────────────────────────────────────
-// Sett MAINTENANCE_MODE = false for å opne appen for alle igjen (éin linje).
-const MAINTENANCE_MODE = true;
-const MAINTENANCE_ALLOW = ['f0cff8a8-d538-431b-8d1f-95db1d75fa03']; // Jørn
+// Status styrast frå app_settings-tabellen i Supabase (key='maintenance_mode').
+// Jørn (MAINTENANCE_ADMIN_UID) slepp alltid inn og ser bryteren på Min profil.
+const MAINTENANCE_ADMIN_UID = 'f0cff8a8-d538-431b-8d1f-95db1d75fa03';
+
+async function _fetchMaintenanceMode(){
+  try{
+    const r = await sbFetch('/rest/v1/app_settings?key=eq.maintenance_mode&select=value', {method:'GET'});
+    if(!r.ok) return 'off';
+    const rows = await r.json();
+    return (rows[0] && rows[0].value==='on') ? 'on' : 'off';
+  }catch(e){ return 'off'; }
+}
+
+async function maintenanceToggle(){
+  const s = _sbSession();
+  if(!s || s.user.id !== MAINTENANCE_ADMIN_UID) return;
+  const el = document.getElementById('maintenance-admin-section');
+  const current = (el && el.dataset.status) || 'off';
+  const next = current==='on' ? 'off' : 'on';
+  if(next==='on' && !confirm('Dette stenger alle andre ute – sikker?')) return;
+  try{
+    const r = await sbFetch('/rest/v1/app_settings?on_conflict=key', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+      body: JSON.stringify({key:'maintenance_mode', value:next, updated_at:new Date().toISOString()})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
+    _renderMaintenanceAdminUI(next);
+  }catch(e){ alert('Feil: kunne ikkje oppdatere vedlikehaldsstatus.\n'+e.message); }
+}
+
+function _renderMaintenanceAdminUI(status){
+  const el = document.getElementById('maintenance-admin-section');
+  if(!el) return;
+  el.dataset.status = status;
+  el.style.display = 'block';
+  const on = status==='on';
+  el.innerHTML =
+    '<div class="card" style="margin-bottom:14px;border:1px solid '+(on?'#A23B27':'#1A7A4E')+';background:'+(on?'#FBE6E6':'#F0FAF5')+'">'
+    +'<div class="card-title">🛠️ Vedlikeholdsmodus</div>'
+    +'<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:'+(on?'#A23B27':'#1A7A4E')+'">'+(on?'🔴 PÅ – andre brukere er sperret':'🟢 AV – alle har tilgang')+'</div>'
+    +'<button onclick="maintenanceToggle()" class="btn '+(on?'btn-dark':'btn-light')+'" style="'+(on?'background:#1A7A4E;border-color:#1A7A4E':'border:1px solid #A23B27;color:#A23B27')+';font-weight:700">'+(on?'Opphev vedlikehold (gi tilgang til alle)':'Aktiver vedlikehold (steng ute andre)')+'</button>'
+    +'</div>';
+}
+
+async function renderMaintenanceAdminSection(){
+  const s = _sbSession();
+  if(!s || s.user.id !== MAINTENANCE_ADMIN_UID) return;
+  const status = await _fetchMaintenanceMode();
+  _renderMaintenanceAdminUI(status);
+}
 
 function _showMaintenanceScreen(){
   const app = document.querySelector('.app');
@@ -276,9 +324,12 @@ async function sbInitAuth(){
   if(s && s.user){
     window._sbUser = s.user;
     if(ov) ov.style.display='none';
-    if(MAINTENANCE_MODE && !MAINTENANCE_ALLOW.includes(s.user.id)){
-      _showMaintenanceScreen();
-      return;
+    const _mUid = s.user.id;
+    if(_mUid !== MAINTENANCE_ADMIN_UID){
+      const _mStatus = await _fetchMaintenanceMode();
+      if(_mStatus === 'on'){ _showMaintenanceScreen(); return; }
+    } else {
+      renderMaintenanceAdminSection();
     }
     // Bakgrunnssynk: forny token, hent endringer, prøv ventende push
     sbRefresh().then(async ok=>{
