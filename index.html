@@ -1076,8 +1076,8 @@
         </div>
         <div class="appt-slbl">Tidspunkt</div>
         <div class="form-row-2">
-          <div class="form-group"><label>Fra</label><input type="time" id="appt-start" value="09:00" onchange="apptUpdateTitle()"></div>
-          <div class="form-group"><label>Til</label><input type="time" id="appt-end" value="10:00"></div>
+          <div class="form-group"><label>Fra</label><select id="appt-start" onchange="apptUpdateTitle()"></select></div>
+          <div class="form-group"><label>Til</label><select id="appt-end"></select></div>
         </div>
         <div class="appt-slbl">Detaljer</div>
         <div class="form-group"><label>Formål / agenda</label><input type="text" id="appt-agenda" placeholder="SS26 innsalg · SIS-gjennomgang..."></div>
@@ -1200,7 +1200,7 @@
 <script src="js/ui.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/customers.js"></script>
-<script src="js/calendar.js"></script>
+<script src="js/calendar.js?v=20260703-2"></script>
 <script src="js/planner-data.js"></script>
 <script src="js/hotels-data.js"></script>
 <script src="js/planner.js"></script>

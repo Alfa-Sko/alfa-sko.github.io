@@ -712,10 +712,11 @@ function getCallSuggestionsForDrive(dateKey, from, to){
 
 function closeDriveModal(){ document.getElementById('drive-modal').classList.remove('open'); }
 document.getElementById('drive-modal').addEventListener('click',function(e){ if(e.target===this) closeDriveModal(); });
-function fillHalfHourSlots(selectEl, defaultVal){
+function fillQuarterHourSlots(selectEl, defaultVal){
   const opts=[];
-  for(let h=6; h<=20; h++){
-    for(let m of [0,30]){
+  for(let h=6; h<=23; h++){
+    for(let m of [0,15,30,45]){
+      if(h===23 && m>0) continue;
       const hh=String(h).padStart(2,'0');
       const mm=String(m).padStart(2,'0');
       opts.push(hh+':'+mm);
@@ -724,6 +725,7 @@ function fillHalfHourSlots(selectEl, defaultVal){
   selectEl.innerHTML=opts.map(o=>'<option value="'+o+'">'+o+'</option>').join('');
   if(defaultVal && opts.includes(defaultVal)) selectEl.value=defaultVal;
 }
+function fillHalfHourSlots(selectEl, defaultVal){ fillQuarterHourSlots(selectEl, defaultVal); }
 // ─── PDF EXPORT ─────────────────────────────────────────────────────────────
 
 function exportPDF(){
@@ -833,12 +835,18 @@ function handleEvClick(evt, dateKey, evJsonEncoded){
 function _evTimeEditRow(dateKey, e){
   if(window._viewOnlyMode) return '';
   const f=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+  const roundQ=m=>Math.round(m/15)*15;
   const lbl=(e.label||'').replace(/'/g,"\\'");
+  const qOpts=[];
+  for(let h=6;h<=23;h++){ for(let m of [0,15,30,45]){ if(h===23&&m>0) continue; qOpts.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')); } }
+  const mkSel=(id,val)=>'<select id="'+id+'" style="padding:5px 7px;border:1px solid #D3D1C7;border-radius:7px;font-size:12px">'+qOpts.map(o=>'<option value="'+o+'"'+(o===val?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+  const sVal=f(Math.min(roundQ(e.startMins||0),23*60));
+  const eVal=f(Math.min(roundQ(e.endMins||((e.startMins||0)+60)),23*60));
   return '<div style="display:flex;gap:6px;align-items:center;padding:10px 0 0;flex-wrap:wrap">'+
     '<span style="font-size:11px;font-weight:600;color:#5F5E5A">🕐 Tid:</span>'+
-    '<input type="time" id="ev-edit-start" value="'+f(e.startMins||0)+'" style="padding:5px 7px;border:1px solid #D3D1C7;border-radius:7px;font-size:12px">'+
+    mkSel('ev-edit-start',sVal)+
     '<span style="color:#888780">–</span>'+
-    '<input type="time" id="ev-edit-end" value="'+f(e.endMins||((e.startMins||0)+60))+'" style="padding:5px 7px;border:1px solid #D3D1C7;border-radius:7px;font-size:12px">'+
+    mkSel('ev-edit-end',eVal)+
     '<button class="btn btn-dark btn-sm" onclick="saveEvTimes(\''+dateKey+'\','+(e.startMins||0)+',\''+lbl+'\')">Lagre tid</button>'+
     '</div>';
 }
@@ -1041,8 +1049,8 @@ function openAppt(dateKey, evt, presetHour){
   const h = presetHour !== undefined ? presetHour : 9;
   const hS = String(h).padStart(2,'0');
   const hE = String(Math.min(h+1,23)).padStart(2,'0');
-  document.getElementById('appt-start').value = hS+':00';
-  document.getElementById('appt-end').value = hE+':00';
+  fillQuarterHourSlots(document.getElementById('appt-start'), hS+':00');
+  fillQuarterHourSlots(document.getElementById('appt-end'), hE+':00');
   document.getElementById('appt-customer').value = '';
   document.getElementById('appt-cinfo').style.display = 'none';
   var apptCsBar=document.getElementById('appt-cs-bar');
@@ -1137,6 +1145,7 @@ function saveAppt(){
   const fdate = document.getElementById('appt-fdate').value;
   const fprio = document.getElementById('appt-fprio').value;
   if(!cname){ showToast('Velg en kunde'); return; }
+  if(tEnd && tStart && tEnd <= tStart){ showToast('Sluttid må være etter starttid'); return; }
   const h = parseInt(tStart.split(':')[0]);
   if(!calEvents[_apptDate]) calEvents[_apptDate]=[];
   const isPrivate = !!(document.getElementById('appt-private')||{}).checked;
