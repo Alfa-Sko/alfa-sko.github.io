@@ -2497,35 +2497,96 @@ function plannerAddStopPrompt(dayIdx){
 function showAddStopModal(dayIdx, available){
   const existing = document.getElementById('add-stop-modal');
   if(existing) existing.remove();
+  window._addStopSelected = new Set();
+  window._addStopDayIdx = dayIdx;
   const modal = document.createElement('div');
   modal.id = 'add-stop-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px';
   modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
-  const rows = available.slice(0,200).map(c=>{
-    const safeName = (c.name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    return '<div class="add-stop-row" data-name="'+escapeHtml(c.name)+'" onclick="plannerConfirmAddStop('+dayIdx+',\''+safeName+'\')" style="padding:10px 12px;border-bottom:1px solid #F1EFE8;cursor:pointer;display:flex;justify-content:space-between;gap:8px">'+
-      '<div style="min-width:0"><div style="font-weight:600;font-size:13px;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</div><div style="font-size:11px;color:#888780">'+escapeHtml(c.city||'')+' · '+escapeHtml(c.chain||'')+'</div></div>'+
-      '<div style="flex-shrink:0;font-size:11px;color:#5F5E5A">'+(c.class||'')+' · '+(c.l12?Math.round(c.l12/1000)+'k':'–')+'</div>'+
+  const rows = available.slice(0,300).map(c=>{
+    const safeName = (c.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div class="add-stop-row" data-name="'+escapeHtml(c.name)+'" onclick="_addStopToggle(this,\''+safeName+'\')" style="padding:10px 12px;border-bottom:1px solid #F1EFE8;cursor:pointer;display:flex;align-items:center;gap:8px">'+
+      '<div style="min-width:0;flex:1"><div style="font-weight:600;font-size:13px;color:#2C2C2A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(c.name)+'</div><div style="font-size:11px;color:#888780">'+escapeHtml(c.city||'')+' · '+escapeHtml(c.chain||'')+'</div></div>'+
+      '<div style="flex-shrink:0;font-size:11px;color:#5F5E5A;text-align:right">'+(c.class||'')+' · '+(c.l12?Math.round(c.l12/1000)+'k':'–')+'</div>'+
+      '<div class="add-stop-check" style="width:22px;height:22px;border-radius:50%;border:2px solid #D3D1C7;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all 0.12s"></div>'+
       '</div>';
   }).join('');
-  modal.innerHTML = '<div style="background:#fff;border-radius:14px;width:520px;max-width:100%;max-height:80vh;display:flex;flex-direction:column">'+
-    '<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:center"><div style="font-size:15px;font-weight:700">Legg til kunde</div><button onclick="document.getElementById(\'add-stop-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button></div>'+
-    '<div style="padding:10px 16px;border-bottom:1px solid #F1EFE8"><input type="text" id="add-stop-search" placeholder="Søk på navn, by, kjede ..." oninput="filterAddStop()" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px"></div>'+
+  modal.innerHTML = '<div style="background:#fff;border-radius:14px;width:540px;max-width:100%;max-height:85vh;display:flex;flex-direction:column">'+
+    '<div style="padding:14px 16px;border-bottom:1px solid #D3D1C7;display:flex;justify-content:space-between;align-items:center">'+
+    '<div style="font-size:15px;font-weight:700">Legg til kunder</div>'+
+    '<button onclick="document.getElementById(\'add-stop-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button></div>'+
+    '<div style="padding:10px 16px;border-bottom:1px solid #F1EFE8"><input type="text" id="add-stop-search" placeholder="Søk på navn, by, kjede ..." oninput="filterAddStop()" style="width:100%;padding:9px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>'+
     '<div onclick="showAdHocForm('+dayIdx+')" style="padding:11px 16px;border-bottom:1px solid #D3D1C7;background:#F8F9FC;cursor:pointer;display:flex;align-items:center;gap:10px;flex-shrink:0">'+
     '<span style="font-size:18px">📍</span>'+
     '<div><div style="font-size:13px;font-weight:700;color:#2C2C2A">Legg til uregistrert kunde</div>'+
     '<div style="font-size:11px;color:#888780">Ad hoc-stopp · geokodes via adresse</div></div></div>'+
-    '<div id="add-stop-list" style="overflow-y:auto;flex:1">'+rows+'</div></div>';
+    '<div id="add-stop-list" style="overflow-y:auto;flex:1">'+rows+'</div>'+
+    '<div style="padding:12px 16px;border-top:1px solid #D3D1C7;display:flex;align-items:center;gap:10px;flex-shrink:0;background:#F8F7F3;border-radius:0 0 14px 14px">'+
+    '<div id="add-stop-counter" style="font-size:13px;color:#888780;flex:1">0 valgt</div>'+
+    '<button id="add-stop-confirm" onclick="_addStopConfirm()" disabled style="padding:10px 20px;background:#D3D1C7;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:default;transition:background 0.15s">Legg til valgte</button>'+
+    '</div></div>';
   document.body.appendChild(modal);
   setTimeout(()=>{ const s=document.getElementById('add-stop-search'); if(s) s.focus(); },50);
+}
+
+function _addStopToggle(rowEl, name){
+  const sel = window._addStopSelected;
+  if(!sel) return;
+  const check = rowEl.querySelector('.add-stop-check');
+  if(sel.has(name)){
+    sel.delete(name);
+    rowEl.style.background = '';
+    if(check){ check.style.background=''; check.style.borderColor='#D3D1C7'; check.style.color=''; check.textContent=''; }
+  } else {
+    sel.add(name);
+    rowEl.style.background = '#F0FAF5';
+    if(check){ check.style.background='#1A7A4E'; check.style.borderColor='#1A7A4E'; check.style.color='#fff'; check.textContent='✓'; }
+  }
+  const n = sel.size;
+  const counter = document.getElementById('add-stop-counter');
+  if(counter) counter.textContent = n === 0 ? '0 valgt' : n + (n===1?' valgt':' valgt');
+  const btn = document.getElementById('add-stop-confirm');
+  if(btn){
+    btn.disabled = n===0;
+    btn.style.background = n>0 ? '#2C2C2A' : '#D3D1C7';
+    btn.style.cursor = n>0 ? 'pointer' : 'default';
+  }
+}
+
+function _addStopConfirm(){
+  const sel = window._addStopSelected;
+  const dayIdx = window._addStopDayIdx;
+  if(!sel || sel.size===0 || dayIdx===undefined) return;
+  plannerConfirmAddMultipleStops(dayIdx, [...sel]);
+}
+
+function plannerConfirmAddMultipleStops(dayIdx, names){
+  const days = window._lastPlan;
+  if(!days || !days[dayIdx]) return;
+  const day = days[dayIdx];
+  const customers = getCustomers();
+  names.forEach(name=>{
+    const cust = customers.find(c=>c.name===name);
+    if(cust) day.customers.push(Object.assign({}, cust, {_manuallyAdded:true}));
+  });
+  recomputeDayTimes(day);
+  const modal = document.getElementById('add-stop-modal');
+  if(modal) modal.remove();
+  renderPlanFromData(days);
+  if(day._manualOverflow){
+    const hh=String(Math.floor(day._manualOverflowEnd/60)).padStart(2,'0');
+    const mm=String(day._manualOverflowEnd%60).padStart(2,'0');
+    showToast('⚠ '+names.length+' kunde(r) lagt til – dagen strekker seg til '+hh+':'+mm+' (over arbeidstid)', 'warning');
+  } else {
+    showToast(names.length===1 ? names[0]+' lagt til' : names.length+' kunder lagt til');
+  }
 }
 
 function filterAddStop(){
   const q = (document.getElementById('add-stop-search').value||'').toLowerCase();
   document.querySelectorAll('#add-stop-list .add-stop-row').forEach(row=>{
-    const name = (row.dataset.name||'').toLowerCase();
-    const text = row.textContent.toLowerCase();
-    row.style.display = (text.includes(q)) ? 'flex' : 'none';
+    const text = (row.dataset.name||'').toLowerCase() + ' ' + row.textContent.toLowerCase();
+    row.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
   });
 }
 
