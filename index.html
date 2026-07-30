@@ -263,14 +263,11 @@
       <div id="follow-pane-tasks">
       <div class="card">
         <div class="card-title">Legg til oppfølging</div>
-        <div class="form-group"><label>Kunde</label>
-          <div id="follow-cs-bar"></div>
-          <input type="hidden" id="follow-customer">
-        </div>
         <div class="form-row-2">
+          <div class="form-group"><label>Kunde</label><select id="follow-customer"><option value="">Velg kunde...</option></select></div>
           <div class="form-group"><label>Forfallsdato</label><input type="date" id="follow-date"></div>
-          <div class="form-group"><label>Oppgave</label><input type="text" id="follow-task" placeholder="Hva skal gjøres?"></div>
         </div>
+        <div class="form-group"><label>Oppgave</label><input type="text" id="follow-task" placeholder="Hva skal gjøres?"></div>
         <div class="flex gap-8">
           <select id="follow-priority" style="flex:1;padding:8px 12px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px">
             <option value="high">Høy prioritet</option>
