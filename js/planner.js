@@ -1547,9 +1547,9 @@ function dayHotelRowHtml(day, dayIdx, daysArr){
     ? '<button onclick="clearDayHotel('+dayIdx+')" style="background:none;border:none;color:#888780;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1" title="Fjern valgt hotell">×</button>'
     : '';
 
-  return '<div id="day-hotel-row-'+dayIdx+'" style="margin-top:6px;padding:8px 12px;background:'+bgColor+';border:1px solid '+borderColor+';border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap'+(sel&&!hb?';opacity:0.62':'')+'">'
+  return '<div id="day-hotel-row-'+dayIdx+'" style="position:relative;z-index:1001;margin-top:6px;padding:8px 12px;background:'+bgColor+';border:1px solid '+borderColor+';border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap'+(sel&&!hb?';opacity:0.62':'')+'">'
     +'<span style="font-size:12px;color:'+labelColor+';font-weight:600;flex-shrink:0">'+bookMark+icon+' Overnatting:</span>'
-    +'<div style="position:relative;flex:1;min-width:180px">'
+    +'<div style="position:relative;flex:1;min-width:180px;z-index:2001">'
       +'<input id="hotel-search-'+dayIdx+'" type="text"'
         +' value="'+escapeHtml(sel)+'"'
         +' placeholder="'+escapeHtml(placeholder)+'"'
