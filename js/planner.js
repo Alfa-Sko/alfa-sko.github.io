@@ -557,7 +557,7 @@ function rpBuildRoute(){
       // ved dayClock uten eget kjøretidstillegg, senere besøk legger til leg.legMin.
       // Åpningstid: ankomst kan ikkje vere FØR butikken åpnar (same logikk som findSlot).
       const _rawStart = chunk.length>0 ? dayClock+leg.legMin : dayClock;
-      const start = Math.max(_rawStart, _gOpeningTimeMin(leg.customer, _rpWeekday));
+      const start = roundUpTo15(Math.max(_rawStart, _gOpeningTimeMin(leg.customer, _rpWeekday)));
       const end = start+dur;
       // Flydag: cutoff = avgangstid − oppmøtetid − kjøretid(denne kunde → flyplass).
       // Vanleg dag: cutoff = dayEndMin.
@@ -594,7 +594,7 @@ function rpBuildRoute(){
       const drive = (li>0) ? leg.legMin : (di>0 ? leg.legMin : (useFly ? 0 : leg.legMin));
       if(li>0) clock += leg.legMin;
       // Åpningstid: start ikkje FØR butikken åpnar (same logikk som getOpeningTimeMin/findSlot)
-      const start = Math.max(clock, _gOpeningTimeMin(c, _rpMapWeekday));
+      const start = roundUpTo15(Math.max(clock, _gOpeningTimeMin(c, _rpMapWeekday)));
       const dur = rpVisitLen(c);
       const end = start + dur;
       clock = end;
@@ -1080,12 +1080,12 @@ function runPlanner(){
     function findSlot(driveMin, durMin, afterMin, fromCity, customer){
       const weekday=dayDate.getDay();
       const openMin=customer?getOpeningTimeMin(customer, weekday):0;
-      let t=roundUpTo30(Math.max(afterMin+driveMin, openMin));
+      let t=roundUpTo15(Math.max(afterMin+driveMin, openMin));
       while(t+durMin<=dayEndEff){
         const conflict=busy.some(b=>t<b.endMins && t+durMin>b.startMins);
         if(!conflict) return t;
         const next=busy.find(b=>b.endMins>t)||{endMins:dayEndEff};
-        t=roundUpTo30(next.endMins);
+        t=roundUpTo15(next.endMins);
       }
       return -1;
     }
@@ -1863,7 +1863,7 @@ function recomputeDayTimes(day){
         const toCoord=(c.lat!=null&&c.lng!=null)?[c.lat,c.lng]:_coordFor(c.city||'');
         const drive=prevCity?getDriveMin(prevCity,c.city||'',prevCoord,toCoord):0;
         const openMin=_gOpeningTimeMin(c,weekday);
-        let t=Math.ceil(Math.max(cursor+drive,openMin)/30)*30;
+        let t=roundUpTo15(Math.max(cursor+drive,openMin));
         if(oIdx<obstacles.length && t+dur>obstacles[oIdx].s && t<obstacles[oIdx].e){
           cursor=obstacles[oIdx].e;
           if(obstacles[oIdx].arrCity){prevCity=obstacles[oIdx].arrCity;prevCoord=_coordFor(obstacles[oIdx].arrCity)||prevCoord;}
@@ -2041,7 +2041,7 @@ function _fillUnplacedIntoDay(day){
       var baseDur=_gVisitDuration(c);
       var dur=day._maxVisitDuration?Math.min(baseDur,day._maxVisitDuration):baseDur;
       var openMin=_gOpeningTimeMin(c,weekday);
-      var t=Math.ceil(Math.max(cursor+drive,openMin)/30)*30;
+      var t=roundUpTo15(Math.max(cursor+drive,openMin));
       if(t+dur>dayEndMin) continue;
       if(drive<bestDrive||(drive===bestDrive&&(c.l12||0)>((best&&best.l12)||0))){
         best=c; bestDrive=drive; bestT=t; bestDur=dur;

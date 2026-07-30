@@ -164,6 +164,8 @@ function rpDateLabelFull(d){
 }
 
 function roundTo30(min){ return Math.floor(min/30)*30; }
-// Rund opp til nærmeste halvtime
+// Rund opp til nærmeste halvtime (brukes til arbeidsdagstart/fly-buffer)
 function roundUpTo30(min){ return Math.ceil(min/30)*30; }
+// Rund opp til nærmeste kvarter (brukes til besøksstart etter kjøretid)
+function roundUpTo15(min){ return Math.ceil(min/15)*15; }
 
