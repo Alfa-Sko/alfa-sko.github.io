@@ -1,6 +1,9 @@
 # Alfa Kompass — instruksjoner til Claude
 
-## Deploy-regel (ALDRI bryt denne)
+## Deploy-regler (ALDRI bryt disse)
+
+Deploy til produksjon skjer ALLTID slik, **ett kommando om gangen**,
+ALDRI som sammensatt kjede med `&&`:
 
 ```
 git checkout main
@@ -11,7 +14,8 @@ git checkout alfa2
 
 - **Aldri commit direkte til `main`** — all utvikling skjer på `alfa2`
 - Deploy = fast-forward merge til `main` + push
-- Bevis på vellykka deploy: `git log --oneline -1 origin/main` skal vise siste commit
+- Etter push: kjør `git log --oneline -1 origin/main` og vis resultatet som bevis
+- Rapporter ALDRI "pushet" eller "deployet" uten å ha vist denne loggen først
 
 ## Ny tabell eller bucket i Supabase — sjekkliste
 
@@ -41,6 +45,7 @@ Ligg i `supabase/` og køyrast manuelt i Supabase SQL-editor av Jørn.
 |-----|---------|
 | `001_customers.sql` | customers + seller_districts + RLS-policies |
 | `002_grants.sql` | GRANT til authenticated for alle tabellar |
+| `003_app_settings.sql` | app_settings-tabell (maintenance_mode) + RLS |
 
 ## Sikkerheitskrav (absolutte)
 
@@ -53,7 +58,6 @@ Ligg i `supabase/` og køyrast manuelt i Supabase SQL-editor av Jørn.
 - `backup/`
 - `.claude/`
 - `scripts/*.json`
-- `CLAUDE.md`
 
 ## Admin-UIDs
 
