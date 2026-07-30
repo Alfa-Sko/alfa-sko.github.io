@@ -28,8 +28,13 @@ function populateVisitCustomers(){
   }
 }
 function populateFollowCustomers(){
-  const sel=document.getElementById('follow-customer');
-  sel.innerHTML='<option value="">Velg kunde...</option>'+getCustomers().map(c=>`<option value="${c.name}">${c.name} — ${c.city}</option>`).join('');
+  var followCsBar=document.getElementById('follow-cs-bar');
+  if(followCsBar && typeof _csMountPicker==='function'){
+    _csMountPicker(followCsBar, getCustomers(), {
+      prefix:'follow',
+      onPick:function(name){ document.getElementById('follow-customer').value=name; }
+    });
+  }
 }
 
 function clearVisitForm(){

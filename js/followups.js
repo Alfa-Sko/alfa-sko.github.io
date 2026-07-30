@@ -96,6 +96,8 @@ function saveFollowup(){
   if(!customer||!task||!due){ showToast('Fyll ut kunde, oppgave og dato'); return; }
   followups.push({id:Date.now(),customer,task,due,priority,done:false});
   saveData('alfa_followups',followups);
+  if(typeof window._csp_follow_setSelected==='function') window._csp_follow_setSelected('');
+  else document.getElementById('follow-customer').value='';
   document.getElementById('follow-task').value='';
   document.getElementById('follow-date').value='';
   renderFollowups();
