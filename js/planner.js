@@ -549,12 +549,15 @@ function rpBuildRoute(){
     const _rpDayDate = startDate ? rpAddDays(startDate,di) : null;
     const _rpDayKey = _rpDayDate ? (_rpDayDate.getFullYear()+'-'+String(_rpDayDate.getMonth()+1).padStart(2,'0')+'-'+String(_rpDayDate.getDate()).padStart(2,'0')) : null;
     const isFlightDay = returnHome && (retDate ? (_rpDayKey===retDate) : di===numDays-1);
+    const _rpWeekday = _rpDayDate ? _rpDayDate.getDay() : 1;
     while(_ri<route.length && chunk.length<maxPerDay){
       const leg=route[_ri];
       const dur=rpVisitLen(leg.customer);
       // Speiler oppsettet i days.map() nedenfor: første besøk i dagen starter
       // ved dayClock uten eget kjøretidstillegg, senere besøk legger til leg.legMin.
-      const start = chunk.length>0 ? dayClock+leg.legMin : dayClock;
+      // Åpningstid: ankomst kan ikkje vere FØR butikken åpnar (same logikk som findSlot).
+      const _rawStart = chunk.length>0 ? dayClock+leg.legMin : dayClock;
+      const start = Math.max(_rawStart, _gOpeningTimeMin(leg.customer, _rpWeekday));
       const end = start+dur;
       // Flydag: cutoff = avgangstid − oppmøtetid − kjøretid(denne kunde → flyplass).
       // Vanleg dag: cutoff = dayEndMin.
@@ -585,11 +588,13 @@ function rpBuildRoute(){
 
     // Klokkeslett: hver dag starter kl. arbeidstid-start; kjøretid + møtelengde kjedes
     let clock = dayStartMin;
+    const _rpMapWeekday = dateObj.getDay();
     const customers = legs.map((leg, li)=>{
       const c = leg.customer;
       const drive = (li>0) ? leg.legMin : (di>0 ? leg.legMin : (useFly ? 0 : leg.legMin));
       if(li>0) clock += leg.legMin;
-      const start = clock;
+      // Åpningstid: start ikkje FØR butikken åpnar (same logikk som getOpeningTimeMin/findSlot)
+      const start = Math.max(clock, _gOpeningTimeMin(c, _rpMapWeekday));
       const dur = rpVisitLen(c);
       const end = start + dur;
       clock = end;
