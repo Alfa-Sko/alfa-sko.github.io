@@ -96,7 +96,8 @@ function saveFollowup(){
   if(!customer||!task||!due){ showToast('Fyll ut kunde, oppgave og dato'); return; }
   followups.push({id:Date.now(),customer,task,due,priority,done:false});
   saveData('alfa_followups',followups);
-  const fcEl=document.getElementById('follow-customer'); if(fcEl) fcEl.value='';
+  if(typeof window._csp_follow_setSelected==='function') window._csp_follow_setSelected('');
+  else { const fcEl=document.getElementById('follow-customer'); if(fcEl) fcEl.value=''; }
   document.getElementById('follow-task').value='';
   document.getElementById('follow-date').value='';
   renderFollowups();
