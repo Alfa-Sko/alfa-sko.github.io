@@ -152,6 +152,22 @@ function mapInitOverview() {
     map.fitBounds(L.featureGroup(_mapLayers).getBounds().pad(0.06));
   }
 
+  // Ladestasjon-toggle-knapp (berre éin gong per kart-instans)
+  if (!document.getElementById('charger-toggle-btn')) {
+    const chargerCtrl = L.control({ position: 'topleft' });
+    chargerCtrl.onAdd = function() {
+      const div = L.DomUtil.create('div');
+      div.innerHTML =
+        '<button id="charger-toggle-btn" onclick="mapToggleChargers(!window._nobilChargerOn)" ' +
+        'style="padding:6px 12px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;' +
+        'font-size:12px;font-weight:500;cursor:pointer;color:#5F5E5A;' +
+        'box-shadow:0 1px 4px rgba(0,0,0,0.12);white-space:nowrap">⚡ Ladestasjoner</button>';
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    };
+    chargerCtrl.addTo(map);
+  }
+
   // Tegnforklaring
   _mapLegend = L.control({ position: 'bottomright' });
   _mapLegend.onAdd = function() {
@@ -307,6 +323,8 @@ function _spreadDuplicates(coords) {
 
 // Fjern alle eksisterende dagskart-instanser (kall FØR ny output.innerHTML)
 function _destroyDayMaps() {
+  _dayChargerLayers.forEach(l => { try { if(l) l.clearLayers(); } catch(_){} });
+  _dayChargerLayers = [];
   _dayMapInstances.forEach(m => { try { m.remove(); } catch (_) {} });
   _dayMapInstances = [];
   window._nearbyPinMap = {};
@@ -434,6 +452,15 @@ async function _initOneDayMap(day, dayIdx, homeBase, tripMeta, days) {
     });
   }
 
+  // ── Ladestasjoner (om toggle er aktiv) ─────────────────────────────────────
+  if (_chargerOn && typeof nobilRenderChargers === 'function') {
+    const cl = L.layerGroup().addTo(map);
+    _dayChargerLayers.push(cl);
+    nobilRenderChargers(map, cl);
+  } else {
+    _dayChargerLayers.push(null);
+  }
+
   // ── OSRM-rute (asynkron — tegnes etter at kartet er synlig) ─────────────────
   const osrmWpts = [
     ...(startCoord ? [startCoord] : []),
@@ -459,6 +486,59 @@ function initPlannerDayMaps(days, homeBase, tripMeta) {
   days.forEach((day, idx) => {
     if (!day.skippedReason && day.customers && day.customers.length > 0) {
       _initOneDayMap(day, idx, homeBase || '', tripMeta || {}, days);
+    }
+  });
+}
+
+// ── LADESTASJONAR (Nobil) ─────────────────────────────────────────────────────
+// Global toggle for ladestasjoner på alle kart (oversikt + planlegger-dagskart).
+// Kall mapToggleChargers(true/false) frå UI-knapp.
+
+let _chargerLayer = null;      // L.layerGroup på hovudkartet
+let _chargerOn = false;        // global toggle-tilstand
+window._nobilChargerOn = false;
+let _chargerMoveTimer = null;  // debounce for moveend/zoomend på hovudkartet
+let _dayChargerLayers = [];    // éin L.layerGroup per dagskart (null = ikkje aktiv)
+
+function mapToggleChargers(show) {
+  _chargerOn = window._nobilChargerOn = !!show;
+
+  // Oppdater knapp-stil (hovudkart + planlegger)
+  document.querySelectorAll('[id^="charger-toggle-btn"], [id="planner-charger-btn"]').forEach(btn => {
+    btn.style.background = _chargerOn ? '#F9A825' : '#fff';
+    btn.style.color = _chargerOn ? '#2C2C2A' : '#5F5E5A';
+    btn.style.fontWeight = _chargerOn ? '700' : '500';
+    btn.style.borderColor = _chargerOn ? '#F57F17' : '#D3D1C7';
+  });
+
+  // Hovudkart
+  if (_mapInstance) {
+    if (!_chargerLayer) {
+      _chargerLayer = L.layerGroup().addTo(_mapInstance);
+      _mapInstance.on('moveend zoomend', function() {
+        if (!_chargerOn) return;
+        clearTimeout(_chargerMoveTimer);
+        _chargerMoveTimer = setTimeout(function() {
+          if (typeof nobilRenderChargers === 'function') nobilRenderChargers(_mapInstance, _chargerLayer);
+        }, 700);
+      });
+    }
+    if (_chargerOn) {
+      if (typeof nobilRenderChargers === 'function') nobilRenderChargers(_mapInstance, _chargerLayer);
+    } else {
+      _chargerLayer.clearLayers();
+    }
+  }
+
+  // Dagskart
+  _dayMapInstances.forEach((map, i) => {
+    if (_chargerOn) {
+      if (!_dayChargerLayers[i]) {
+        _dayChargerLayers[i] = L.layerGroup().addTo(map);
+      }
+      if (typeof nobilRenderChargers === 'function') nobilRenderChargers(map, _dayChargerLayers[i]);
+    } else {
+      if (_dayChargerLayers[i]) _dayChargerLayers[i].clearLayers();
     }
   });
 }

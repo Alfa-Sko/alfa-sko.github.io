@@ -747,6 +747,17 @@ function mapsLink(from, to){
   return 'https://www.google.com/maps/dir/'+encodeURIComponent(from)+'/'+encodeURIComponent(to);
 }
 
+// Rekn ut total kjørelengde (km) for ein dag ved å summere getRouteInfo-km per etappe
+function _computeDayKm(day){
+  let km = 0, prev = day.startCity || '';
+  (day.customers||[]).forEach(c=>{
+    const ri = getRouteInfo(prev, c.city||'');
+    if(ri && ri.km) km += ri.km;
+    prev = c.city || prev;
+  });
+  return km;
+}
+
 
 // Hent korridor-naboer til et område, ordnet etter geografisk avstand fra startindeks
 // I stedet for å veksle nord/sør symmetrisk, sender vi tilbake alle naboer i én retning
@@ -2921,7 +2932,13 @@ function renderPlanFromData(days){
   if(!output) return;
   let html = '<div class="planner-result">';
   const totalVisits = days.reduce((s,d)=>s+d.customers.length,0);
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px"><div style="font-size:16px;font-weight:700;color:#2C2C2A">Redigert plan</div><div style="font-size:12px;color:#888780;flex-shrink:0">'+totalVisits+' besøk · '+days.length+' dag(er)</div></div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px">'+
+    '<div style="font-size:16px;font-weight:700;color:#2C2C2A">Redigert plan</div>'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+    '<div style="font-size:12px;color:#888780;flex-shrink:0">'+totalVisits+' besøk · '+days.length+' dag(er)</div>'+
+    '<button id="planner-charger-btn" onclick="mapToggleChargers(!window._nobilChargerOn)" style="padding:5px 10px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;color:#5F5E5A;white-space:nowrap">⚡ Ladestasjoner</button>'+
+    '</div>'+
+    '</div>';
   days.forEach((day, dayIdx)=>{
     const fixedInfo = day.fixedCount>0 ? ' · '+day.fixedCount+' fast(e) avtale(r)' : '';
     const zoneInfo = day.zones&&day.zones.length>0 ? ' · 📍 '+day.zones.join(' → ') : '';
@@ -3041,6 +3058,17 @@ function renderPlanFromData(days){
     if(day.customers.length===0){
       html+='<div style="color:#888780;font-size:13px;padding:14px;background:#F8F7F3;border-radius:8px;text-align:center;border:1px dashed #D3D1C7;margin-top:6px">Ingen besøk denne dagen.</div>';
     }
+    // EV rekkevidde-varsel (berre synleg når carType=elbil og evRange>0)
+    if(!day.skippedReason && day.customers.length>0 && typeof userProfile!=='undefined' && userProfile.carType==='elbil' && Number(userProfile.evRange)>0){
+      const _dKm = _computeDayKm(day);
+      if(_dKm > Number(userProfile.evRange)){
+        html+='<div style="margin:8px 0 4px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;font-size:13px">'+
+          '<div style="font-weight:700;color:#6D4C00;margin-bottom:3px">⚡ Rekkevidde kan være utilstrekkelig</div>'+
+          '<div style="color:#6D4C00;margin-bottom:5px">Estimert kjørelengde <strong>'+_dKm+' km</strong> overskrider rekkevidde på <strong>'+userProfile.evRange+' km</strong> — vurder ladestopp.</div>'+
+          '<div id="nobil-nearest-'+dayIdx+'" style="font-size:12px;color:#888780">Søker nærmeste ladestasjon…</div>'+
+          '</div>';
+      }
+    }
     if(!day.skippedReason && day.customers.length>0){
       html+='<div id="plan-map-'+dayIdx+'" class="planner-day-map"></div>';
     }
@@ -3068,6 +3096,28 @@ function renderPlanFromData(days){
   if(typeof _destroyDayMaps==='function') _destroyDayMaps();
   output.innerHTML = html;
   setTimeout(()=>{ if(typeof initPlannerDayMaps==='function') initPlannerDayMaps(window._lastPlan,window._lastHomeBase,window._lastTripMeta); },0);
+  // Synk charger-toggle-knapp-stil med gjeldande tilstand
+  const _pcb = document.getElementById('planner-charger-btn');
+  if(_pcb && window._nobilChargerOn){ _pcb.style.background='#F9A825'; _pcb.style.color='#2C2C2A'; _pcb.style.fontWeight='700'; _pcb.style.borderColor='#F57F17'; }
+  // Asynkron oppdatering av nærmaste lader i rekkevidde-varsel
+  if(typeof nobilFindNearest==='function' && typeof userProfile!=='undefined' && userProfile.carType==='elbil' && Number(userProfile.evRange)>0){
+    days.forEach((day, dayIdx)=>{
+      const el = document.getElementById('nobil-nearest-'+dayIdx);
+      if(!el) return;
+      const cities = [day.startCity,...(day.customers||[]).map(c=>c.city)].filter(Boolean);
+      nobilFindNearest(cities).then(nearest=>{
+        if(!el.isConnected) return;
+        if(nearest){
+          el.innerHTML = '📍 Nærmeste: <strong>'+escapeHtml(nearest.name)+'</strong>'+
+            (nearest.op ? ' · '+escapeHtml(nearest.op) : '')+
+            ' · ca. '+nearest.distKm+' km fra ruten'+
+            (nearest.conns&&nearest.conns[0] ? ' · '+escapeHtml(nearest.conns[0].type+(nearest.conns[0].cap?' '+nearest.conns[0].cap:'')) : '');
+        } else {
+          el.textContent='Ingen ladestasjon funnet i nærheten — sjekk kartet.';
+        }
+      }).catch(()=>{ if(el.isConnected) el.textContent=''; });
+    });
+  }
 }
 
 function plannerAddToCalendar(days){
