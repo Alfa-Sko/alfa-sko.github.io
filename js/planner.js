@@ -1413,6 +1413,7 @@ function runPlanner(){
             '<div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(item.to)+' kl. '+f2(item.retMins)+'</div>'+
             '<div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f2(item.retMins-FLIGHT_BUFFER_MIN)+'</div>'+
           '</div>'+
+          '<button onclick="openFlightEditModal(\'return\')" style="background:none;border:none;color:#0C447C;font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Endre">✏️</button>'+
           '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
       } else if(item.kind==='drive-home-return'){
         const dur=item.endMins-item.startMins;
@@ -2092,6 +2093,144 @@ function removeFlightLeg(dayIdx, legId){
   renderPlanFromData(days);
 }
 
+function openFlightEditModal(type, dayIdx, itemId){
+  const existing = document.getElementById('flight-edit-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'flight-edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  let title='', fieldsHtml='', confirmCall='';
+  if(type==='return'){
+    const meta = window._lastTripMeta||{};
+    title = '✈ Rediger Hjemreise';
+    confirmCall = 'confirmFlightReturnEdit()';
+    fieldsHtml =
+      '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Dato</div>'+
+      '<input type="date" id="fe-ret-date" value="'+escapeHtml(meta.retDate||'')+'" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>'+
+      '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Avgangstid (fly)</div>'+
+      '<input type="time" id="fe-ret-time" value="'+escapeHtml(meta.retTime||'')+'" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>'+
+      '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">By / flyplass</div>'+
+      '<input type="text" id="fe-ret-city" value="'+escapeHtml(meta.retCity||'')+'" placeholder="f.eks. Bergen, Oslo Gardermoen" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>';
+  } else {
+    const days = window._lastPlan;
+    const day = days&&days[dayIdx];
+    const legInLegs = day&&(day.flightLegs||[]).find(l=>l.id===itemId);
+    const legInTimeline = day&&(day.timeline||[]).find(x=>x.kind==='flight-leg'&&x.id===itemId);
+    const leg = legInLegs||legInTimeline;
+    title = '✈ Rediger Flyetappe';
+    confirmCall = 'confirmFlightLegEdit('+dayIdx+','+itemId+')';
+    const dep = leg?escapeHtml(leg.depCity||leg.from||''):'';
+    const arr = leg?escapeHtml(leg.arrCity||leg.to||''):'';
+    const depT = leg?rpFmtTime(leg.depMins!=null?leg.depMins:leg.startMins||0):'09:00';
+    const arrT = leg?rpFmtTime(leg.arrMins!=null?leg.arrMins:leg.endMins||0):'10:00';
+    fieldsHtml =
+      '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+      '<div style="flex:1"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Fra by</div>'+
+      '<input type="text" id="fe-dep-city" value="'+dep+'" placeholder="Avreiseby" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>'+
+      '<div style="flex:1"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Til by</div>'+
+      '<input type="text" id="fe-arr-city" value="'+arr+'" placeholder="Ankomstby" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div></div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:14px">'+
+      '<div style="flex:1"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Avgangstid</div>'+
+      '<input type="time" id="fe-dep-time" value="'+depT+'" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div>'+
+      '<div style="flex:1"><div style="font-size:11px;font-weight:600;color:#5F5E5A;margin-bottom:4px">Ankomsttid</div>'+
+      '<input type="time" id="fe-arr-time" value="'+arrT+'" style="width:100%;padding:8px 10px;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;box-sizing:border-box"></div></div>';
+  }
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:400px;max-width:100%;padding:16px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+    '<div style="font-size:15px;font-weight:700">'+title+'</div>'+
+    '<button onclick="document.getElementById(\'flight-edit-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888780">×</button>'+
+    '</div>'+
+    fieldsHtml+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-dark" style="flex:1" onclick="'+confirmCall+'">Lagre</button>'+
+    '<button style="flex:1;padding:10px;background:#F1EFE8;border:1px solid #D3D1C7;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#5F5E5A" onclick="document.getElementById(\'flight-edit-modal\').remove()">Avbryt</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  setTimeout(()=>{ const fi=modal.querySelector('input'); if(fi) fi.focus(); }, 30);
+}
+
+function confirmFlightReturnEdit(){
+  const date = ((document.getElementById('fe-ret-date')||{}).value||'').trim();
+  const time = ((document.getElementById('fe-ret-time')||{}).value||'').trim();
+  const city = ((document.getElementById('fe-ret-city')||{}).value||'').trim();
+  if(!time){ showToast('Legg inn avgangstid'); return; }
+  document.getElementById('flight-edit-modal').remove();
+  saveFlightReturnEdit(date, time, city);
+}
+
+function confirmFlightLegEdit(dayIdx, itemId){
+  const dep = ((document.getElementById('fe-dep-city')||{}).value||'').trim();
+  const arr = ((document.getElementById('fe-arr-city')||{}).value||'').trim();
+  const depT = ((document.getElementById('fe-dep-time')||{}).value||'').trim();
+  const arrT = ((document.getElementById('fe-arr-time')||{}).value||'').trim();
+  if(!dep||!arr){ showToast('Fyll inn fra- og til-by'); return; }
+  if(!depT||!arrT){ showToast('Fyll inn avgangstid og ankomsttid'); return; }
+  document.getElementById('flight-edit-modal').remove();
+  saveFlightLegEdit(dayIdx, itemId, dep, arr, depT, arrT);
+}
+
+function saveFlightReturnEdit(date, time, city){
+  const days = window._lastPlan;
+  const meta = window._lastTripMeta;
+  if(!days || !meta) return;
+  const tm = time.match(/^(\d{1,2}):(\d{2})$/);
+  if(!tm){ showToast('Ugyldig klokkeslett'); return; }
+  const newRetMins = parseInt(tm[1])*60 + parseInt(tm[2]);
+  // Find the day currently holding flight-return
+  let oldDayIdx = days.length - 1;
+  days.forEach((d,i)=>{ if((d.timeline||[]).some(x=>x.kind==='flight-return')) oldDayIdx=i; });
+  // Remove from old day
+  days[oldDayIdx].timeline = (days[oldDayIdx].timeline||[]).filter(x=>x.kind!=='flight-return');
+  // Find new target day by date string
+  let newDayIdx = days.length - 1;
+  if(date){
+    const found = days.findIndex(d=>{
+      if(!d.date) return false;
+      const dk2 = d.date.getFullYear()+'-'+String(d.date.getMonth()+1).padStart(2,'0')+'-'+String(d.date.getDate()).padStart(2,'0');
+      return dk2===date;
+    });
+    if(found>=0) newDayIdx=found;
+  }
+  // Add minimal item; recomputeDayTimes will fill in from, driveMin, startMins
+  days[newDayIdx].timeline = (days[newDayIdx].timeline||[]).concat([{kind:'flight-return', retMins:newRetMins, to:city, from:'', driveMin:0, startMins:0, endMins:newRetMins}]);
+  // Update meta (one source of truth)
+  meta.retDate = date;
+  meta.retTime = time;
+  meta.retCity = city;
+  meta.hasReturn = true;
+  // Sync setup-form fields (both planner prefixes)
+  ['rp-ret-date','trip-ret-date'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=date; });
+  ['rp-ret-time','trip-ret-time'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=time; });
+  ['rp-ret-city','trip-ret-city'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=city; });
+  // Recompute to get correct startMins/from/driveMin
+  recomputeDayTimes(days[newDayIdx]);
+  if(oldDayIdx!==newDayIdx) recomputeDayTimes(days[oldDayIdx]);
+  renderPlanFromData(days);
+  showToast('Hjemreise oppdatert');
+}
+
+function saveFlightLegEdit(dayIdx, itemId, dep, arr, depTime, arrTime){
+  const days = window._lastPlan;
+  if(!days||!days[dayIdx]) return;
+  const day = days[dayIdx];
+  const pm = s=>{ const m=s.match(/^(\d{1,2}):(\d{2})$/); return m?parseInt(m[1])*60+parseInt(m[2]):null; };
+  const depMins = pm(depTime), arrMins = pm(arrTime);
+  if(depMins===null||arrMins===null||arrMins<=depMins){ showToast('Ankomsttid må være etter avgangstid'); return; }
+  const li = (day.flightLegs||[]).findIndex(l=>l.id===itemId);
+  if(li>=0){
+    day.flightLegs[li] = {id:itemId, depCity:dep, arrCity:arr, depMins:depMins, arrMins:arrMins, booked:day.flightLegs[li].booked||false};
+  } else {
+    // Direct-to-timeline leg (e.g. auto-planner arrival leg)
+    const ti = (day.timeline||[]).findIndex(x=>x.kind==='flight-leg'&&x.id===itemId);
+    if(ti>=0) day.timeline[ti] = {kind:'flight-leg', id:itemId, from:dep, to:arr, startMins:depMins, endMins:arrMins, booked:day.timeline[ti].booked||false};
+  }
+  recomputeDayTimes(day);
+  renderPlanFromData(days);
+  showToast('✈ Flyetappe oppdatert');
+}
 
 function showTimeBlockModal(dayIdx){
   const existing = document.getElementById('time-block-modal');
@@ -2808,7 +2947,7 @@ function renderPlanFromData(days){
     function _renderExtra(item){
       const f3=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
       if(item.kind==='flight-leg'){
-        return '<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(item.booked?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f3(item.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(item.booked?'✅':'❌')+'</span> Fly: '+escapeHtml(item.from)+' → '+escapeHtml(item.to)+'</div><div class="planner-stop-meta" style="color:#0C447C">Avgang '+f3(item.startMins)+' · Ankomst '+f3(item.endMins)+' · vær der 30 min før</div></div><label style="display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(item.booked?'checked':'')+' onchange="toggleLegBooked('+dayIdx+','+item.id+',this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label><button onclick="removeFlightLeg('+dayIdx+','+item.id+')" style="background:none;border:none;color:#A23B27;font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0" title="Fjern flyetappe">×</button></div>';
+        return '<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(item.booked?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f3(item.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(item.booked?'✅':'❌')+'</span> Fly: '+escapeHtml(item.from)+' → '+escapeHtml(item.to)+'</div><div class="planner-stop-meta" style="color:#0C447C">Avgang '+f3(item.startMins)+' · Ankomst '+f3(item.endMins)+' · vær der 30 min før</div></div><label style="display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(item.booked?'checked':'')+' onchange="toggleLegBooked('+dayIdx+','+item.id+',this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label><button onclick="openFlightEditModal(\'leg\','+dayIdx+','+item.id+')" style="background:none;border:none;color:#0C447C;font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Endre flyetappe">✏️</button><button onclick="removeFlightLeg('+dayIdx+','+item.id+')" style="background:none;border:none;color:#A23B27;font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0" title="Fjern flyetappe">×</button></div>';
       }
       // time-block
       const tt = TIME_BLOCK_TYPES.find(t=>t.key===item.type)||{emoji:'🕐'};
@@ -2884,7 +3023,7 @@ function renderPlanFromData(days){
       const f4=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
       const driveTxt = _fr.from && _fr.from!==_fr.to ? '🚗 Kjør '+escapeHtml(_fr.from)+' → '+escapeHtml(_fr.to)+' ('+_fr.driveMin+' min) · ' : '';
       const _retB2 = (window._lastTripMeta||{}).retBooked;
-      html+='<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(_retB2?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f4(_fr.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB2?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(_fr.to)+' kl. '+f4(_fr.retMins)+'</div><div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f4(_fr.retMins-FLIGHT_BUFFER_MIN)+'</div></div><label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB2?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
+      html+='<div class="planner-stop" style="background:#E6F1FB;border:1px solid #B8D4E8;border-radius:8px;padding:8px 12px;margin:4px 0'+(_retB2?'':';opacity:0.62')+'"><div class="planner-stop-time" style="color:#0C447C">'+f4(_fr.startMins)+'</div><div class="planner-stop-icon">✈</div><div class="planner-stop-body"><div class="planner-stop-name" style="color:#2C2C2A"><span class="book-mark">'+(_retB2?'✅':'❌')+'</span> Hjemreise: fly fra '+escapeHtml(_fr.to)+' kl. '+f4(_fr.retMins)+'</div><div class="planner-stop-meta" style="color:#0C447C">'+driveTxt+'Vær på flyplassen senest '+f4(_fr.retMins-FLIGHT_BUFFER_MIN)+'</div></div><button onclick="openFlightEditModal(\'return\')" style="background:none;border:none;color:#0C447C;font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Endre">✏️</button><label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;font-size:11px;font-weight:700;color:#0C447C"><input type="checkbox" '+(_retB2?'checked':'')+' onchange="toggleRetBooked(this)" style="width:15px;height:15px;cursor:pointer">Bestilt</label></div>';
     }
     html+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button onclick="plannerAddStopPrompt('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#F1EFE8;border:1px dashed #888780;border-radius:8px;color:#5F5E5A;font-size:12px;font-weight:600;cursor:pointer">+ Kunde</button><button onclick="addFlightLegPrompt('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#E6F1FB;border:1px dashed #0C447C;border-radius:8px;color:#0C447C;font-size:12px;font-weight:600;cursor:pointer">✈ Flyetappe</button><button onclick="showTimeBlockModal('+dayIdx+')" style="flex:1;min-width:120px;padding:8px;background:#F1EFE8;border:1px dashed #5F5E5A;border-radius:8px;color:#5F5E5A;font-size:12px;font-weight:600;cursor:pointer">🕐 Legg til tid</button></div>';
     // Vis kveldsetappe (transport til neste dags område / hotellby)
