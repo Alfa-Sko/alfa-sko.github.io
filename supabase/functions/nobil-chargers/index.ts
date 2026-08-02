@@ -44,15 +44,16 @@ serve(async (req) => {
 
     // ── Bygg Nobil-kall ────────────────────────────────────────────────────────
     // Nobil v3 API: northeast og southwest som "(lat,lon)"-strengar, ikkje separate felt.
-    // Ref: https://info.nobil.no/api (search.php, type=rectangle)
+    // countrycode=NOR filterer bort svenske/finske stasjoner på API-nivå.
     const nobilParams = new URLSearchParams({
-      apikey:     key,
-      apiversion: '3',
-      action:     'search',
-      type:       'rectangle',
-      northeast:  `(${northEast.lat},${northEast.lng})`,
-      southwest:  `(${southWest.lat},${southWest.lng})`,
-      format:     'json',
+      apikey:      key,
+      apiversion:  '3',
+      action:      'search',
+      type:        'rectangle',
+      northeast:   `(${northEast.lat},${northEast.lng})`,
+      southwest:   `(${southWest.lat},${southWest.lng})`,
+      countrycode: 'NOR',
+      format:      'json',
     })
 
     let nobilResp: Response
@@ -103,12 +104,13 @@ serve(async (req) => {
         })).filter(c => c.type)
 
         return [{
-          id:    String(m.International_id || m.id || ''),
-          name:  String(m.name || ''),
-          op:    String(m.Operator || m.Owned_by || ''),
+          id:     String(m.International_id || m.id || ''),
+          name:   String(m.name || ''),
+          op:     String(m.Operator || m.Owned_by || ''),
+          county: String(m.County || ''),
           lat, lng,
-          total: Number(m.Number_charging_points || 0),
-          avail: Number(m.Available_charging_points || 0),
+          total:  Number(m.Number_charging_points || 0),
+          avail:  Number(m.Available_charging_points || 0),
           conns,
         }]
       } catch (_) {

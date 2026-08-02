@@ -2937,6 +2937,7 @@ function renderPlanFromData(days){
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
     '<div style="font-size:12px;color:#888780;flex-shrink:0">'+totalVisits+' besøk · '+days.length+' dag(er)</div>'+
     '<button id="planner-charger-btn" onclick="mapToggleChargers(!window._nobilChargerOn)" style="padding:5px 10px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;color:#5F5E5A;white-space:nowrap">⚡ Ladestasjoner</button>'+
+    '<button class="nobil-filter-btn" onclick="nobilFilterOpen(this)" style="padding:5px 8px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;color:#5F5E5A" title="Filtrer ladestasjoner">⚙</button>'+
     '</div>'+
     '</div>';
   days.forEach((day, dayIdx)=>{

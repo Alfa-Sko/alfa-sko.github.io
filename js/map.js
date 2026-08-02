@@ -152,16 +152,22 @@ function mapInitOverview() {
     map.fitBounds(L.featureGroup(_mapLayers).getBounds().pad(0.06));
   }
 
-  // Ladestasjon-toggle-knapp (berre éin gong per kart-instans)
+  // Ladestasjon-toggle + filter-knapp (berre éin gong per kart-instans)
   if (!document.getElementById('charger-toggle-btn')) {
     const chargerCtrl = L.control({ position: 'topleft' });
     chargerCtrl.onAdd = function() {
       const div = L.DomUtil.create('div');
+      div.style.display = 'flex';
+      div.style.gap = '4px';
       div.innerHTML =
         '<button id="charger-toggle-btn" onclick="mapToggleChargers(!window._nobilChargerOn)" ' +
         'style="padding:6px 12px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;' +
         'font-size:12px;font-weight:500;cursor:pointer;color:#5F5E5A;' +
-        'box-shadow:0 1px 4px rgba(0,0,0,0.12);white-space:nowrap">⚡ Ladestasjoner</button>';
+        'box-shadow:0 1px 4px rgba(0,0,0,0.12);white-space:nowrap">⚡ Ladestasjoner</button>' +
+        '<button class="nobil-filter-btn" onclick="nobilFilterOpen(this)" ' +
+        'style="padding:6px 10px;background:#fff;border:1px solid #D3D1C7;border-radius:6px;' +
+        'font-size:12px;font-weight:500;cursor:pointer;color:#5F5E5A;' +
+        'box-shadow:0 1px 4px rgba(0,0,0,0.12)" title="Filtrer ladestasjoner">⚙</button>';
       L.DomEvent.disableClickPropagation(div);
       return div;
     };
