@@ -207,11 +207,12 @@ function rangeGainedKm(stationKw, minutes) {
 const state = {
   rangeKm:         45,
   origin:          null,
-  stations:        [],
+  stations:        [],   // alle stasjonar innanfor rekkevidde (maks 15), ufiltrert
   events:          [],
   selectedStation: null,
   chargeMinutes:   30,
   plan:            null,
+  opFilter:        null, // null = alle, string = berre denne leverandøren
 };
 
 const TIME_OPTIONS = [15, 30, 45, 60, 90];
@@ -278,22 +279,56 @@ function consequences(plan) {
    ================================================================ */
 const $ = id => document.getElementById(id);
 
+function renderOpFilter() {
+  const box = $('cpOpFilter');
+  if (!box) return;
+  const ops = [...new Set(state.stations.map(s => s.operator).filter(Boolean))].sort();
+  if (ops.length < 2) { box.innerHTML = ''; return; }
+
+  const isAll = state.opFilter === null;
+  const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(s) : s);
+  const chips = [
+    `<button class="cp-chip" type="button" data-op="" aria-pressed="${isAll}">Alle</button>`,
+    ...ops.map(op => `<button class="cp-chip" type="button" data-op="${esc(op)}" aria-pressed="${!isAll && state.opFilter === op}">${esc(op)}</button>`),
+  ].join('');
+
+  box.innerHTML = `<div class="cp-chips" style="flex-wrap:wrap;margin-bottom:8px">${chips}</div>`;
+  box.querySelectorAll('.cp-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.op;
+      state.opFilter = v === '' ? null : v;
+      state.selectedStation = null;
+      renderAll();
+    });
+  });
+}
+
 function renderStations() {
   const box = $('cpStations');
   if (!box) return;
-  if (!state.stations.length) {
-    box.innerHTML = `<p class="cp-empty">Ingen ladestasjoner innenfor ${state.rangeKm} km
-      minus 15 km reserve. Øk rekkevidden eller sjekk kartet manuelt.</p>`;
+
+  const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(s) : s);
+  const visible = (state.opFilter
+    ? state.stations.filter(s => s.operator === state.opFilter)
+    : state.stations
+  ).slice(0, 5);
+
+  if (!visible.length) {
+    const msg = state.opFilter
+      ? `Ingen stasjoner fra <strong>${esc(state.opFilter)}</strong> innenfor rekkevidden. Prøv «Alle».`
+      : `Ingen ladestasjoner innenfor ${state.rangeKm} km minus 15 km reserve. Øk rekkevidden eller sjekk kartet manuelt.`;
+    box.innerHTML = `<p class="cp-empty">${msg}</p>`;
     return;
   }
-  box.innerHTML = state.stations.map(s => {
+
+  box.innerHTML = visible.map(s => {
     const sel  = state.selectedStation && state.selectedStation.id === s.id;
     const fast = s.max_kw >= 100;
     return `
       <button class="cp-station" type="button" data-id="${s.id}" aria-pressed="${sel}">
         <span class="cp-st-main">
-          <span class="cp-st-name">${typeof escapeHtml === 'function' ? escapeHtml(s.name) : s.name}</span>
-          <span class="cp-st-meta">${typeof escapeHtml === 'function' ? escapeHtml(s.operator) : s.operator} · ${s.connector_types.join(', ')}</span>
+          <span class="cp-st-name">${esc(s.name)}</span>
+          <span class="cp-st-meta">${esc(s.operator)} · ${s.connector_types.join(', ')}</span>
         </span>
         <span class="cp-kw ${fast ? 'cp-kw--fast' : ''}">${s.max_kw} kW</span>
         <span class="cp-st-dist">${s.distanceKm.toFixed(1)} km
@@ -458,6 +493,7 @@ function renderActions(plan) {
 }
 
 function renderAll() {
+  renderOpFilter();
   renderStations();
   if (!state.selectedStation) return;
   renderChips();
@@ -525,11 +561,12 @@ findBtn.addEventListener('click', async () => {
     state.events = events.slice().sort((a, b) => a.start - b.start);
 
     const usable = Math.max(0, state.rangeKm - CP.reserveKm);
+    state.opFilter = null; // tilbakestill leverandørfilter ved nytt søk
     state.stations = stations
       .map(s => ({ ...s, distanceKm: distanceKm(origin, s) }))
       .filter(s => s.distanceKm <= usable)
       .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 5);
+      .slice(0, 15); // hent fleire for å gi filtervalg mening
 
     state.selectedStation = state.stations[0] || null;
     const r = $('cpResult');
