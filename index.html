@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/charge-planner.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 </head>
 <body>
@@ -100,6 +101,44 @@
     <!-- OVERSIKT -->
     <div id="sec-oversikt" class="section">
       <div id="ev-range-widget"></div>
+      <div id="cp-widget-host" class="cp-scope" style="margin-bottom:14px">
+        <div class="cp-card">
+          <div class="cp-head">
+            <div class="cp-bolt">&#9889;</div>
+            <h2>Lading underveis</h2>
+          </div>
+          <p class="cp-sub">Oppgi gjenværende rekkevidde – appen finner beste ladestopp langs dagens rute og sjekker om du rekker avtalene.</p>
+          <div class="cp-input-row">
+            <div class="cp-field">
+              <label class="cp-label" for="cpRange">Rekkevidde igjen (km)</label>
+              <div class="cp-inputwrap">
+                <input class="cp-input" type="number" id="cpRange" placeholder="f.eks. 80" min="1" max="800">
+                <span class="cp-unit">km</span>
+              </div>
+            </div>
+            <button class="cp-btn" id="cpFind">Finn ladestasjon</button>
+          </div>
+          <div class="cp-result cp-hidden" id="cpResult">
+            <div class="cp-stack">
+              <div>
+                <p class="cp-secttl">Nærmeste ladestasjoner</p>
+                <div class="cp-stations" id="cpStations"></div>
+              </div>
+              <div>
+                <p class="cp-secttl">Ladetid</p>
+                <div class="cp-chips" id="cpChips"></div>
+                <p class="cp-gain" id="cpGain"></p>
+              </div>
+              <div>
+                <p class="cp-secttl">Tidslinje</p>
+                <div class="cp-timeline" id="cpTimeline"></div>
+              </div>
+              <div id="cpVerdict"></div>
+              <div class="cp-actions" id="cpActions"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="section-label">Dagens plan</div>
       <div id="today-calendar" class="card" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
       <div id="overview-metrics" class="metrics"></div>
@@ -476,6 +515,18 @@
                 <option value="recharge">Recharge</option>
                 <option value="kople">Kople / Mer</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label>Maks ladefart (kW)</label>
+              <input type="number" id="prof-max-charge-kw" min="0" max="400" placeholder="170">
+              <div style="font-size:11px;color:#888780;margin-top:4px">Bilens maks ladeeffekt (f.eks. 170 kW for Tesla Model 3).</div>
+            </div>
+            <div class="form-group">
+              <label>Forbruk (kWh/100 km)</label>
+              <input type="number" id="prof-consumption-kwh" min="0" max="50" step="0.1" placeholder="24">
+              <div style="font-size:11px;color:#888780;margin-top:4px">Brukes av ladeplanleggeren underveis.</div>
             </div>
           </div>
         </div>
@@ -1244,6 +1295,7 @@
 <script src="js/workbooks.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/nobil.js"></script>
+<script src="js/charge-planner.js"></script>
 <script src="js/map.js"></script>
 <script src="js/help-content.js"></script>
 <script src="js/help.js"></script>

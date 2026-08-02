@@ -10,6 +10,10 @@ function loadProfileIntoForm(){
   document.getElementById('prof-car-model').value = userProfile.carModel||'';
   document.getElementById('prof-ev-range').value = userProfile.evRange||'';
   document.getElementById('prof-charging').value = userProfile.chargingPref||'alle';
+  const mckEl = document.getElementById('prof-max-charge-kw');
+  if(mckEl) mckEl.value = userProfile.maxChargeKw||'';
+  const cwhEl = document.getElementById('prof-consumption-kwh');
+  if(cwhEl) cwhEl.value = userProfile.consumptionKwh100||'';
   document.getElementById('prof-autopass').checked = userProfile.autopass!==false;
   document.getElementById('prof-rental').value = userProfile.rentalPref||'';
   document.getElementById('prof-airline').value = userProfile.airlinePref||'alle';
@@ -50,6 +54,10 @@ function saveUserProfile(){
   userProfile.carModel = document.getElementById('prof-car-model').value.trim();
   userProfile.evRange = parseInt(document.getElementById('prof-ev-range').value)||0;
   userProfile.chargingPref = document.getElementById('prof-charging').value;
+  const mckSave = document.getElementById('prof-max-charge-kw');
+  if(mckSave) userProfile.maxChargeKw = parseInt(mckSave.value)||170;
+  const cwhSave = document.getElementById('prof-consumption-kwh');
+  if(cwhSave) userProfile.consumptionKwh100 = parseFloat(cwhSave.value)||24;
   userProfile.autopass = document.getElementById('prof-autopass').checked;
   userProfile.rentalPref = document.getElementById('prof-rental').value||'';
   userProfile.airlinePref = document.getElementById('prof-airline').value;

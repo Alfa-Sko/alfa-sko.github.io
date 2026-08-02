@@ -47,6 +47,9 @@ const DEFAULT_USER_PROFILE = {
   lunchDuration: 30,
   // Ferje
   preferredFerryOperator: 'torghatten', // torghatten | norled | fjord1 | alle
+  // Elbil-ladeplanlegger
+  maxChargeKw:        170, // bilens maks ladeeffekt (kW)
+  consumptionKwh100:  24,  // forbruk kWh/100 km
 };
 let userProfile = Object.assign({}, DEFAULT_USER_PROFILE, loadData('alfa_user_profile', {}));
 
