@@ -585,8 +585,58 @@ function openNewList(){
 }
 
 
+// ── EV-rekkevidde-widget øverst i oversikt ──────────────────────────────────
+
+let _evRangeSaveTimer = null;
+
+function _evRangeTsLabel(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const yesterday = new Date(today.getTime()-864e5);
+  const dDay = new Date(d); dDay.setHours(0,0,0,0);
+  if(dDay.getTime()===today.getTime()) return 'oppdatert kl. '+hh+':'+mm;
+  if(dDay.getTime()===yesterday.getTime()) return 'i går kl. '+hh+':'+mm;
+  return d.getDate()+'. '+['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'][d.getMonth()]+' kl. '+hh+':'+mm;
+}
+
+function _saveEvRange(val){
+  clearTimeout(_evRangeSaveTimer);
+  _evRangeSaveTimer = setTimeout(function(){
+    userProfile.evRange = parseInt(val)||0;
+    userProfile.evRangeUpdatedAt = new Date().toISOString();
+    saveData('alfa_user_profile', userProfile);
+    const tsEl = document.getElementById('ev-range-ts');
+    if(tsEl) tsEl.textContent = _evRangeTsLabel(userProfile.evRangeUpdatedAt);
+    if(window._lastPlan && typeof renderPlanFromData==='function') renderPlanFromData(window._lastPlan);
+  }, 600);
+}
+
+function renderEvRangeWidget(){
+  const el = document.getElementById('ev-range-widget');
+  if(!el) return;
+  if(!userProfile || userProfile.carType!=='elbil'){ el.style.display='none'; el.innerHTML=''; return; }
+  const rangeVal = userProfile.evRange||'';
+  const tsLabel = _evRangeTsLabel(userProfile.evRangeUpdatedAt||'');
+  el.style.display='';
+  el.innerHTML=
+    '<div style="margin-bottom:10px;padding:10px 14px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span style="font-size:13px;font-weight:600;color:#2E7D32">&#9889; Rekkevidde i dag:</span>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<input id="ev-range-input" type="number" min="0" max="999" value="'+escapeHtml(String(rangeVal))+'" '
+    +'style="width:72px;padding:5px 8px;border:1px solid #A5D6A7;border-radius:6px;font-size:14px;font-weight:600;color:#2C2C2A;text-align:right;box-sizing:border-box" '
+    +'onchange="_saveEvRange(this.value)" oninput="_saveEvRange(this.value)">'
+    +'<span style="font-size:13px;color:#2E7D32;font-weight:500">km</span>'
+    +'</div>'
+    +'<span id="ev-range-ts" style="font-size:11px;color:#888780">'+escapeHtml(tsLabel)+'</span>'
+    +'</div>';
+}
+
 function renderOverview(){
   if(window._leaderHome && !window._mgrBackup){ renderLeaderDashboard(); return; }
+  renderEvRangeWidget();
   renderDistrictDashboard();
   const _days=['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
   const _months=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
