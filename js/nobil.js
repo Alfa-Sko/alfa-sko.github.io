@@ -163,28 +163,47 @@ function _nobilSyncFilterBadges() {
 function _nobilRenderCheckboxes(containerId, items, filterKey) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const isAll = window._nobilFilter[filterKey] === null;
 
   if (items.length === 0) {
     el.innerHTML = '<span style="color:#888780;font-size:11px;font-style:italic">Aktiver ladestasjoner for å laste data</span>';
     return;
   }
 
-  const allLabel = filterKey === 'ops' ? 'Alle leverandører' : 'Alle typer';
-  let html = '<label style="display:flex;gap:6px;align-items:center;padding:2px 0;cursor:pointer;font-weight:600;border-bottom:1px solid #F1EFE8;margin-bottom:3px;padding-bottom:4px">'
-    +'<input type="checkbox"'+(isAll?' checked':'')+' onchange="_nobilCheckAll(\''+filterKey+'\',this)">'
-    +escapeHtml(allLabel)
-    +'</label>';
+  if (filterKey === 'ops') {
+    // Leverandørliste: Velg alle / Fjern alle + søkefelt, ingen master-checkbox
+    const opsF = window._nobilFilter.ops;
+    const bBase = 'font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer;font-weight:600;border:1px solid';
+    let html = '<div style="display:flex;gap:4px;margin-bottom:6px">'
+      + '<button onclick="_nobilOpsSelectAll()" style="'+bBase+' #0C447C;background:#0C447C;color:#fff">Velg alle</button>'
+      + '<button onclick="_nobilOpsClearAll()" style="'+bBase+' #A23B27;background:#fff;color:#A23B27">Fjern alle</button>'
+      + '</div>'
+      + '<input type="text" id="nobil-ops-search" placeholder="Søk leverandør..." oninput="_nobilOpsSearch()"'
+      + ' style="width:100%;padding:5px 8px;border:1px solid #D3D1C7;border-radius:6px;font-size:11px;box-sizing:border-box;margin-bottom:5px">';
 
-  items.forEach(item => {
-    const checked = isAll || (window._nobilFilter[filterKey] && window._nobilFilter[filterKey].has(item));
-    html += '<label style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;cursor:pointer">'
-      +'<input type="checkbox" value="'+escapeHtml(item)+'"'+(checked?' checked':'')+' onchange="_nobilCheckItem(\''+filterKey+'\',this)" style="margin-top:1px;flex-shrink:0">'
-      +'<span style="word-break:break-word">'+escapeHtml(item)+'</span>'
-      +'</label>';
-  });
-
-  el.innerHTML = html;
+    items.forEach(item => {
+      const checked = opsF === null || (opsF && opsF.has(item));
+      html += '<label class="nobil-ops-row" style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;cursor:pointer">'
+        + '<input type="checkbox" value="'+escapeHtml(item)+'"'+(checked?' checked':'')
+        + ' onchange="_nobilCheckItem(\'ops\',this)" style="margin-top:1px;flex-shrink:0">'
+        + '<span class="nobil-ops-name" style="word-break:break-word">'+escapeHtml(item)+'</span>'
+        + '</label>';
+    });
+    el.innerHTML = html;
+  } else {
+    // Kontakttypar: beheld master-checkbox-mønster
+    const isAll = window._nobilFilter[filterKey] === null;
+    let html = '<label style="display:flex;gap:6px;align-items:center;padding:2px 0;cursor:pointer;font-weight:600;border-bottom:1px solid #F1EFE8;margin-bottom:3px;padding-bottom:4px">'
+      + '<input type="checkbox"'+(isAll?' checked':'')+' onchange="_nobilCheckAll(\''+filterKey+'\',this)">Alle typer</label>';
+    items.forEach(item => {
+      const checked = isAll || (window._nobilFilter[filterKey] && window._nobilFilter[filterKey].has(item));
+      html += '<label style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;cursor:pointer">'
+        + '<input type="checkbox" value="'+escapeHtml(item)+'"'+(checked?' checked':'')
+        + ' onchange="_nobilCheckItem(\''+filterKey+'\',this)" style="margin-top:1px;flex-shrink:0">'
+        + '<span style="word-break:break-word">'+escapeHtml(item)+'</span>'
+        + '</label>';
+    });
+    el.innerHTML = html;
+  }
 }
 
 function _nobilSyncFilterPanel() {
@@ -194,8 +213,13 @@ function _nobilSyncFilterPanel() {
       _nobilKnownCounties.map(c => '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>').join('');
     countyEl.value = window._nobilFilter.county || '';
   }
+  const savedQ = (document.getElementById('nobil-ops-search') || {}).value || '';
   _nobilRenderCheckboxes('nobil-filter-ops',   _nobilKnownOps,       'ops');
   _nobilRenderCheckboxes('nobil-filter-conns',  _nobilKnownConnTypes, 'connTypes');
+  if (savedQ) {
+    const newSearch = document.getElementById('nobil-ops-search');
+    if (newSearch) { newSearch.value = savedQ; _nobilOpsSearch(); }
+  }
   _nobilSyncFilterBadges();
 }
 
@@ -245,30 +269,51 @@ function _nobilCheckItem(filterKey, cb) {
 
   if (current === null) {
     if (!cb.checked) {
-      // Fjern éin → alle bortsett frå denne
       current = new Set(allItems.filter(i => i !== cb.value));
     }
-    // Ellers: var allereie null (alle) og bruker huka av — ingen endring
   } else {
     current = new Set(current);
     if (cb.checked) current.add(cb.value);
     else current.delete(cb.value);
-    if (current.size === 0) current = null;            // ingenting → tilbakestill til alle
-    if (current && current.size === allItems.length) current = null;  // alle → null
+    // current.size === 0 er gyldig: tom mengde = vis ingenting (ikkje reset til null/alle)
+    if (current && current.size === allItems.length) current = null; // alle hukt = tilbake til null
   }
 
   window._nobilFilter[filterKey] = current;
 
-  // Oppdater "Alle"-boksen i containaren
-  const containerId = filterKey === 'ops' ? 'nobil-filter-ops' : 'nobil-filter-conns';
-  const el = document.getElementById(containerId);
-  if (el) {
-    const allCb = el.querySelector('input[type="checkbox"]');
-    if (allCb) allCb.checked = (window._nobilFilter[filterKey] === null);
+  // Oppdater "Alle"-boksen — berre for connTypes (ops-lista har ikkje lenger master-checkbox)
+  if (filterKey === 'connTypes') {
+    const el = document.getElementById('nobil-filter-conns');
+    if (el) {
+      const allCb = el.querySelector('input[type="checkbox"]');
+      if (allCb) allCb.checked = (window._nobilFilter[filterKey] === null);
+    }
   }
 
   _nobilSyncFilterBadges();
   _nobilRerender();
+}
+
+function _nobilOpsSelectAll() {
+  window._nobilFilter.ops = null; // null = alle
+  _nobilSyncFilterPanel();
+  _nobilSyncFilterBadges();
+  _nobilRerender();
+}
+
+function _nobilOpsClearAll() {
+  window._nobilFilter.ops = new Set(); // tom mengde = vis ingenting
+  _nobilSyncFilterPanel();
+  _nobilSyncFilterBadges();
+  _nobilRerender();
+}
+
+function _nobilOpsSearch() {
+  const q = ((document.getElementById('nobil-ops-search') || {}).value || '').toLowerCase();
+  document.querySelectorAll('#nobil-filter-ops .nobil-ops-row').forEach(row => {
+    const name = ((row.querySelector('.nobil-ops-name') || {}).textContent || '').toLowerCase();
+    row.style.display = (!q || name.includes(q)) ? '' : 'none';
+  });
 }
 
 function nobilFilterReset() {
