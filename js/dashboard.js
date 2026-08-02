@@ -637,7 +637,6 @@ function renderEvRangeWidget(){
 function renderOverview(){
   if(window._leaderHome && !window._mgrBackup){ renderLeaderDashboard(); return; }
   renderEvRangeWidget();
-  if(typeof cpInit==='function') cpInit();
   renderDistrictDashboard();
   const _days=['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
   const _months=['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];

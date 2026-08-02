@@ -89,6 +89,7 @@
     <div class="nav-item" onclick="showSection('tidslinje',this)">&#128279; Tidslinje</div>
     <div class="nav-item" onclick="showSection('kunder',this)">&#127978; Kunder</div>
     <div class="nav-item" onclick="showSection('kart',this)">&#128506; Kart</div>
+    <div class="nav-item" onclick="showSection('transport',this)">&#128663; Transport</div>
     <div class="nav-item" onclick="showSection('oppfolging',this)">&#10003; Oppfølging</div>
     <div class="nav-item" onclick="showSection('lookbooks',this)">&#128213; Workbooks</div>
     <div class="nav-item" onclick="showSection('prisliste',this)">&#128202; Prisliste</div>
@@ -101,6 +102,26 @@
     <!-- OVERSIKT -->
     <div id="sec-oversikt" class="section">
       <div id="ev-range-widget"></div>
+      <div class="section-label">Dagens plan</div>
+      <div id="today-calendar" class="card" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
+      <div id="overview-metrics" class="metrics"></div>
+      <div id="district-dashboard"></div>
+      <div class="section-label">Forfalt oppfølging</div>
+      <div id="overdue-follow"></div>
+    </div>
+
+    <!-- TRANSPORT -->
+    <div id="sec-transport" class="section" style="display:none">
+      <div style="font-size:22px;font-weight:700;color:#2C2C2A;margin-bottom:4px">&#128663; Transport</div>
+      <div style="font-size:13px;color:#888780;margin-bottom:16px">Lading, ferje og andre reiseverktøy</div>
+
+      <!-- Lading underveis -->
+      <div class="section-label">&#9889; Lading underveis</div>
+      <div id="cp-no-ev" style="display:none;padding:16px;background:#F8F7F3;border-radius:10px;border:1px dashed #D3D1C7;font-size:13px;color:#5F5E5A;line-height:1.6;margin-bottom:14px">
+        &#9889; Ladefunksjoner er kun tilgjengelig for elbil — endre kjøretøytype i
+        <a href="#" onclick="showSection('profil',null);return false;" style="color:#0C447C;text-decoration:underline">Min profil</a>
+        for å aktivere.
+      </div>
       <div id="cp-widget-host" class="cp-scope" style="margin-bottom:14px">
         <div class="cp-card">
           <div class="cp-head">
@@ -140,12 +161,6 @@
           </div>
         </div>
       </div>
-      <div class="section-label">Dagens plan</div>
-      <div id="today-calendar" class="card" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
-      <div id="overview-metrics" class="metrics"></div>
-      <div id="district-dashboard"></div>
-      <div class="section-label">Forfalt oppfølging</div>
-      <div id="overdue-follow"></div>
     </div>
 
     <!-- KALENDER -->
@@ -1258,6 +1273,7 @@
 
 <div id="mer-menu" style="display:none;position:fixed;bottom:calc(72px + env(safe-area-inset-bottom));left:0;right:0;background:#fff;border-top:1px solid #D3D1C7;box-shadow:0 -4px 16px rgba(0,0,0,0.1);z-index:90;padding:14px 16px;border-radius:14px 14px 0 0">
   <div style="font-size:11px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Mer</div>
+  <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('transport',null);closeMer()">&#128663; Transport</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('tidslinje',null);closeMer()">⏱ Tidslinje</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('oppfolging',null);closeMer()">✓ Oppfølging</button>
   <button class="btn btn-light" style="width:100%;margin-bottom:8px;text-align:left;padding:12px" onclick="mobileNav('lookbooks',null);closeMer()">📕 Workbooks</button>

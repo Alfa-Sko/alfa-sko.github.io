@@ -4,14 +4,16 @@
 //       state.js (userProfile, calEvents), dashboard.js (_saveEvRange)
 
 /* ------------------------------------------------------------------
-   cpInit() — kalt frå renderOverview() kvar gong oversikta rendrar.
-   Viser/gøymer widgeten og pre-fyller rekkevidde-feltet.
+   cpInit() — kalt frå showSection('transport') i ui.js.
+   Viser/gøymer widgeten, og viser placeholder for ikkje-elbil-brukarar.
    ------------------------------------------------------------------ */
 function cpInit() {
   const host = document.getElementById('cp-widget-host');
+  const noEv = document.getElementById('cp-no-ev');
   if (!host) return;
   const isEV = typeof userProfile !== 'undefined' && userProfile.carType === 'elbil';
   host.style.display = isEV ? '' : 'none';
+  if (noEv) noEv.style.display = isEV ? 'none' : '';
   if (!isEV) return;
 
   const inp = document.getElementById('cpRange');

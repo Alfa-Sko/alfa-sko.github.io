@@ -151,3 +151,25 @@
 .cp-hidden{display:none !important}
 
 @media (prefers-reduced-motion:reduce){.cp-scope *{transition:none !important}}
+
+/* ── Mobiltilpassing ─────────────────────────────────────────────────────── */
+@media (max-width:520px){
+  .cp-input-row{flex-direction:column;align-items:stretch}
+  .cp-input-row .cp-btn{width:100%}
+  .cp-field{min-width:0}
+
+  .cp-station{flex-wrap:wrap}
+  .cp-st-main{width:100%}
+  .cp-kw{margin-left:0}
+  .cp-st-dist{margin-left:auto;text-align:right}
+
+  .cp-tl-row{flex-wrap:wrap;gap:4px}
+  .cp-tl-time{width:auto;flex:none}
+  .cp-tl-what{width:100%;order:2}
+  .cp-tl-dur{order:3;margin-left:auto}
+
+  .cp-actions{flex-direction:column}
+  .cp-actions .cp-btn{min-width:0;width:100%;text-align:center}
+
+  .cp-opt{flex-wrap:nowrap}
+}

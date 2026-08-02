@@ -44,6 +44,7 @@ function showSection(id, el){
   if(id==='prisliste'){ plLoad(); rkCalculate(); }
   if(id==='kart') mapInitOverview();
   if(id==='hjelp') renderHelp();
+  if(id==='transport') cpInit();
 }
 
 // ─── KUNDEVELGER MED LIVE-LISTE ───────────────────────────────────────────────
