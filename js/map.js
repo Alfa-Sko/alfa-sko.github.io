@@ -190,6 +190,9 @@ function mapInitOverview() {
     return div;
   };
   _mapLegend.addTo(map);
+
+  // Leaflet treng invalidateSize() etter at containeren vart synleg
+  setTimeout(() => map.invalidateSize(), 150);
 }
 
 // ── RUTEVISNING (fase 3 – planlegger) ────────────────────────────────────────

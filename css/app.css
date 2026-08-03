@@ -557,6 +557,10 @@ a{color:inherit;text-decoration:none}
 
   /* TOAST — over bottom nav */
   .toast { bottom: calc(72px + var(--safe-bottom) + 8px); right: 12px; left: 12px; text-align: center; }
+
+  /* KART — korriger margin og høgde for mobil */
+  #sec-kart { margin: -16px -12px 0 !important; }
+  #map-container { height: calc(100dvh - 72px - var(--safe-bottom)) !important; }
 }
 
 /* ═══════════════════════════════════════════════════════
