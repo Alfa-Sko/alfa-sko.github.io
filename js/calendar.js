@@ -189,7 +189,7 @@ function monthEvClick(key){
 // Felter som ikke er satt (eldre/manuelle events) vises normalt.
 // ✅/❌-symbol for bestillingsstatus på reise-elementer
 function calBookedMark(e){
-  if(e.type==='flight'||e.type==='hotel'||e.type==='rental'){
+  if(e.type==='flight'||e.type==='hotel'||e.type==='rental'||e.type==='ferry'){
     if(e.booked===true) return '✅ ';
     if(e.booked===false) return '❌ ';
   }
@@ -199,15 +199,15 @@ function calEvDim(e){
   // Kundebesøk: GRØNN når avtalt, RØD når uanmeldt/ikke avtalt
   if(e.type==='visit' && e.appointed===true) return 'background:#E3F2E8;color:#1A5C3A;border-left-color:#1A5C3A;';
   if(e.type==='visit' && e.appointed===false) return 'background:#FBE9E7;color:#A23B27;border-left-color:#A23B27;border-left-style:dashed;';
-  if((e.type==='flight'||e.type==='hotel'||e.type==='rental') && e.booked===false) return 'opacity:0.45;border-left-style:dashed;';
+  if((e.type==='flight'||e.type==='hotel'||e.type==='rental'||e.type==='ferry') && e.booked===false) return 'opacity:0.45;border-left-style:dashed;';
   return '';
 }
 function calEvClass(type){
-  const m={visit:'cev-visit',phone:'cev-phone',nydalen:'cev-nydalen',teams:'cev-teams',clinic:'cev-clinic',external:'cev-external',dinner:'cev-dinner',drive:'cev-d','drive-auto':'cev-drive-auto',hotel:'cev-h','hotel-start':'cev-h',flight:'cev-h',rental:'cev-d'};
+  const m={visit:'cev-visit',phone:'cev-phone',nydalen:'cev-nydalen',teams:'cev-teams',clinic:'cev-clinic',external:'cev-external',dinner:'cev-dinner',drive:'cev-d','drive-auto':'cev-drive-auto',hotel:'cev-h','hotel-start':'cev-h',flight:'cev-h',rental:'cev-d',ferry:'cev-h'};
   return m[type]||'cev-v';
 }
 function calEvEmoji(type){
-  const m={visit:'🏪',phone:'📞',nydalen:'🏢',teams:'👥',clinic:'🎓',external:'📈',dinner:'🍽️',drive:'🚗','drive-auto':'🚗',hotel:'🏨','hotel-start':'🏨',flight:'✈',adm:'💻',lunch:'🍽️',training:'🏃',leisure:'🌿',rental:'🚙',other:'📌'};
+  const m={visit:'🏪',phone:'📞',nydalen:'🏢',teams:'👥',clinic:'🎓',external:'📈',dinner:'🍽️',drive:'🚗','drive-auto':'🚗',hotel:'🏨','hotel-start':'🏨',flight:'✈️',adm:'💻',lunch:'🍽️',training:'🏃',leisure:'🌿',rental:'🚙',ferry:'⛴️',other:'📌'};
   return m[type]||'📅';
 }
 function _calStatusIcons(e, key){
@@ -459,6 +459,7 @@ function renderWeek(body){
       const eEnc=encodeURIComponent(JSON.stringify(e));
       html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;'+(isDrive?'padding:2px 52px 2px 5px;':'padding:2px 5px;')+'font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
       if(showTime) html+='<span style="font-size:9px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
+      if(e.type==='flight'&&e.bookingRef) html+='<span style="font-size:9px;font-weight:500;opacity:0.85;display:block">'+escapeHtml(e.bookingRef)+'</span>';
       if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:3px;right:4px;font-size:9px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.88);border-radius:3px;padding:1px 3px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
       const _siW=_calStatusIcons(e,key);
       if(_siW) html+='<span style="font-size:9px;display:block;opacity:0.85;line-height:1.2">'+_siW+'</span>';
@@ -565,6 +566,7 @@ function buildDayViewHtml(key, readOnly){
     const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')"';
     html+='<div class="'+cc+'"'+dragAttrs+' onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;'+(isDrive?'padding:4px 80px 4px 8px;':'padding:4px 8px;')+'font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:'+cursor+';'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
     if(showTime) html+='<span style="font-size:10px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
+    if(e.type==='flight'&&e.bookingRef) html+='<span style="font-size:10px;font-weight:500;opacity:0.85;display:block">'+escapeHtml(e.bookingRef)+'</span>';
     if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:5px;right:6px;font-size:11px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.9);border-radius:3px;padding:1px 4px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
     const _siD=_calStatusIcons(e,key);
     if(_siD) html+='<span style="font-size:11px;display:block;margin-top:2px;line-height:1;opacity:0.85">'+_siD+'</span>';
@@ -811,6 +813,10 @@ async function _loadEvPopupPhotos(v){
 function handleEvClick(evt, dateKey, evJsonEncoded){
   evt.stopPropagation();
   const e = JSON.parse(decodeURIComponent(evJsonEncoded));
+  if(e.reiseEvent && typeof openReiseEditor === 'function'){
+    openReiseEditor(dateKey, e);
+    return;
+  }
   if(e.type==='drive-auto'){
     openEvPopup(evt, dateKey, e);
     return;
@@ -882,9 +888,9 @@ function openEvPopup(evt, dateKey, e){
   const popup = document.getElementById('ev-popup');
   const dateStr = dateKey.split('-').reverse().join('.');
   const SIMPLE_TYPES = ['adm','lunch','dinner','training','leisure','teams','phone','external','nydalen','clinic','drive','drive-auto','other','hotel-start'];
-  if(e.type==='hotel' || e.type==='flight' || e.type==='rental'){
+  if(e.type==='hotel' || e.type==='flight' || e.type==='rental' || e.type==='ferry'){
     const isBooked = e.booked===true;
-    const icon = e.type==='hotel' ? '🏨' : (e.type==='rental' ? '🚙' : '✈');
+    const icon = e.type==='hotel' ? '🏨' : e.type==='rental' ? '🚙' : e.type==='ferry' ? '⛴️' : '✈️';
     const bookBtn = '<button class="btn btn-sm" onclick="toggleCalBooked(\''+dateKey+'\','+e.startMins+',\''+(e.label||'').replace(/'/g,"\\'")+'\')" style="'+(isBooked?'background:#1A5C3A;color:#fff':'background:#FFF6E6;color:#6D4C00;border:1px solid #E6D9B8')+'">'+(isBooked?'✓ Bestilt':'Merk som bestilt')+'</button>';
     const delBtnTravel = '<button class="btn btn-sm" style="background:#FFF0EC;color:#D85A30;border:1px solid #F2C5B8" onclick="deleteCalEventGeneric(\''+dateKey+'\','+e.startMins+',\''+e.type+'\',\''+(e.label||'').replace(/'/g,"\\'")+'\')">🗑 Fjern</button>';
     popup.innerHTML = `<div class="ev-popup-hdr" style="background:#185FA5"><div class="ev-popup-hdr-left"><div class="ev-popup-hdr-title">${icon} ${e.label}</div><div class="ev-popup-hdr-sub">${dateStr}${isBooked?' · ✓ bestilt':' · ikke bestilt'}</div></div><button class="ev-popup-close" onclick="closeEvPopup()">✕</button></div><div class="ev-popup-actions" style="padding-top:12px;display:flex;gap:6px">${bookBtn}${delBtnTravel}${_calPrivBtn(dateKey,e)}<button class="btn btn-light btn-sm" onclick="closeEvPopup()">Lukk</button></div>${_evTimeEditRow(dateKey,e)}`;
