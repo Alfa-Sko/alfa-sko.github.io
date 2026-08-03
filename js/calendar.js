@@ -362,8 +362,29 @@ function calColClick(ev,key,colEl){
   if(ev.target!==colEl&&!ev.target.style.borderTop)return;
   const rect=colEl.getBoundingClientRect();
   const slot=Math.max(0,Math.round((ev.clientY-rect.top)/15));
-  const h=Math.floor(((calView==='day'?4:6)*60+slot*15)/60);
-  openAppt(key,ev,h);
+  const presetMins=(calView==='day'?4:6)*60+slot*15;
+  const h=Math.floor(presetMins/60);
+  _calShowAddPicker(ev.clientX,ev.clientY,key,h,presetMins);
+}
+
+function _calShowAddPicker(x,y,dateKey,h,presetMins){
+  const old=document.getElementById('cal-add-picker');
+  if(old) old.remove();
+  const d=document.createElement('div');
+  d.id='cal-add-picker';
+  d.style.cssText='position:fixed;z-index:600;background:#fff;border:1px solid #D3D1C7;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.18);padding:8px 10px;display:flex;gap:6px;align-items:center';
+  const pw=240;
+  d.style.left=Math.min(x,window.innerWidth-pw-8)+'px';
+  d.style.top=Math.min(y+6,window.innerHeight-54)+'px';
+  const actBtn='<button onclick="document.getElementById(\'cal-add-picker\').remove();openAppt(\''+dateKey+'\',null,'+h+')" style="padding:7px 12px;border:1px solid #D3D1C7;border-radius:7px;font-size:12px;font-weight:600;background:#fff;cursor:pointer;color:#2C2C2A;white-space:nowrap">&#9997;&#65039; Aktivitet</button>';
+  const reiseBtn=typeof openReiseModalAt==='function'
+    ?'<button onclick="document.getElementById(\'cal-add-picker\').remove();openReiseModalAt(\''+dateKey+'\','+presetMins+')" style="padding:7px 12px;border:1px solid #0C447C;border-radius:7px;font-size:12px;font-weight:600;background:#EEF4FB;cursor:pointer;color:#0C447C;white-space:nowrap">&#9992;&#65039; Reise</button>'
+    :'';
+  d.innerHTML=actBtn+reiseBtn+'<button onclick="this.parentElement.remove()" style="padding:3px 6px;border:none;background:none;font-size:15px;cursor:pointer;color:#888780;line-height:1">&#10005;</button>';
+  document.body.appendChild(d);
+  setTimeout(()=>{
+    document.addEventListener('click',function _dp(e){if(!d.contains(e.target)){d.remove();document.removeEventListener('click',_dp);}},true);
+  },10);
 }
 
 let _calResize=null;

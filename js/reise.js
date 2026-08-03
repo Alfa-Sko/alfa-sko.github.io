@@ -1,18 +1,26 @@
 // Reise-modal: enkeltbookinger (fly, hotell, leiebil, ferge) til kalender
 
 function openReiseModal() {
-  document.getElementById('mode-modal').style.display = 'none';
+  const modeM = document.getElementById('mode-modal');
+  if (modeM) modeM.style.display = 'none';
   const m = document.getElementById('reise-modal');
   if (!m) return;
   window._reiseType = 'fly';
   document.querySelectorAll('.reise-type-chip').forEach(c => _reiseChipStyle(c, c.dataset.type === 'fly'));
   _reiseRenderFields('fly');
+  _reiseApplyPreset();
   m.style.display = 'flex';
+}
+
+function openReiseModalAt(dateKey, presetMins) {
+  window._reisePreset = { dateKey, presetMins };
+  openReiseModal();
 }
 
 function closeReiseModal() {
   const m = document.getElementById('reise-modal');
   if (m) m.style.display = 'none';
+  window._reisePreset = null;
 }
 
 function _reiseChipStyle(btn, active) {
@@ -26,6 +34,22 @@ function _reiseSetType(t) {
   window._reiseType = t;
   document.querySelectorAll('.reise-type-chip').forEach(c => _reiseChipStyle(c, c.dataset.type === t));
   _reiseRenderFields(t);
+  _reiseApplyPreset();
+}
+
+function _reiseApplyPreset() {
+  const p = window._reisePreset;
+  if (!p) return;
+  const { dateKey, presetMins } = p;
+  const h = Math.floor(presetMins / 60), mm = presetMins % 60;
+  const timeStr = (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+  const t = window._reiseType || 'fly';
+  const dateMap = { fly:'rf-dep-date', hotell:'rf-checkin-date', leiebil:'rf-pickup-date', ferge:'rf-ferry-dep-date' };
+  const timeMap = { fly:'rf-dep-time', hotell:'rf-checkin-time', leiebil:'rf-pickup-time', ferge:'rf-ferry-dep-time' };
+  const df = document.getElementById(dateMap[t]);
+  const tf = document.getElementById(timeMap[t]);
+  if (df) df.value = dateKey;
+  if (tf) tf.value = timeStr;
 }
 
 function _reiseRenderFields(t, vals, containerEl) {
