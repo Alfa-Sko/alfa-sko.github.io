@@ -94,6 +94,7 @@ serve(async (req) => {
         const lat = parseFloat(pos[0])
         const lng = parseFloat(pos[1])
         if (isNaN(lat) || isNaN(lng)) return []
+        if (String(m.Land_code || '').toLowerCase() !== 'nor') return []
         if (Number(m.Station_status ?? 0) !== 1) return []
 
         const attr = (s.attr as Record<string, unknown>) || {}
