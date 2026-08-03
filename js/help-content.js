@@ -44,6 +44,10 @@ const HELP_CONTENT = [
       {
         tittel: 'Konstellasjoner — hva er det?',
         svar: 'En konstellasjon er eieren/driveren bak en eller flere butikker, på tvers av kjeder. Eksempel: én eier kan stå bak både en Sport 1 og en Intersport. Konstellasjoner finner du som egen underfane i Kunder. Der kan du opprette, gi nytt navn, slette, sette konstellasjon på en kunde, og slå sammen konstellasjoner.'
+      },
+      {
+        tittel: 'Åpne adresse i Google Maps',
+        svar: 'På kundekortet og i kalender-popup for besøk finner du en «🗺 Google Maps»-lenke ved adressen. Trykk på den for å åpne adressen direkte i Google Maps på telefon eller PC. Nyttig for å få veibeskrivelse direkte til butikken.'
       }
     ]
   },
@@ -66,6 +70,14 @@ const HELP_CONTENT = [
       {
         tittel: 'Legge til telefonanrop på en kjøreetappe',
         svar: 'På en kjøreetappe i ruten kan du trykke «+ Legg til anrop». Du kan velge enten en åpen oppfølging du vil ringe, eller en kontaktperson hos en bestemt kunde. Telefonnummeret blir klikkbart, så du kan ringe direkte fra mobilen.'
+      },
+      {
+        tittel: 'Åpningstider og besøkstart',
+        svar: 'Planleggeren tar hensyn til åpningstidene du har registrert på kundene. Besøk starter ikke før kunden åpner, og planleggeren avsetter ikke tid etter stenging.\n\nBesøkstart rundes alltid opp til nærmeste kvarter (15 min) etter beregnet kjøretid — slik at starttidspunktene alltid er hele kvarter (f.eks. 09:15, ikke 09:13). Dette gjelder konsekvent i både regionvisning og dagsvisning.'
+      },
+      {
+        tittel: 'Ferieplanlegging: flyankomst og hjemreise',
+        svar: 'I oppsettsskjemaet for planleggeren kan du angi fly og hotell for reisen:\n\n1. Fyll inn flyankomst: by, dato og klokkeslett.\n2. Fyll inn hjemreise: by, dato og klokkeslett.\n3. Angi hotellet du bor på under turen.\n\nPlanleggeren bruker disse opplysningene til å sette riktig start- og sluttsted per dag — du kjører fra flyplassen første dag og avslutter reisen der på siste dag.'
       }
     ]
   },
@@ -131,7 +143,87 @@ const HELP_CONTENT = [
       },
       {
         tittel: 'Legge til notat eller bilde på et besøk',
-        svar: 'På et besøk eller kundekort kan du legge til notater og bilder. Notater kan redigeres med ✏-knappen, og endringen vises alle steder notatet dukker opp.'
+        svar: 'På et besøk eller kundekort kan du legge til notater og bilder. Notater er klikkbare overalt de vises — i tidslinja, på kundekortet, i kalender-popup og andre steder. Klikker du på et notat, åpnes det i redigeringsvisning med den allerede lagrede teksten klar til endring. Redigeringer lagres og oppdateres alle steder notatet dukker opp.'
+      },
+      {
+        tittel: 'Registrere en reise (hotell, fly, leiebil, ferge)',
+        svar: 'Trykk «+ Ny aktivitet» → «Legg til reise» for å registrere en reisebooking i kalenderen.\n\nVelg blant fire typer:\n— Hotell: navn, innsjekk- og utsjekkdato\n— Fly: flyselskap, flightnummer, avreise- og ankomsttidspunkt\n— Leiebil: leveringssted, hente- og leveringstidspunkt\n— Ferge: avgangssted og avgangstidspunkt\n\nReisen vises i kalenderen med eget ikon per type. Flynummeret vises direkte på fly-boksen i kalendervisningen.\n\nDu kan også starte reiseregistrering ved å klikke på et ledig tidspunkt i dag- eller ukevisningen — velg «Reise» i dialogboksen som dukker opp.'
+      },
+      {
+        tittel: 'Redigere tidspunkt på en flyreise',
+        svar: 'Klikk på en flyreise-boks i kalenderen. Et popup åpnes der du kan endre avreisedato og -tidspunkt. Endringen lagres umiddelbart.'
+      }
+    ]
+  },
+  {
+    kategori: 'Prisliste',
+    icon: '📄',
+    artikler: [
+      {
+        tittel: 'Hva er prisliste-verktøyet?',
+        svar: 'Prisliste-verktøyet samler alle tilgjengelige prisnøkler og produktlister på ett sted, organisert per sesong. Du kan se veiledende utsalgspris og produktinformasjon for de sesongene og kjedene du har tilgang til.\n\nInterne priser (innkjøpspris, rabattsatser og nettopris) vises aldri i Kompass — kun veiledende utsalgspris.'
+      },
+      {
+        tittel: 'Sesonger og søk i prislisten',
+        svar: 'Prislister er organisert per sesong (f.eks. Vår/Sommer og Høst/Vinter). Bytt sesong med nedtrekksmenyen øverst i Prisliste-fanen.\n\nBruk søkefeltet for å finne enkeltartikler, og filtrer på kjede eller kategori for å begrense visningen.'
+      },
+      {
+        tittel: 'Laste opp prisliste (kun for administratorer)',
+        svar: 'Opplasting av prislistefiler er forbeholdt brukere med administratortilgang.\n\n1. Gå til Prisliste-fanen.\n2. Trykk «Last opp» og velg en Excel PRICAT-fil eller PDF-prisliste.\n3. Velg hvilken sesong filen tilhører.\n4. Trykk «Last opp». Filen er tilgjengelig for alle brukere med tilgang så snart opplastingen er fullført.'
+      }
+    ]
+  },
+  {
+    kategori: 'Kart og ladestasjoner',
+    icon: '⚡',
+    artikler: [
+      {
+        tittel: 'Vise ladestasjoner på kartet',
+        svar: 'Trykk ⚡-knappen øverst til venstre på kartet for å vise ladestasjoner (data fra Nobil). Trykk igjen for å skjule dem. Det samme fungerer på planlegger-kartet for enkeltdager.\n\nKun norske ladestasjoner vises — svenske og finske stasjoner filtreres alltid bort, selv på kartutsnitt som strekker seg over grensen.'
+      },
+      {
+        tittel: 'Filtrere på region og leverandør',
+        svar: 'Trykk ⚙-knappen (ved siden av ⚡) for å åpne filterpanelet.\n\nREGION: Velg et fylke for å begrense visningen til ladestasjoner i det området. Standardvalget viser alle norske fylker.\n\nLEVERANDØR: Søk i leverandørlisten, hak av de du vil se, eller bruk «Velg alle» / «Fjern alle». Bare stasjoner fra valgte leverandører vises på kartet.'
+      }
+    ]
+  },
+  {
+    kategori: 'Transport og elbil',
+    icon: '🚗',
+    artikler: [
+      {
+        tittel: 'Transport-fanen',
+        svar: 'Transport-fanen samler verktøy knyttet til kjøring og logistikk. I første omgang inneholder den ladeplanlegging for elbil — med plass til fremtidige verktøy som rutetabell for ferjer og annen transportinfo.\n\nDu finner Transport-fanen i hovedmenyen på PC og under «Mer» på mobil.'
+      },
+      {
+        tittel: 'Rekkevidde-felt på Oversikt-siden',
+        svar: '«Rekkevidde i dag (km)»-feltet på Oversikt-siden lar deg raskt registrere gjenværende rekkevidde ved dagens start. Verdien er synkronisert med Lading underveis-widgeten i Transport-fanen — endrer du rekkevidde ett sted, oppdateres den automatisk det andre stedet også.'
+      },
+      {
+        tittel: 'Lading underveis — finne nærmeste stasjon',
+        svar: 'Lading underveis-widgeten hjelper deg planlegge et ladestopp midt i arbeidsdagen.\n\n1. Skriv inn gjenværende rekkevidde i km.\n2. Widgeten finner nærmeste ladestasjon innenfor rekkevidden og viser ventet ladetid.\n3. Du ser konsekvensen for neste avtale i kalenderen.\n4. Kolliderer ladingen med en avtale, kan du velge å skyve avtalen, korte den ned eller slette den.\n\nFunksjonen er kun tilgjengelig når kjøretøytype er satt til «Elbil» i Min profil.'
+      },
+      {
+        tittel: 'Elbilinnstillinger i Min profil',
+        svar: 'For å bruke Lading underveis, sett kjøretøytype til «Elbil» i Min profil.\n\nDu kan også fylle inn to valgfrie felt som gjør beregningene mer nøyaktige:\n— Maks ladefart (kW): brukes til å beregne ventet ladetid.\n— Forbruk (kWh/100 km): brukes til å anslå reell rekkevidde.\n\nDisse verdiene finner du i bilens spesifikasjoner eller i produsentens dokumentasjon.'
+      }
+    ]
+  },
+  {
+    kategori: 'Varsler, notater og reaksjoner',
+    icon: '🔔',
+    artikler: [
+      {
+        tittel: 'Varselsenter — bjellen i banneret',
+        svar: 'Bjelle-ikonet (🔔) øverst i banneret viser varsler utledet fra aktivitet i Kompass. Antall uleste varsler vises som et tall på bjellen.\n\nTrykk på bjellen for å åpne varselsenteret. Varsler markeres som leste når du åpner dem. Her samles blant annet påminnelser om oppfølginger og relevante teamhendelser.'
+      },
+      {
+        tittel: 'Kommentarer på oppføringer',
+        svar: 'Du kan legge til kommentarer på besøk og andre oppføringer. Klikk på kommentar-ikonet på en oppføring og skriv inn kommentaren din.\n\nKommentarer er synlige for alle på teamet som har tilgang til samme oppføring.'
+      },
+      {
+        tittel: 'Emoji-reaksjoner',
+        svar: 'På besøk og oppføringer kan du reagere med emoji. Velg en emoji fra reaksjonsvelgeren — reaksjonen vises på oppføringen og er synlig for alle med tilgang til samme oppføring.'
       }
     ]
   },
@@ -150,6 +242,10 @@ const HELP_CONTENT = [
       {
         tittel: 'Hjemskjerm-ikonet på iPhone viser bare en «K»',
         svar: 'Det betyr at iPhone har mellomlagret et gammelt ikon. Fjern Kompass fra hjemskjermen, åpne siden på nytt i Safari, og legg den til på hjemskjermen igjen. Da dukker kompassrosen opp.'
+      },
+      {
+        tittel: 'Vedlikeholdsmodus (kun for administratorer)',
+        svar: 'Vedlikeholdsmodus stenger Kompass for alle vanlige brukere og viser en «Under vedlikehold»-melding. Bare administratorer kan logge inn og jobbe mens vedlikeholdsmodus er aktiv.\n\nAdministratorer slår vedlikeholdsmodus av og på under Min profil → Administrasjon.'
       },
       {
         tittel: 'Jeg trenger hjelp som ikke står her',
