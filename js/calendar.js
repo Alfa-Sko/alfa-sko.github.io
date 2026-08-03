@@ -232,7 +232,7 @@ function calAutoAddDrives(evs,key){
     const from=visits[i],to=visits[i+1];
     const ds=from.endMins,de=to.startMins;
     if(de>ds&&!evs.some(e=>e.type==='drive'&&Math.abs((e.startMins||e.h*60)-ds)<30)){
-      result.push({id:'auto-'+key+'-'+i,type:'drive-auto',auto:true,label:from.label+' → '+to.label,startMins:ds,endMins:de,mapsFrom:from.label,mapsTo:to.label});
+      result.push({id:'auto-'+key+'-'+i,type:'drive-auto',auto:true,label:'→ '+to.label,mapsTitle:from.label+' → '+to.label,startMins:ds,endMins:de,mapsFrom:from.label,mapsTo:to.label});
     }
   }
   return result;
@@ -247,7 +247,7 @@ function calLayoutOverlap(evs,HSTART,HEND){
     if(placed===-1){cols.push(e.endMins);placed=cols.length-1;}
     return{...e,_col:placed};
   });
-  result.forEach(e=>{e._cols=result.filter(o=>o.startMins<e.endMins&&o.endMins>e.startMins).reduce((m,o)=>Math.max(m,o._col+1),1);});
+  result.forEach(e=>{e._cols=result.filter(o=>o.startMins<e.endMins&&o.endMins>e.startMins).reduce((m,o)=>Math.max(m,o._col+1),e._col+1);});
   return result;
 }
 
@@ -478,7 +478,7 @@ function renderWeek(body){
       const showTime=heightPx>=24&&!isCompact;
       const showMaps=isDrive;
       const eEnc=encodeURIComponent(JSON.stringify(e));
-      html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;'+(isDrive?'padding:2px 52px 2px 5px;':'padding:2px 5px;')+'font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
+      html+='<div class="'+cc+'" draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')" onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.mapsTitle||e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 2px);width:calc('+wPct+'% - 4px);border-radius:4px;'+(isDrive?'padding:2px 52px 2px 5px;':'padding:2px 5px;')+'font-size:10px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:grab;'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
       if(showTime) html+='<span style="font-size:9px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
       if(e.type==='flight'&&e.bookingRef) html+='<span style="font-size:9px;font-weight:500;opacity:0.85;display:block">'+escapeHtml(e.bookingRef)+'</span>';
       if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:3px;right:4px;font-size:9px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.88);border-radius:3px;padding:1px 3px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
@@ -585,7 +585,7 @@ function buildDayViewHtml(key, readOnly){
     const showMaps=isDrive;
     const cursor=readOnly?'pointer':'grab';
     const dragAttrs=readOnly?'':' draggable="true" ondragstart="calEvDragStart(event,\''+key+'\',\''+eEnc+'\')" ondragend="calEvDragEnd()" ontouchstart="calEvTouchStart(event,\''+key+'\',\''+eEnc+'\')"';
-    html+='<div class="'+cc+'"'+dragAttrs+' onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;'+(isDrive?'padding:4px 80px 4px 8px;':'padding:4px 8px;')+'font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:'+cursor+';'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
+    html+='<div class="'+cc+'"'+dragAttrs+' onclick="event.stopPropagation();handleEvClick(event,\''+key+'\',\''+eEnc+'\')" title="'+(e.mapsTitle||e.label||'').replace(/"/g,'&quot;')+'" style="position:absolute;top:'+topPx+'px;height:'+heightPx+'px;left:calc('+lPct+'% + 4px);width:calc('+wPct+'% - 8px);border-radius:5px;'+(isDrive?'padding:4px 80px 4px 8px;':'padding:4px 8px;')+'font-size:12px;font-weight:600;overflow:hidden;border-left:3px solid rgba(0,0,0,0.2);z-index:3;box-sizing:border-box;cursor:'+cursor+';'+calEvDim(e)+'">'+calBookedMark(e)+emoji+' '+(e.label||'');
     if(showTime) html+='<span style="font-size:10px;font-weight:400;opacity:0.75;display:block">'+calFmt(e.startMins)+'–'+calFmt(e.endMins)+'</span>';
     if(e.type==='flight'&&e.bookingRef) html+='<span style="font-size:10px;font-weight:500;opacity:0.85;display:block">'+escapeHtml(e.bookingRef)+'</span>';
     if(showMaps){const mf=encodeURIComponent(e.mapsFrom||'');const mt=encodeURIComponent(e.mapsTo||'');html+='<a onclick="event.stopPropagation()" href="https://www.google.com/maps/dir/'+mf+'/'+mt+'" target="_blank" style="position:absolute;top:5px;right:6px;font-size:11px;color:#1565C0;white-space:nowrap;text-decoration:underline;background:rgba(255,255,255,0.9);border-radius:3px;padding:1px 4px;line-height:1.3;cursor:pointer">🗺 Maps ↗</a>';}
