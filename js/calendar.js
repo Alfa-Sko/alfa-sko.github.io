@@ -447,7 +447,6 @@ function renderWeek(body){
   html+='<div style="width:48px;flex-shrink:0;background:#F8F7F3;border-right:1px solid #D3D1C7">';
   for(let h=HSTART;h<HEND;h++){
     html+='<div style="height:60px;border-bottom:1px solid #D3D1C7;font-size:9px;color:#888780;text-align:right;padding:2px 4px 0 0;box-sizing:border-box">'+(h<10?'0':'')+h+':00</div>';
-    for(let q=1;q<4;q++){html+='<div style="height:0;border-bottom:1px dashed #ECEAE4"></div>';}
   }
   html+='</div>';
   days.forEach((d,i)=>{
