@@ -459,7 +459,7 @@ function renderWeek(body){
     const laid=calLayoutOverlap(normEvs,HSTART,HEND);
     const flex=wknd?'0 0 8%':'1';
     const totalH=totalSlots*SPX;
-    html+='<div data-calkey="'+key+'" style="flex:'+flex+';position:relative;min-width:0;height:'+totalH+'px;'+(wknd?'background:#F8F7F3;':'')+(tod?'background:rgba(25,118,210,0.025);':'')+'border-left:1px solid #D3D1C7;" ondragover="calDragOver(event,\''+key+'\',this)" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
+    html+='<div data-calkey="'+key+'" style="flex:'+flex+';position:relative;min-width:0;height:'+totalH+'px;box-sizing:border-box;'+(wknd?'background:#F8F7F3;':'')+(tod?'background:rgba(25,118,210,0.025);':'')+'border-left:1px solid #D3D1C7;" ondragover="calDragOver(event,\''+key+'\',this)" ondragleave="calDragLeave(event,\''+key+'\')" ondrop="calDrop(event,\''+key+'\',this)" onclick="calColClick(event,\''+key+'\',this)">';
     for(let s=0;s<totalSlots;s++){const isH=(s%SPH===0);html+='<div style="position:absolute;left:0;right:0;top:'+(s*SPX)+'px;border-top:1px '+(isH?'solid #D3D1C7':'dashed #ECEAE4')+';pointer-events:none"></div>';}
     html+='<div id="wkghost-'+key+'" style="display:none;position:absolute;left:2px;right:2px;background:rgba(25,118,210,0.12);border:2px dashed #1976D2;border-radius:4px;pointer-events:none;z-index:2"></div>';
     laid.forEach(e=>{
