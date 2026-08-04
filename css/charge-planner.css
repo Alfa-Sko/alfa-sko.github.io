@@ -41,12 +41,21 @@
 /* --- inndata --- */
 .cp-input-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .cp-field{flex:1;min-width:140px}
+.cp-field--provider{flex:1.15;min-width:220px}
+.cp-provider-wrap{position:relative}
+.cp-provider-list{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;display:flex;flex-direction:column;gap:4px;padding:6px;border:1px solid var(--cp-line);border-radius:9px;background:#fff;box-shadow:0 8px 24px rgba(44,44,42,.12)}
+.cp-provider-option{display:block;width:100%;text-align:left;padding:8px 9px;border:1px solid transparent;border-radius:7px;background:#fff;font:inherit;font-size:12px;color:var(--cp-ink);cursor:pointer}
+.cp-provider-option:hover{border-color:var(--cp-line);background:var(--cp-line-2)}
+.cp-provider-option--active{background:var(--cp-accent-soft);border-color:var(--cp-accent);color:var(--cp-accent)}
+.cp-provider-option--muted{color:var(--cp-ink-3);cursor:default}
+.cp-provider-option--muted:hover{background:#fff;border-color:transparent}
 .cp-label{display:block;font-size:12px;font-weight:600;color:var(--cp-ink-2);margin-bottom:6px}
 .cp-inputwrap{position:relative;display:flex;align-items:center}
 .cp-input{
   width:100%;font:inherit;font-size:14px;padding:9px 42px 9px 11px;
   border:1px solid var(--cp-line);border-radius:8px;background:#fff;color:var(--cp-ink)
 }
+.cp-input--provider{padding:9px 11px}
 .cp-input:focus-visible{outline:2px solid var(--cp-accent);outline-offset:1px;border-color:var(--cp-accent)}
 .cp-unit{position:absolute;right:11px;font-size:13px;color:var(--cp-ink-3);pointer-events:none}
 

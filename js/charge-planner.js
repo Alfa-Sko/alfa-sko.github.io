@@ -209,15 +209,117 @@ function rangeGainedKm(stationKw, minutes) {
 const state = {
   rangeKm:         45,
   origin:          null,
-  stations:        [],   // alle stasjonar innanfor rekkevidde (maks 15), ufiltrert
+  allStations:     [],   // alle stasjonar innanfor rekkevidde, før leverandørfiltrering
+  stations:        [],   // stasjonar som faktisk visast etter leverandørfiltrering
   events:          [],
   selectedStation: null,
   chargeMinutes:   30,
   plan:            null,
   opFilter:        null, // null = alle, string = berre denne leverandøren
+  providerFilter:  null, // null = alle, string = berre denne leverandøren
+  providerOptions: [],
+  providerQuery:   '',
 };
 
 const TIME_OPTIONS = [15, 30, 45, 60, 90];
+
+function normalizeProviderName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function applyProviderFilter(stations) {
+  if (!state.providerFilter) return stations;
+  const target = normalizeProviderName(state.providerFilter);
+  return stations.filter(s => normalizeProviderName(s.operator) === target);
+}
+
+function setProviderSelection(provider) {
+  state.providerFilter = provider || null;
+  state.providerQuery = '';
+  const input = $('cpProviderInput');
+  if (input) input.value = state.providerFilter || '';
+  const list = $('cpProviderList');
+  if (list) list.classList.add('cp-hidden');
+}
+
+function renderProviderOptions() {
+  const list = $('cpProviderList');
+  const input = $('cpProviderInput');
+  if (!list || !input) return;
+
+  const q = normalizeProviderName(state.providerQuery);
+  let matches = ['Nærmeste (alle leverandører)', ...state.providerOptions];
+  if (q) {
+    matches = matches.filter(opt => {
+      if (opt === 'Nærmeste (alle leverandører)') return normalizeProviderName(opt).includes(q);
+      return normalizeProviderName(opt).includes(q);
+    });
+  }
+
+  if (!matches.length) {
+    list.innerHTML = '<div class="cp-provider-option cp-provider-option--muted">Ingen leverandører funnet</div>';
+  } else {
+    list.innerHTML = matches.map(opt => {
+      const isAll = opt === 'Nærmeste (alle leverandører)';
+      const isSelected = (!state.providerFilter && isAll) || (
+        state.providerFilter && !isAll && normalizeProviderName(state.providerFilter) === normalizeProviderName(opt)
+      );
+      const value = isAll ? '' : opt;
+      return `<button type="button" class="cp-provider-option${isSelected ? ' cp-provider-option--active' : ''}" data-provider="${escapeHtml(value)}">${escapeHtml(opt)}</button>`;
+    }).join('');
+  }
+
+  list.querySelectorAll('.cp-provider-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const value = btn.dataset.provider || '';
+      setProviderSelection(value || null);
+    });
+  });
+
+  list.classList.remove('cp-hidden');
+}
+
+async function refreshProviderOptions() {
+  const input = $('cpProviderInput');
+  if (!input) return;
+  const pos = await CP.getPosition();
+  const pad = 0.9;
+  const raw = typeof nobilFetch === 'function'
+    ? await nobilFetch(pos.lat - pad, pos.lon - pad, pos.lat + pad, pos.lon + pad)
+    : [];
+  state.providerOptions = [...new Set(raw.map(s => String(s.op || '').trim()).filter(Boolean))].sort();
+  renderProviderOptions();
+}
+
+function initProviderPicker() {
+  const input = $('cpProviderInput');
+  const list = $('cpProviderList');
+  if (!input || !list) return;
+
+  input.addEventListener('focus', async () => {
+    if (!state.providerOptions.length) await refreshProviderOptions();
+    state.providerQuery = input.value;
+    renderProviderOptions();
+  });
+
+  input.addEventListener('input', () => {
+    state.providerQuery = input.value;
+    renderProviderOptions();
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !list.classList.contains('cp-hidden')) {
+      e.preventDefault();
+      const first = list.querySelector('.cp-provider-option:not(.cp-provider-option--muted)');
+      if (first) first.click();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (list.contains(e.target) || input.contains(e.target)) return;
+    list.classList.add('cp-hidden');
+  }, true);
+}
 
 /* ================================================================
    KJERNE: bygg plan og konsekvensar
@@ -316,9 +418,11 @@ function renderStations() {
   ).slice(0, 5);
 
   if (!visible.length) {
-    const msg = state.opFilter
-      ? `Ingen stasjoner fra <strong>${esc(state.opFilter)}</strong> innenfor rekkevidden. Prøv «Alle».`
-      : `Ingen ladestasjoner innenfor ${state.rangeKm} km minus 15 km reserve. Øk rekkevidden eller sjekk kartet manuelt.`;
+    const msg = state.providerFilter && !state.stations.length
+      ? `Ingen stasjoner fra <strong>${esc(state.providerFilter)}</strong> innenfor rekkevidden. Prøv «Alle leverandører».`
+      : (state.opFilter
+        ? `Ingen stasjoner fra <strong>${esc(state.opFilter)}</strong> innenfor rekkevidden. Prøv «Alle».`
+        : `Ingen ladestasjoner innenfor ${state.rangeKm} km minus 15 km reserve. Øk rekkevidden eller sjekk kartet manuelt.`);
     box.innerHTML = `<p class="cp-empty">${msg}</p>`;
     return;
   }
@@ -540,6 +644,8 @@ async function resolve(action, plan) {
 /* ================================================================
    OPPSTART — event-lyttarar
    ================================================================ */
+initProviderPicker();
+
 const findBtn  = $('cpFind');
 const rangeInp = $('cpRange');
 if (!findBtn || !rangeInp) return; // element ikkje i DOM enda
@@ -564,11 +670,11 @@ findBtn.addEventListener('click', async () => {
 
     const usable = Math.max(0, state.rangeKm - CP.reserveKm);
     state.opFilter = null; // tilbakestill leverandørfilter ved nytt søk
-    state.stations = stations
+    state.allStations = stations
       .map(s => ({ ...s, distanceKm: distanceKm(origin, s) }))
       .filter(s => s.distanceKm <= usable)
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 15); // hent fleire for å gi filtervalg mening
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+    state.stations = applyProviderFilter(state.allStations).slice(0, 15);
 
     state.selectedStation = state.stations[0] || null;
     const r = $('cpResult');
