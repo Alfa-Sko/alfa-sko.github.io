@@ -940,7 +940,7 @@ function openEvPopup(evt, dateKey, e){
         if(!_commEl) return;
         const count=rows.filter(function(r){ return r.kind==='comment'; }).length;
         if(!count){ _commEl.innerHTML=''; return; }
-        _commEl.innerHTML='<button onclick="closeEvPopup();showSection(\'timeline\')" style="border:none;background:none;padding:3px 0 0;cursor:pointer;font-size:12px;color:#0C447C;font-weight:500">💬 '+count+' kommentar'+(count===1?'':'ar')+' — sjå tidslinja →</button>';
+        _commEl.innerHTML='<button onclick="closeEvPopup();showSection(\'timeline\')" style="border:none;background:none;padding:3px 0 0;cursor:pointer;font-size:12px;color:#0C447C;font-weight:500">💬 '+count+' kommentar'+(count===1?'':'ar')+' — se tidslinjen →</button>';
       });
     }
   }

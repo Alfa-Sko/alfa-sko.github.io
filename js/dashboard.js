@@ -513,29 +513,29 @@ function renderDistrictDashboard(){
           totalOverdue,
           totalOverdue>0?totalOverdue+' krev handling':'Alt under kontroll ✓',
           totalOverdue>0?'#A23B27':'#1A7A4E',
-          'Oppfølgingar med forfallsdato passert. Klikk for å gå til oppfølging.',
+          'Oppfølginger med forfallsdato passert. Klikk for å gå til oppfølging.',
           'Oppfølgings-data',
           "showSection('oppfolging',document.querySelector('.nav-item:nth-child(7)'));")}
         ${sigCard('📈','Aktivitetstrend 90 dg',
           trendVal,
           trendSub,
           trendColor,
-          'Samanliknar aktivitetsvolum siste 45 dg mot dei 45 før. ↑ stigande · → stabil · ↓ fallande.',
+          'Sammenligner aktivitetsvolum siste 45 dg mot de 45 før. ↑ stigende · → stabil · ↓ fallende.',
           'Besøkshistorikk')}
         ${sigCard('👤','Med kontaktperson',
           withContacts+' / '+customers.length,
-          withContacts>0?withContacts+' kundar med min. 1 kontakt':'Ingen kundar har kontaktperson',
+          withContacts>0?withContacts+' kunder med min. 1 kontakt':'Ingen kunder har kontaktperson',
           withContacts>customers.length*0.5?'#1A7A4E':'#BA7517',
-          'Kundar med minst éin registrert kontaktperson. Proxy for relasjonsbygging.',
+          'Kunder med minst én registrert kontaktperson. Proxy for relasjonsbygging.',
           'Kundekort')}
         ${turnoverCards}
       </div>
 
-      ${worst.length>0?`
+        ${worst.length>0?`
       <div style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:#5F5E5A;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Kundar som treng merksemd <span style="font-weight:400;color:#B4B2A9">(klikk for å opne kundekort)</span></div>
+        <div style="font-size:11px;font-weight:700;color:#5F5E5A;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Kunder som trenger oppmerksomhet <span style="font-weight:400;color:#B4B2A9">(klikk for å åpne kundekort)</span></div>
         <div style="background:#fff;border:1px solid #E5E3DB;border-radius:8px;padding:4px 12px">${worstRows}</div>
-        ${unknownCount>0?'<div style="font-size:10px;color:#B4B2A9;margin-top:4px">● '+unknownCount+' kundar utan aktivitetsdata — vist som ukjent, ikkje dårleg helse</div>':''}
+        ${unknownCount>0?'<div style="font-size:10px;color:#B4B2A9;margin-top:4px">● '+unknownCount+' kunder uten aktivitetsdata — vist som ukjent, ikke dårlig helse</div>':''}
       </div>`:''}
 
       <div style="border-top:1px solid #E5E3DB;padding-top:12px">
@@ -547,7 +547,7 @@ function renderDistrictDashboard(){
               ${srcTag('Kjøreetappar')}
             </div>
             <div style="display:flex;gap:16px;flex-wrap:wrap">
-              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${kmMonth>0?Math.round(kmMonth)+' km':'—'}</div><div style="font-size:10px;color:#888780">Inneværande md.</div></div>
+              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${kmMonth>0?Math.round(kmMonth)+' km':'—'}</div><div style="font-size:10px;color:#888780">Inneværende md.</div></div>
               <div><div style="font-size:18px;font-weight:700;color:#5F5E5A">${kmLast30>0?Math.round(kmLast30)+' km':'—'}</div><div style="font-size:10px;color:#888780">Siste 30 dg</div></div>
             </div>
           </div>
@@ -557,7 +557,7 @@ function renderDistrictDashboard(){
               ${srcTag('Besøkshistorikk')}
             </div>
             <div style="display:flex;gap:16px;flex-wrap:wrap">
-              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${visMonth}</div><div style="font-size:10px;color:#888780">Inneværande md.</div></div>
+              <div><div style="font-size:18px;font-weight:700;color:#0C447C">${visMonth}</div><div style="font-size:10px;color:#888780">Inneværende md.</div></div>
               <div><div style="font-size:18px;font-weight:700;color:#5F5E5A">${visLast30}</div><div style="font-size:10px;color:#888780">Siste 30 dg</div></div>
             </div>
           </div>
@@ -578,7 +578,7 @@ function renderDistrictDashboard(){
 
 function openFallingList(){
   // Parkert bak HEALTH_TURNOVER_ENABLED — reaktiver når salgstall-import er på plass
-  showCustomerListModal('Kunder med fallende omsetning (ikkje aktivt)', []);
+  showCustomerListModal('Kunder med fallende omsetning (ikke aktivt)', []);
 }
 function openNewList(){
   showCustomerListModal('Nye relasjoner uten besøk', window._dashNew||[]);

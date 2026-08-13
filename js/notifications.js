@@ -38,7 +38,7 @@ async function nfBuildNotifs() {
           notifs.push({
             key:     'c:' + row.id,
             icon:    '💬',
-            text:    escapeHtml(row.author_name || 'Nokon') + ' kommenterte notatet ditt',
+            text:    escapeHtml(row.author_name || 'Noen') + ' kommenterte notatet ditt',
             ts:      row.created_at,
             nav:     'tidslinje',
             entryId: 'tl-entry-' + kind + '-' + row.target_id
@@ -47,7 +47,7 @@ async function nfBuildNotifs() {
           notifs.push({
             key:     'r:' + row.id,
             icon:    row.text || '👍',
-            text:    escapeHtml(row.author_name || 'Nokon') + ' reagerte på notatet ditt',
+            text:    escapeHtml(row.author_name || 'Noen') + ' reagerte på notatet ditt',
             ts:      row.created_at,
             nav:     'tidslinje',
             entryId: 'tl-entry-' + kind + '-' + row.target_id
@@ -200,13 +200,13 @@ async function nfMarkAllRead() {
     if (!r.ok) {
       var errTxt = ''; try { errTxt = await r.text(); } catch(_) {}
       console.error('[nf] nfMarkAllRead HTTP', r.status, errTxt);
-      showToast('Kunne ikkje merke som lest (HTTP ' + r.status + ')');
+      showToast('Kunne ikke merke som lest (HTTP ' + r.status + ')');
       return;
     }
     window._nfLastNotifs.forEach(function(n) { window._nfLastReadMap[n.key] = true; });
     nfRenderPanel(window._nfLastNotifs, window._nfLastReadMap);
     nfUpdateBadge(0);
-    showToast('Alle varsler merka som lest');
+    showToast('Alle varsler merket som lest');
   } catch(e) { console.error('[nf] nfMarkAllRead feil:', e); showToast('Feil ved merking: ' + (e.message || e)); }
 }
 

@@ -36,7 +36,7 @@ async function maintenanceToggle(){
     });
     if(!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
     _renderMaintenanceAdminUI(next);
-  }catch(e){ alert('Feil: kunne ikkje oppdatere vedlikehaldsstatus.\n'+e.message); }
+  }catch(e){ alert('Feil: kunne ikke oppdatere vedlikeholdsstatus.\n'+e.message); }
 }
 
 function _renderMaintenanceAdminUI(status){

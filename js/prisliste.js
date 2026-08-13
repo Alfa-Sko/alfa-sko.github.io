@@ -69,8 +69,8 @@ async function plLoad() {
     if (!_plActiveSeason || !_plSeasons[_plActiveSeason]) _plActiveSeason = _plPickCurrentSeason();
     _plFiltered = _plActiveSeason ? ((_plSeasons[_plActiveSeason] || {}).items || []) : [];
     _plRenderSeasons(); _plRenderMeta(); _plRender();
-  } catch (e) {
-    listEl.innerHTML = '<div style="color:#A23B27;padding:20px;font-size:13px">Kunne ikkje hente prislister: ' + escapeHtml(e.message || '') + '</div>';
+    } catch (e) {
+    listEl.innerHTML = '<div style="color:#A23B27;padding:20px;font-size:13px">Kunne ikke hente prislister: ' + escapeHtml(e.message || '') + '</div>';
     console.error('[prisliste] Load feilet:', e);
   }
 }
@@ -94,7 +94,7 @@ function _plIsCurrentSeason(key) {
 
 function plUploadClick() {
   if (!window._sbUser) { showToast('Logg inn først'); return; }
-  if (!_plIsAdmin()) { showToast('Berre administratorar kan laste opp prislistar'); return; }
+  if (!_plIsAdmin()) { showToast('Kun administratorer kan laste opp prislister'); return; }
   document.getElementById('pl-file-input').click();
 }
 
